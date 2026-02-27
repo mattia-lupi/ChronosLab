@@ -192,23 +192,13 @@ else
 
    % Filter prolongation
    tic;
-   type = param.filter.filt_type;
    np   = param.filter.np;
    wgt  = param.filter.filt_wgt;
    tol  = param.filter.filt_tol;
    if wgt < 100
       fprintf('Filtering prolongation\n');
-      switch upper(type)
-         case 'MTLB_FILT'
-            % MATLAB filtering
-            Pf = Filter_Prol(wgt,tol,TVnext,P);
-         case 'MEX_FILT'
-            % MEX filtering
-            Pf = MEX_FiltProl(np,wgt,tol,TVnext,P);
-         otherwise
-            err_msg = strcat('This kind of filtering is not supported:  ',type);
-            error(err_msg);
-      end
+      % MEX filtering
+      Pf = MEX_FiltProl(np,wgt,tol,TVnext,P);
    else
       Pf = P;
    end
@@ -263,24 +253,14 @@ else
 
    % Filter the next level operator
    tic;
-   type = param.filter.filt_type;
    tau = param.filter.filt_tau;
    np = param.filter.np;
    patt_min_flag = param.filter.min_patt;
    fprintf('Avg nnzr Anext before filtering: %f\n',nnz(Anext)/size(Anext,1));
    if tau > 0
       fprintf('Filtering next level operator\n');
-      switch upper(type)
-         case 'MTLB_FILT'
-            % MATLAB filtering
-            Anext = Filter_CoarseLev(patt_min_flag,tau,A,Anext,fcnode,Pf,TVnext);
-         case 'MEX_FILT'
-            % MEX filtering
-            Anext = MEX_FiltCLEV(np,patt_min_flag,tau,A,Anext,fcnode,Pf,TVnext);
-         otherwise
-            err_msg = strcat('This kind of filtering is not supported:  ',type);
-            error(err_msg);
-      end
+      % MEX filtering
+      Anext = MEX_FiltCLEV(np,patt_min_flag,tau,A,Anext,fcnode,Pf,TVnext);
    end
    fprintf('Avg nnzr Anext after filtering: %f\n',nnz(Anext)/size(Anext,1));
    T_FilCLev = T_FilCLev + toc;

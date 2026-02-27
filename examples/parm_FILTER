@@ -1,13 +1,5 @@
-MEX_filt                % filt_type (MTLB_filt,MEX_filt)
 10                      % np   (# of threads)
-150.0                   % weight     (prolongation filter)
+170.0                   % weight     (prolongation filter)
 0.1                     % tol        (prolongation filter)
 0.000                   % tau        (coarse operator filter)
 0                       % min_patt   (coarse operator filter)
-
-
-
-
-
-MEX_filt                % filt_type (MTLB_filt,MEX_filt)
-MTLB_filt                % filt_type (MTLB_filt,MEX_filt)
