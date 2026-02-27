@@ -1,0 +1,9 @@
+global T_smoo
+global T_tspa
+global T_coar
+global T_CR
+global T_prol
+global T_FilCLev
+global T_FilProl
+global T_LowRank
+global T_Total
