@@ -255,44 +255,9 @@ else
    end
    AMG_hrc.nupre = param.smoother.nupre;
    AMG_hrc.nupost = param.smoother.nupost;
-   if strcmp(lower(param.smoother.method),'afsai_enh')
-      F     = smootherOp.left;
-      FT    = smootherOp.right;
-      W     = smootherOp.W;
-      THETA = smootherOp.THETA;
-      omega = smootherOp.omega;
-      AMG_hrc.Minv1 = @(x) omega*(FT*(F*x) + W*(THETA*(W'*x)));
-      AMG_hrc.Minv2 = @(x) omega*(FT*(F*x) + W*(THETA*(W'*x)));
-   else
-      if smootherOp.LS_deg > 0
-         AMG_hrc.Minv1 = smootherOp.polyPrec;
-         AMG_hrc.Minv2 = smootherOp.polyPrec;
-      else
-         if strcmp(lower(param.smoother.method),'blk_j')
-            AMG_hrc.Minv1 = smootherOp.BLKJ;
-            AMG_hrc.Minv2 = smootherOp.BLKJ;
-         elseif strcmp(lower(param.smoother.method),'bafsai')
-            AMG_hrc.Minv1 = smootherOp.BAFSAI;
-            AMG_hrc.Minv2 = smootherOp.BAFSAI;
-         elseif strcmp(lower(param.smoother.method),'ddsw')
-            AMG_hrc.Minv1 = smootherOp.DDSW1;
-            AMG_hrc.Minv2 = smootherOp.DDSW2;
-         else
-            if (numel(smootherOp.left_out) + numel(smootherOp.right_out)) == 0
-               % Simple smoother
-               AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
-               AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
-            else
-               AMG_hrc.Snnz = AMG_hrc.Snnz + nnz(smootherOp.left_out) + nnz(smootherOp.right_out);
-               % Nested smoother
-               AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.right_out*...
-                                   (smootherOp.left_out*(smootherOp.left*x))));
-               AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.right_out*...
-                                   (smootherOp.left_out*(smootherOp.left*x))));
-            end
-         end
-      end
-   end
+   % Simple smoother
+   AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
+   AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
 
    %--------------------------------------------------------------------------------------
 
