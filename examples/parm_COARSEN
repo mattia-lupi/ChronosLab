@@ -1,0 +1,5 @@
+DOM               % SoC_type (AFF, CLA, CLASNY, DOM, ALG)
+-10.0             % tau (0.01 DOM, 0.5 CLA, -30 ALG)
+20                % SoC_perc (only AFF)
+1                 % nl_agg
+1                 % CR_iters

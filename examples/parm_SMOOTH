@@ -1,0 +1,22 @@
+20                    % nthread
+1                     % nupre
+1                     % nupost
+15                    % nstep
+1                     % step_size
+1.e-3                 % epsilon
+20                    % avg_nnzr
+0.005                 % tau_pref
+100                   % power
+300                   % nnzr_max
+0.01                  % tau_pref_2
+100                   % power_2
+50                    % nnzr_max_2
+1.e-5                 % tol_CGfsai
+5                     % niter_CGfsai
+0.0                   % droptol
+aggregate             % DDSW_method (aggregate/mis/mis2/mis2_nov)
+multiplicative        % DDSW_apply (multiplicative/additive)
+afsai_cpp             % method*
+
+*method options available:
+fsai_mtlb/afsai_cpp/afsai_enh/sfsai_cpp/ainv_cpp/dbafsai_cpp/dbsfsai_cpp/dbainv_cpp/afsai_nsy/fsai_fort/jacobi/blk_j/bafsai/ddsw/sgs

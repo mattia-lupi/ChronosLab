@@ -1,0 +1,7 @@
+false       % ascii_input
+unit_rhs    % rhs_build (unit_rhs, rand_rhs, unit_sol, rhs_in)
+true        % symmetric
+PCG         % solv_method (PCG, STAT_AMG, BICGSTAB, GMRES, SQMR)
+15000       % itmax
+1.e-8       % tol
+100         % restart (GMRES only)
