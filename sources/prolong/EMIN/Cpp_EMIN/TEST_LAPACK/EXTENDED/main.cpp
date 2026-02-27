@@ -1,0 +1,105 @@
+#include <iostream>  // to use: cout,endl
+#include <iomanip>
+#include <stdlib.h>  // to use: exit
+#include <fstream>   // to use: ifstream,ofstream
+#include <sstream>   // to use: stringstream
+#include <math.h>
+#include <libgen.h>  // to use: basename
+#include <chrono>    // to use: system_clock,duration
+#include "lapacke.h"  // to use: dpotrf,dpotrs
+using namespace std;
+
+#define charStrLen 2000
+
+// MAIN PROGRAM
+int main(int argc, const char* argv[]){
+
+// Check arguments
+if (argc < 2) {
+   printf("Too few arguments.\n Usage: [parm file]\n");
+   exit(1);
+}
+
+// Input matrix
+int nn, mm;
+
+// Open the input file
+ifstream fileAA(argv[1]);
+// Read header
+int k = 0;
+fileAA >> nn >> mm;
+// Allocate and read AA matrix (AA is nn x mm but it is stored by columns)
+double **AA   = (double**) malloc( nn*sizeof(double*) );
+double *AAbuf = (double*) malloc( (nn*nn)*sizeof(double) );
+for (int i = 0; i < mm; i++){
+   AA[i] = &(AAbuf[k]);
+   k += nn;
+}
+for (int i = mm; i < nn; i++){
+   AA[i] = &(AAbuf[k]);
+   k += nn;
+}
+for (int i = 0; i < nn; i++){
+   for (int j = 0; j < mm; j++) fileAA >> AA[j][i];
+}
+// Close the input fileAA
+fileAA.close();
+cout << "TSPACE read " << nn << " " << mm  << endl;
+
+FILE *ofile = fopen("MAT_IN","w");
+for (int i = 0; i < nn; i++){
+   for (int j = 0; j < mm; j++) fprintf(ofile," %15.6e",AA[j][i]);
+   fprintf(ofile,"\n");
+}
+fclose(ofile);
+
+// PROVARE A USARE SIA LAPACKE_dgeqrf_work (bloccked) che LAPACKE_dgeqrfp_work (non-blocked)
+
+double query_work_1;
+double query_work_2;
+double *work;
+double *tau;
+lapack_int ierr;
+lapack_int l_nn = static_cast<lapack_int>(nn);
+lapack_int l_mm = static_cast<lapack_int>(mm);
+lapack_int l_kk = min(l_nn,l_mm);
+
+// Query workspace
+lapack_int lwork = -1;
+ierr = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,AAbuf,l_nn,tau,&query_work_1,lwork);
+ierr = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_nn,l_kk,AAbuf,l_nn,tau,&query_work_2,lwork);
+cout << "query_work_1 " << query_work_1 << endl;
+cout << "query_work_2 " << query_work_2 << endl;
+lwork = static_cast<lapack_int>(max(query_work_1,query_work_2));
+cout << "lwork " << lwork << endl;
+
+// Allocate workspace
+tau = (double*) malloc( min(nn,mm)*sizeof(double) );
+work = (double*) malloc( lwork*sizeof(double) );
+
+// Factorize with QR
+ierr = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,AAbuf,l_nn,tau,work,lwork);
+cout << "IERR DGEQRF: " << ierr << endl;
+
+ofile = fopen("QR_OUT","w");
+for (int i = 0; i < nn; i++){
+   for (int j = 0; j < mm; j++) fprintf(ofile," %15.6e",AA[j][i]);
+   fprintf(ofile,"\n");
+}
+fclose(ofile);
+
+// Create Q
+ierr = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_nn,l_kk,AAbuf,l_nn,tau,work,lwork);
+cout << "IERR DORGQR: " << ierr << endl;
+
+ofile = fopen("QQ_OUT","w");
+for (int i = 0; i < nn; i++){
+   for (int j = 0; j < nn; j++) fprintf(ofile," %15.6e",AA[j][i]);
+   fprintf(ofile,"\n");
+}
+fclose(ofile);
+
+
+exit(0);
+
+}

@@ -1,0 +1,195 @@
+function ICHOL_wrapper(lfil,jcol_offset,nn_in,nt_in,iat_in,ja_in,coef_in,                 &
+&                      iU_out,jU_out,mat_U_out,D_inv_out) result(ierr)                    &
+&                      bind ( C, name="ICHOL_wrapper" )
+!-----------------------------------------------------------------------------------------
+!
+!  Subroutine: ICHOL_wrapper
+!
+!  Coded by Carlo Janna
+!  November 2020
+!
+!  Purpose: Receives from Cpp a diagonal block a matrix, stored as CSR (including lower
+!           part), etracts its upper part shifting column indices and transforming them
+!           from c-style to fortran style. Finally returns the upper and diagonal
+!           factors of the incomplete Cholesky factorization.
+!
+!  Variables:
+!
+!  lfil:        number of entries retained for each row of U in addition to those in A
+!  jcol_offset: column offset of local part of A with respect to global
+!
+!  ierr:        error code: 0 ---> success
+!                           1 ---> error in allocating/deallocating scratches
+!                           2 ---> error in allocating preconditioner
+!                           3 ---> zero or negative pivot encountered during factorization
+!
+!-----------------------------------------------------------------------------------------
+
+use class_precision
+use iso_c_binding, only: c_ptr, c_loc, c_f_pointer
+
+implicit none
+
+include 'Ichol_RootFree_shift_int.h'
+
+! Input variables
+integer(CB_IREG), value, intent(in)    :: lfil
+integer(CB_IREG), value, intent(in)    :: jcol_offset
+integer(CB_IREG), value, intent(in)    :: nn_in
+integer(CB_IEXT), value, intent(in)    :: nt_in
+type(C_PTR), value, intent(in)         :: iat_in
+type(C_PTR), value, intent(in)         :: ja_in
+type(C_PTR), value, intent(in)         :: coef_in
+
+! Output variables
+type(C_PTR), intent(out)               :: iU_out
+type(C_PTR), intent(out)               :: jU_out
+type(C_PTR), intent(out)               :: mat_U_out,D_inv_out
+
+! Result
+integer(CB_IREG)                       :: ierr
+
+! Pointers to store output
+integer(IEXT), pointer                 :: it_U(:)
+integer(IREG), pointer                 :: jcol_U(:)
+real(double), pointer                  :: mat_U(:),D_inv(:)
+
+! Locals
+integer(IREG)                          :: nn_A
+integer(IEXT)                          :: nt_A
+integer(IREG)                          :: i,idiag,ineg
+integer(IEXT)                          :: j,jcol,ind_A,istart_in,iend_in,iwk_U
+real(double)                           :: avg_diag,droptol,alpha,small
+integer(IEXT), pointer                 :: iat_tmp(:)
+integer(IREG), pointer                 :: ja_tmp(:)
+real(double), pointer                  :: coef_tmp(:)
+
+! Local scratches
+integer(IEXT), allocatable             :: iat_A(:)
+integer(IREG), allocatable             :: ja_A(:)
+real(double), allocatable              :: coef_A(:)
+integer(IREG), allocatable             :: U_irow_lst(:)
+integer(IEXT), allocatable             :: U_nxt_lst(:),U_end_lst(:),ind_U(:),JWI(:)
+
+!-----------------------------------------------------------------------------------------
+
+! Init error code
+ierr = 0
+
+! Convert C pointers into fortran pointers
+call c_f_pointer(iat_in,iat_tmp,[nn_in+1])
+call c_f_pointer(ja_in,ja_tmp,[nt_in])
+call c_f_pointer(coef_in,coef_tmp,[nt_in])
+
+! Allocate matrix A
+nn_A = nn_in
+nt_A = ( nt_in + nn_in ) / 2
+allocate(iat_A(nn_A+1),ja_A(nt_A),coef_A(nt_A),stat=ierr)
+if (ierr /= 0) then
+   ierr = 1
+   return
+endif
+
+! Store input matrix in A
+iend_in = iat_tmp(1) + 1
+iat_A(1) = 1
+ind_A = 1
+! Set initial diagonal index (C style)
+idiag = jcol_offset
+avg_diag = ZERO
+do i = 1,nn_A
+   istart_in = iend_in
+   iend_in = iat_tmp(i+1) + 1
+   ! Find diagonal entry
+   do while (ja_tmp(istart_in) < idiag)
+      istart_in = istart_in + 1
+   enddo
+   avg_diag = avg_diag + coef_tmp(istart_in)
+   ! Store column indices and entries
+   j_loop: do j = istart_in,iend_in-1
+      jcol = ja_tmp(j) - jcol_offset + 1
+      if (jcol > nn_A) exit j_loop
+      ja_A(ind_A) = jcol
+      coef_A(ind_A) = coef_tmp(j)
+      ind_A = ind_A + 1
+   enddo j_loop
+   iat_A(i+1) = ind_A
+   ! Increase diagonal index
+   idiag = idiag + 1
+enddo
+avg_diag = avg_diag / real(nn_A,double)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!if (jcol_offset == 682464) then
+!   write(*,*) 'DENTRO TAGLIA',nn_A
+!   do i = 1,nn_A
+!      do j = iat_A(i),iat_A(i+1)-1
+!         write(777,'(2i10,e20.11)') i,ja_A(j),coef_A(j)
+!      enddo
+!   enddo
+!endif
+!write(777,*)'-----------------------'
+!call flush(777)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Set some parameters for preconditioner computation
+droptol = 1.d-10
+droptol = ZERO
+alpha = ZERO
+small = ZERO    !1.d-17*avg_diag
+iwk_U = nt_A + nn_A * (lfil+1)
+
+! Allocate scratches
+allocate(U_irow_lst(iwk_U+nn_A),U_nxt_lst(iwk_U+nn_A),U_end_lst(nn_A),ind_U(nn_A),        &
+&        JWI(nn_A),stat=ierr)
+if (ierr /= 0) then
+   ierr = 1
+   return
+endif
+! Allocate room for preconditioner
+allocate(it_U(nn_A+1),jcol_U(iwk_U),mat_U(iwk_U),D_inv(nn_A),stat=ierr)
+if (ierr /= 0) then
+   ierr = 2
+   return
+endif
+
+! Compute Incomplete Cholesky Factorization
+call Ichol_RootFree_shift(nn_A,nt_A,lfil,droptol,alpha,small,iat_A,ja_A,coef_A,iwk_U,     &
+&                         it_U,jcol_U,mat_U,D_inv,U_irow_lst,U_nxt_lst,U_end_lst,ind_U,   &
+&                         JWI,ineg,ierr)
+if (ierr /= 0) then
+   write(*,*) 'ERROR IN CHOLESKY FACT ineg: ',ineg
+   write(*,*) 'ERROR IN CHOLESKY FACT: ',ierr
+   ierr = 3
+   return
+endif
+
+! Modify indexing of it_U and jcol_U
+do i = 1,nn_A+1
+   it_U(i) = it_U(i) - 1
+enddo
+do i = 1,it_U(nn_A+1)
+   jcol_U(i) =jcol_U(i) - 1
+enddo
+
+! Deallocate scratches
+deallocate(U_irow_lst,U_nxt_lst,U_end_lst,ind_U,JWI,stat=ierr)
+if (ierr /= 0) then
+   ierr = 1
+   return
+endif
+
+! Deallocate A
+deallocate(iat_A,ja_A,coef_A,stat=ierr)
+if (ierr /= 0) then
+   ierr = 1
+   return
+endif
+
+! Convert fortran pointers into c pointer before return
+iU_out = c_loc(it_U)
+jU_out = c_loc(jcol_U)
+mat_U_out = c_loc(mat_U)
+D_inv_out = c_loc(D_inv)
+
+end function ICHOL_wrapper

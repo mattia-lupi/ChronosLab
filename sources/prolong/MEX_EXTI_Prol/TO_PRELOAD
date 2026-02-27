@@ -1,0 +1,2 @@
+export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/4.8/libgomp.so
+export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/5/libgomp.so    <---- Per Bender

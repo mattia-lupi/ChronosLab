@@ -1,0 +1,69 @@
+//////////////////////////////
+#include <stdlib.h>
+#include <stdio.h>
+//////////////////////////////
+#include "omp.h"
+
+void icholRF_apply(const int np, const int nblk, const int* __restrict__ pt_blk,
+                   const int* __restrict__ iU, const int* __restrict__ jU,
+                   const double* __restrict__ coef_U, const double* __restrict__ D_inv,
+                   const double* __restrict__ vec, double* __restrict__ pvec){
+
+   /////////////////////////////////
+   FILE *of1 = fopen("V1","w");
+   FILE *of2 = fopen("V2","w");
+   FILE *of3 = fopen("V3","w");
+   FILE *of4 = fopen("V4","w");
+   /////////////////////////////////
+   #pragma omp parallel for num_threads(np)
+   for (int iblk = 0; iblk < nblk; iblk++){
+      int firstrow = pt_blk[iblk];
+      int lastrow = pt_blk[iblk+1];
+
+      // Initialize pvec
+      for (int i = firstrow; i < lastrow; i++) pvec[i] = 0.0;
+
+      ////////////////////////////////////////////
+      for (int i = firstrow; i < lastrow; i++) fprintf(of1,"%20.11e\n",vec[i]);
+      ////////////////////////////////////////////
+      // Forward substitution
+      int iend = iU[firstrow];
+      for (int k = firstrow; k < lastrow; k++){
+         int istart = iend;
+         iend = iU[k+1];
+         pvec[k] = vec[k] - pvec[k];
+         for (int m = istart; m < iend; m++) pvec[jU[m]] += coef_U[m]*pvec[k];
+      }
+      ////////////////////////////////////////////
+      for (int i = firstrow; i < lastrow; i++) fprintf(of2,"%20.11e\n",pvec[i]);
+      ////////////////////////////////////////////
+
+      // Scale by D_inv
+      for (int i = firstrow; i < lastrow; i++) pvec[i] *= D_inv[i];
+      ////////////////////////////////////////////
+      for (int i = firstrow; i < lastrow; i++) fprintf(of3,"%20.11e\n",pvec[i]);
+      ////////////////////////////////////////////
+
+      // Backward substitution
+      iend = iU[lastrow];
+      for (int k = lastrow-1; k >= firstrow; k--){
+         int istart = iend-1;
+         iend = iU[k];
+         double a = 0.0;
+         for (int m = istart; m >= iend; m--) a += coef_U[m]*pvec[jU[m]];
+         pvec[k] -= a;
+      }
+      ////////////////////////////////////////////
+      for (int i = firstrow; i < lastrow; i++) fprintf(of4,"%20.11e\n",pvec[i]);
+      ////////////////////////////////////////////
+
+   }
+   /////////////////////////////////////
+   fclose(of1); 
+   fclose(of2); 
+   fclose(of3); 
+   fclose(of4); 
+   exit(0);
+   ////////////////////////////////////////////
+
+}

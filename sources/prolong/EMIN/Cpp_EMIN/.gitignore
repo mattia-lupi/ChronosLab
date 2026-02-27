@@ -1,0 +1,5 @@
+*.o
+gather_col.cpp.sav
+a.out
+lapack
+Example
