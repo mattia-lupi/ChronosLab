@@ -31,7 +31,7 @@ switch lower(method)
         if numel(irow) > 0
            if verb
               fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
-           fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
+           end
         end
         for i = 1:numel(irow)
            ii = irow(i);
@@ -47,7 +47,7 @@ switch lower(method)
         lambda = eigs(FAFT,size(A,1),1,'la',opts);
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
-        fprintf('Max Lambda: %10.4f\n',lambda);
+        end
         omega = min(1,1.9 / lambda);
         % Append the smoother
         smootherOp.left = F;
@@ -58,7 +58,7 @@ switch lower(method)
     case 'afsai_nsy'
         if verb
            fprintf('Non-Symmetric AFSAI is used\n');
-        fprintf('Non-Symmetric AFSAI is used\n');
+        end
         % Set-up AFSAI_NSY (afsai for nsy systems with mex-cpp code)
         [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A);
         % Compute damping parameter
@@ -83,7 +83,7 @@ switch lower(method)
 	     F = diag(sparse(F));
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
-        opts.issym = 1;
+        % opts.issym = 1;
         if true
            lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
                          'Tolerance',1.e-2,'Display',1,'FailureTreatment','keep');

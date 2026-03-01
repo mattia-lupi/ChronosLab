@@ -1,10 +1,10 @@
-function patt_out = drop_patt(nnzr,patt_in,patt_0);
+function patt_out = drop_patt(nnzr,patt_in,patt_0)
 
 [nrows,ncols] = size(patt_in);
 
 % Use patt_0 to avoid dropping original entries
 fac = 1.000*max(max(abs(patt_in)));
-[ii,jj,pp] = find(patt_0);
+[ii,jj,~] = find(patt_0);
 pp = fac;
 patt_0 = sparse(ii,jj,pp,nrows,ncols);
 

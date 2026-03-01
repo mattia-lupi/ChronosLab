@@ -1,4 +1,4 @@
-function [vec, val, iter, resid] = Arnoldi(V0,ProdMat,m,ntv,dual_orth,verb)
+function [vec, val, iter, resid] = Arnoldi(V0,ProdMat,m,ntv,dual_orth,~)
 
 n = size(V0,1);
 H = zeros(m);

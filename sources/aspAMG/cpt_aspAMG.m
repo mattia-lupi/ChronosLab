@@ -336,7 +336,7 @@ else
       fprintf('\n');
    end
    % Compute next level of the hierarchy
-   AMG_hrc.next = REC_cpt_aspAMG(level,param,Anext,TVnext);
+   AMG_hrc.next = REC_cpt_aspAMG(level,param,Anext,TVnext,verb);
 
 end
 

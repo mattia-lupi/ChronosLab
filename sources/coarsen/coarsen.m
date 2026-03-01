@@ -49,7 +49,7 @@ switch upper(SoC_type)
       [S,S_patt] = cpt_SoC_nsyCla(tau,A,verb);
    case 'DOM'
       % Compute strength of connections based on diagonal dominance
-      [S,S_patt] = cpt_SoC_dom(tau,A);
+      [S,S_patt] = cpt_SoC_dom(tau,A,verb);
    case 'ALG'
       % Compute strength of connections based on diagonal dominance
       [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A,verb);
@@ -67,7 +67,7 @@ if verb
 end
 
 % Compute the Maximum Independent Set
-[fcnode, clist, flist] = cpt_PMIS(S, fcnode);
+[fcnode, clist, flist] = cpt_PMIS(S, fcnode,verb);
 
 if verb
    fprintf('# of Dirichlet nodes: %10d\n',ndir);

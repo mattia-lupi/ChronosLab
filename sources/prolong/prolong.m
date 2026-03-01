@@ -1,6 +1,6 @@
 function [P,clist,fcnode,emin_info] = prolong(two_stg_prol,level,symm_flag,param,...
                                               clist,fclist,...
-                                              fflist,fcnode,S,S_patt,smootherOp,A,TV,verb);
+                                              fflist,fcnode,S,S_patt,smootherOp,A,TV,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Main driver for the prolongation set-up
@@ -239,7 +239,7 @@ if strcmpi(prol_emin,'EMIN')
 end
 
 % Store in structure
-if strcmp(upper(prol_emin),'EMIN');
+if strcmpi(prol_emin,'EMIN')
    emin_info.time_gath_K   = info(1);
    emin_info.time_prec_K   = info(2);
    emin_info.time_gath_B   = info(3);

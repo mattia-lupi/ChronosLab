@@ -15,7 +15,7 @@ function TV_out = cpt_initApp(k_type,FT,TV_in,verb)
 %
 %-----------------------------------------------------------------------------------------
 if nargin < 4
-   verb = 1
+   verb = 1;
 end
 if k_type == 0
    TV_out = FT\TV_in;

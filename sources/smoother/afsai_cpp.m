@@ -20,8 +20,8 @@ function F = afsai_cpp(M,nthread,nstep,step_size,eps)
 
 
 % Unpack the Master matrix
-nrows_M = size(M,1);
-nterm_M = nnz(M);
+% nrows_M = size(M,1);
+% nterm_M = nnz(M);
 [iat_M,ja_M,coef_M] = unpack_csr(M);
 
 
@@ -53,7 +53,7 @@ tau = 0.;
 % Create a sparse matrix for the FSAI
 irow_G = zeros(nterm_G,1);
 iend   = iat_G(1)-1;
-for i = 1:nrows_M;
+for i = 1:nrows_M
      istart = iend + 1;
      iend = iat_G(i+1)-1;
      irow_G(istart:iend) = i;

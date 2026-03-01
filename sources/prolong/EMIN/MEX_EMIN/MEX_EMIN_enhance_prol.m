@@ -1,4 +1,4 @@
-function [Pout,info] = MEX_EMIN_enhance_prol(level,param,A,Ppatt,Pin,TV,fcnode)
+function [Pout,info] = MEX_EMIN_enhance_prol(level,param,A,Ppatt,Pin,TV,fcnode,verb)
 
 %-----------------------------------------------------------------------------------------
 %

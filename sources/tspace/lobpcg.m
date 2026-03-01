@@ -85,7 +85,7 @@ end
 % Check failure in B-orthonormalization
 if isempty(blockX)
    fprintf('Initial approximation is not full-rank\n');
-   ierr = 1
+   ierr = 1;
 end
 
 % Compute initial Ritz vectors

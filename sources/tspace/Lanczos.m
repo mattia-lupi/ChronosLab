@@ -13,7 +13,7 @@
 % id_conv  : convergece estimator
 %
 
-function [vec,val,iter,resid] = Lanczos(V0,ProdMat,m,ntv,verb)
+function [vec,val,iter,resid] = Lanczos(V0,ProdMat,m,ntv,~)
 
 % Compress input test space
 startvec = sum(V0,2);
@@ -46,7 +46,7 @@ for k = 1:m
       anorm = abs( a(1)+b(1) );
    else
       anorm = max( anorm, b(k-1)+abs(a(k))+b(k) );
-   end;
+   end
 end
 
 % Compute eigenpairs of the tridiagonal matrix

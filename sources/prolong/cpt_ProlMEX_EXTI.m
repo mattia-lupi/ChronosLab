@@ -22,8 +22,8 @@ np        = params.np;
 
 % Unpack the SoC matrix
 nn_S = size(mat_S,1);
-nt_S = nnz(mat_S);
-[iat_S,ja_S,coef_S] = unpack_csr(mat_S);
+% nt_S = nnz(mat_S);
+[~,~,coef_S] = unpack_csr(mat_S);
 
 % Unpack the system matrix
 nn_A = size(mat_A,1);
@@ -31,7 +31,7 @@ nt_A = nnz(mat_A);
 [iat_A,ja_A,coef_A] = unpack_csr(mat_A);
 
 % Unpack the system matrix compressed
-nt_A_comp = nnz(mat_A_comp);
+% nt_A_comp = nnz(mat_A_comp);
 [iat_A_comp,ja_A_comp,coef_A_comp] = unpack_csr(mat_A_comp);
 
 % Create vecstart

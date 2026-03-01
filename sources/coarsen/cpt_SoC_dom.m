@@ -1,4 +1,4 @@
-function [S,S_patt] = cpt_SoC_cla(tau,A,verb)
+function [S,S_patt] = cpt_SoC_dom(tau,A,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to compute strength of connection based on diagonal dominance
