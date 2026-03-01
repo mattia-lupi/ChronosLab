@@ -45,14 +45,14 @@ class linsol_error{
    /**
     * @brief Print error message.
     */
-   linsol_error(const string __restrict__ function_name,
-                const string __restrict__ error_message);
+   linsol_error(const string function_name,
+                const string error_message);
 
    /**
     * @brief Print memory error message.
     */
-   linsol_error(const string __restrict__ function_name,
-                const string __restrict__ error_message,
+   linsol_error(const string function_name,
+                const string error_message,
                 unsigned long int nbytes_requested);
 
 };

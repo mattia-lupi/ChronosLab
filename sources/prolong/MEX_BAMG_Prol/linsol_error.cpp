@@ -10,8 +10,8 @@ using namespace std;
 /**
  * @brief Print error message.
  */
-linsol_error::linsol_error(const string __restrict__ function_name,
-                           const string __restrict__ error_message) {
+linsol_error::linsol_error(const string function_name,
+                           const string error_message) {
 
    cout << "FUNCTION: " << function_name << " - ERROR: " << error_message << endl;
 
@@ -22,8 +22,8 @@ linsol_error::linsol_error(const string __restrict__ function_name,
 /**
  * @brief Print memory error message.
  */
-linsol_error::linsol_error(const string __restrict__ function_name,
-                           const string __restrict__ error_message,
+linsol_error::linsol_error(const string function_name,
+                           const string error_message,
                            unsigned long int nbytes_requested) {
 
    #pragma omp critical (error_print)

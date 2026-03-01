@@ -1,6 +1,6 @@
 FC            = gfortran
-FFLAGS        = -O2 -fopenmp -mcmodel=medium -fPIC
-DFFLAGS       = -fopenmp -mcmodel=medium -fPIC -fbacktrace
+FFLAGS        = -O2 -fopenmp -fPIC
+DFFLAGS       = -fopenmp -fPIC -fbacktrace
 ARFLAGS	      = 
 
 CFLAGS	      =
@@ -53,6 +53,7 @@ all:		$(LIBRARY)
 $(LIBRARY):	$(OBJS)
 		@echo "Loading $(LIBRARY) ..."
 		@ar $(ARFLAGS) cr $(LIBRARY) $(OBJS)
+		@ranlib $(LIBRARY)
 		@echo "done"
 
 debug:;		@make "FFLAGS=$(DFFLAGS) -g -C" $(LIBRARY)
