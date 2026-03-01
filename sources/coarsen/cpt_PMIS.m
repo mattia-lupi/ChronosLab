@@ -1,4 +1,4 @@
-function [fcnode, clist, flist] = cpt_PMIS(S, fcnode)
+function [fcnode, clist, flist] = cpt_PMIS(S, fcnode,verb)
 
 %  0 --> not assigned
 % -1 --> FINE
@@ -97,7 +97,9 @@ while len_list > 0
 
 end
 time = toc;
-fprintf('Time for MIS: %f\n',time);
+if verb
+   fprintf('Time for MIS: %f\n',time);
+end
 
 % Count and number coarse nodes
 nc = 0;

@@ -4,7 +4,7 @@
 %
 %-----------------------------------------------------------------------------------------
 
-function [x,flag,relres,iter,resvec] = gmres_RIGHT(A,b,restart,tol,maxit,M1,M2,x,varargin)
+function [x,flag,relres,iter,resvec] = gmres_RIGHT(A,b,restart,tol,maxit,M1,M2,x,verb,varargin)
 %GMRES   Generalized Minimum Residual Method.
 %   X = GMRES(A,B) attempts to solve the system of linear equations A*X = B
 %   for X.  The N-by-N coefficient matrix A must be square and the right
@@ -134,6 +134,11 @@ if (nargin < 5) || isempty(maxit)
     end
 end
 maxit = max(maxit, 0);
+
+
+if nargin < 9
+   verb = true;
+end
 
 if restarted
     outer = maxit;
@@ -392,6 +397,13 @@ for outiter = 1 : outer
         
         normr = abs(w(initer+1)); %@@@@@@ OK NEL CASO LEFT E NON PREC, VALE ANCHE PER RIGHT
         resvec((outiter-1)*inner+initer+1) = normr;
+        %@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        if mod((outiter-1)*inner+initer+1,10) == 0
+           if verb
+              fprintf('%5d %15.6e\n',(outiter-1)*inner+initer+1,normr);
+           end
+        end
+        %@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         normr_act = normr;
         
         if (normr <= tolb || stag >= maxstagsteps || moresteps)

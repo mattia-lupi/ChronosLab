@@ -91,8 +91,8 @@ nn_I = double(nn_I);
 nc_I = double(nc_I);
 mat_I = sparse(irow_I,ja_I,coef_I,nn_I,nc_I);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fprintf('max irow: %d %d\n',max(irow_I))
-fprintf('size(mat_I): %d %d\n',size(mat_I))
+%fprintf('max irow: %d %d\n',max(irow_I))
+%fprintf('size(mat_I): %d %d\n',size(mat_I))
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 return

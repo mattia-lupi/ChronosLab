@@ -22,7 +22,7 @@
 %
 %-----------------------------------------------------------------------------------------
 
-function [Zk,qk,iter,resid] = SRQCG(V0,ProdMat,itmax,tol,ritz_freq)
+function [Zk,qk,iter,resid] = SRQCG(V0,ProdMat,itmax,tol,ritz_freq,verb)
 
 % Get dimensions
 [nn,mm] = size(V0);
@@ -62,7 +62,9 @@ while NRM_res > tol && iter < itmax
 
    iter = iter + 1;
    if mod(iter,floor(itmax/10)) == 0
-      fprintf('SRQCG iter %5d out of %5d | NRM_res: %15.6e\n',iter,itmax,NRM_res)
+      if verb
+         fprintf('SRQCG iter %5d out of %5d | NRM_res: %15.6e\n',iter,itmax,NRM_res)
+      end
    end
    APk = ProdMat(Pk);
    for i = 1:mm

@@ -150,7 +150,7 @@ switch lower(method)
       V0 = rand(size(A,1),neig);
       ProdMat = @(x) A*x;
       ritz_freq = 1;
-      [Zk,qk,iter,resid] = NG_SRQCG(V0,ProdMat,PREC_apply,itmax,tol,ritz_freq);
+      [eigV,eigS,iter,resid] = NG_SRQCG(V0,ProdMat,PREC_apply,itmax,tol,ritz_freq);
       fprintf('END: Eigenvalue with SRQCG\n\n');
       tot_iter = iter*neig;
 
@@ -160,10 +160,17 @@ switch lower(method)
       V0 = rand(size(A,1),neig);
       ProdMat = @(x) A*x;
       ritz_freq = 1;
+
       % Load the space for deflation
-      load DEFL_SPACE;
-      [Zk,qk,iter,resid] = DEFL_SRQCG(V0,ProdMat,PREC_apply,itmax,tol,ritz_freq,VV);
-      fprintf('END: Eigenvalue with SRQCG\n\n');
+      if isfile('DEFL_SPACE.mat')
+         load DEFL_SPACE;
+      else
+         fprintf("\nThis function requires the deflation space to work\n");
+         return;
+      end
+
+      [eigV,eigS,iter,resid] = DEFL_SRQCG(V0,ProdMat,PREC_apply,itmax,tol,ritz_freq,YY);
+      fprintf('END: Eigenvalue with Deflated SRQCG\n\n');
       tot_iter = iter*neig;
 
     case 'lanczos'
@@ -175,23 +182,29 @@ switch lower(method)
       fprintf('BEGIN: Eigenvalue with LANCZOS\n');
       % Define application of the inverse
       Ainv = @(x) SolvePCG(A,PREC_apply,x,1000,1.e-8);
-      [V,D] = eigs(Ainv,size(A,1),neig,'lm','Display',1);
+      [eigV,eigS] = eigs(Ainv,size(A,1),neig,'lm','Display',1);
+      eigS = diag(eigS);
       fprintf('END: Eigenvalue with LANCZOS\n\n');
       iter = count;
 
     case 'lobpcg'
 
       largest_flag = false;
-      restartControl = 20;
+      restartControl = 7;
       prodA = @(x) A*x;
       prodB = [];
-      Y = [];
-      load DEFL_SPACE;
-      V0 = rand(size(A,1),neig);
       fprintf('BEGIN: Eigenvalue with LOBPCG\n');
+      if isfile('DEFL_SPACE.mat')
+         load DEFL_SPACE;
+      else
+         YY = [];
+      end
+         
+      X0 = rand(size(A,1),neig);
+
       % Define application of the inverse
-      [iter,D,V,resnorm_vec,lambda_vec,ierr] =...
-             lobpcg(prodA,prodB,PREC_apply,Y,V0,largest_flag,...
+      [iter,eigS,eigV,resnorm_vec,lambda_vec,ierr] =...
+             lobpcg(prodA,prodB,PREC_apply,YY,X0,largest_flag,...
                     reslambda_check,itmax,tol,restartControl);
       fprintf('END: Eigenvalue with LOBPCG\n\n');
       tot_iter = iter*neig;
@@ -213,6 +226,17 @@ fprintf('# of matvet applications:   %15d\n',tot_iter);
 fprintf('\n');
 fprintf('Preconditioner time: %10.2f\n',T_prec);
 fprintf('EigenSolver time:    %10.2f\n',T_iter);
+
+fprintf('\n');
+for i = 1:neig
+    fprintf('Eigenvalue (%d): %12.6f\n', i, eigS(i,1));
+end
+
+if(isfile('DEFL_SPACE.mat'))
+   YY = [YY eigV];
+   % Save the eigenvectors to use them as a deflation space
+   save("DEFL_SPACE","YY");
+end
 
 return
 % Print results in a file
@@ -246,6 +270,11 @@ fprintf(ofile,'Coarsening time:   %10.2f\n',T_coar);
 fprintf(ofile,'Comp. Relax. time: %10.2f\n',T_CR);
 fprintf(ofile,'Prolongation time: %10.2f\n',T_prol);
 fprintf(ofile,'Iteration time:    %10.2f\n',T_iter);
+
+fprintf('\n');
+for i = 1:neig
+    fprintf(ofile,'Eigenvalue (%d): %12.6f\n', i, D(i,1));
+end
 
 % Print report on EMIN
 if strcmp(upper(param.prolong.prol_emin),'MEX_EMIN');

@@ -1,4 +1,4 @@
-function [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A)
+function [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to compute strength of connection based on algebraic distance
@@ -19,7 +19,9 @@ function [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A)
 
 global DEBINFO
 
-fprintf('Computing SoC\n')
+if verb
+   fprintf('Computing SoC\n')
+end
 
 % Generare a random vector
 nn = size(A,1);
@@ -30,11 +32,15 @@ k = 50;
 Minv = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
 nrm_0 = norm(x);
 nrm_old = nrm_0;
-fprintf('Computing Algebraic Distance SoC\n');
-fprintf('%4s   %12s\n','iter','res_norm');
+if verb
+   fprintf('Computing Algebraic Distance SoC\n');
+   fprintf('%4s   %12s\n','iter','res_norm');
+end
 for i = 1:k
    x = x - Minv(A*x);
-   fprintf('%3d   %12.3e %12.3e\n',i,norm(x)/nrm_0,norm(x)/nrm_old);
+   if verb
+      fprintf('%3d   %12.3e %12.3e\n',i,norm(x)/nrm_0,norm(x)/nrm_old);
+   end
    nrm_old = norm(x);
 end
 
@@ -42,10 +48,12 @@ end
 [ii,jj,ss] = find(A);
 ss = 1 - abs( x(ii) - x(jj) ) ./ max( abs(x(ii)),abs(x(jj)) );
 
-fprintf('End Computing SoC\n')
+if verb
+   fprintf('End Computing SoC\n')
 
-fprintf('Filtering SoC\n')
-fprintf('Average NNZR before filtering: %f\n',nnz(A)/size(A,1))
+   fprintf('Filtering SoC\n')
+   fprintf('Average NNZR before filtering: %f\n',nnz(A)/size(A,1))
+end
 if tau >= 0
    sf = ss;
    sf(sf <= tau)=0;
@@ -66,13 +74,17 @@ else
    ss(ncut+1:end) = -1;
    S_patt = sparse(ii,jj,ss);
 end
-fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
-fprintf('End Filtering SoC\n')
+if verb
+   fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
+   fprintf('End Filtering SoC\n')
+end
 %save('SSS','S','S_patt');
 
 nn = size(S,1);
-fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
-fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+if verb
+   fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
+   fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+end
 
 %if DEBINFO.coarsen.draw_dist
 %   % Draw SoC distribution

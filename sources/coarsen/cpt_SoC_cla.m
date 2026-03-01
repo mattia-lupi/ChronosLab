@@ -1,4 +1,4 @@
-function [S,S_patt] = cpt_SoC_cla(tau,A)
+function [S,S_patt] = cpt_SoC_cla(tau,A,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to compute classical strength of connection.
@@ -17,7 +17,9 @@ function [S,S_patt] = cpt_SoC_cla(tau,A)
 
 global DEBINFO
 
-fprintf('Computing SoC\n')
+if verb
+   fprintf('Computing SoC\n')
+end
 
 % Get the minimum value of each column
 min_col = full(min(A-diag(diag(A))))';
@@ -29,9 +31,12 @@ min_col(min_col==0) = 1;
 [ii,jj,aa] = find(A);
 ss = aa ./ max(min_col(ii),min_col(jj));
 
-fprintf('End Computing SoC\n')
+if verb
+   fprintf('End Computing SoC\n')
 
-fprintf('Filtering SoC\n')
+   fprintf('Filtering SoC\n')
+end
+
 sf = ss;
 sf(sf <= tau) = 0;
 S = sparse(ii,jj,sf);
@@ -39,8 +44,10 @@ sp = ss;
 sp(ss <= tau)=-1;
 sp(ss >  tau)=1;
 S_patt = sparse(ii,jj,sp);
-fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
-fprintf('End Filtering SoC\n')
+if verb
+   fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
+   fprintf('End Filtering SoC\n')
+end
 
 % Complete the matrix with a unitary diagonal
 nn = size(S,1);
@@ -48,9 +55,10 @@ S = S + speye(nn);
 S_patt = S_patt - diag(diag(S_patt)) + speye(nn);
 %save('SSS','S','S_patt');
 
-fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
-fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
-
+if verb
+   fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
+   fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+end
 
 if DEBINFO.coarsen.draw_dist
    % Draw SoC distribution

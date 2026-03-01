@@ -1,6 +1,6 @@
 function [P,clist,fcnode,emin_info] = prolong(two_stg_prol,level,symm_flag,param,...
                                               clist,fclist,...
-                                              fflist,fcnode,S,S_patt,smootherOp,A,TV);
+                                              fflist,fcnode,S,S_patt,smootherOp,A,TV,verb);
 %-----------------------------------------------------------------------------------------
 %
 % Main driver for the prolongation set-up
@@ -25,6 +25,9 @@ function [P,clist,fcnode,emin_info] = prolong(two_stg_prol,level,symm_flag,param
 % emin_info:    some detailed info on EMIN computation
 %
 %-----------------------------------------------------------------------------------------
+if nargin < 14
+   verb = 1;
+end
 
 % Compute prolongation
 nc = numel(clist);
@@ -33,11 +36,15 @@ if ~two_stg_prol
    switch upper(param.prolong.proltype)
       case 'BAMG'
          [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
-         fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+         if verb 
+            fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+         end
          %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
          if sum(c_mark) > 0
             if param.prolong.updateCF == 1
-               fprintf('Update the coarse nodes only\n');
+               if verb
+                  fprintf('Update the coarse nodes only\n');
+               end
                % Update coarsening
                ind_new = find(c_mark==1);
                n_add = numel(ind_new);
@@ -51,7 +58,9 @@ if ~two_stg_prol
                nc = nc + n_add;
                clist = [clist; ind_new];
             elseif param.prolong.updateCF == 2
-               fprintf('Update the coarse nodes and recompute prolongation\n');
+               if verb
+                  fprintf('Update the coarse nodes and recompute prolongation\n');
+               end
                % Update coarsening
                fcnode(fcnode>0) = 1;
                fcnode(fcnode<0) = 0;
@@ -63,7 +72,9 @@ if ~two_stg_prol
                clist = find(fcnode>0);
                % Recompute prolongation
                [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
-               fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+               if verb
+                  fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+               end
             elseif (param.prolong.updateCF ~= 0)
                error('Wrong value of updateCF: %d\n',updateCF);
             end
@@ -71,8 +82,10 @@ if ~two_stg_prol
          %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
          v = vecnorm(P');
          [amax,ind] = max(v);
-         fprintf('Max row norm: %15.6e\n',full(amax));
-         fprintf('On row:       %d\n',ind);
+         if verb
+            fprintf('Max row norm: %15.6e\n',full(amax));
+            fprintf('On row:       %d\n',ind);
+         end
       case 'CLAS'
          [P] = cpt_ProlMEX_Classical(param.prolong,nc,fcnode,S_patt,A);
       case 'HYBC'
@@ -94,11 +107,15 @@ else
    switch upper(param.prolong.proltype)
       case 'BAMG'
          [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
-         fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+         if verb
+            fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+         end
          %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
          if sum(c_mark) > 0
             if param.prolong.updateCF == 1
-               fprintf('Update the coarse nodes only\n');
+               if verb
+                  fprintf('Update the coarse nodes only\n');
+               end
                % Update coarsening
                ind_new = find(c_mark==1);
                n_add = numel(ind_new);
@@ -112,7 +129,9 @@ else
                nc = nc + n_add;
                clist = [clist; ind_new];
             elseif param.prolong.updateCF == 2
-               fprintf('Update the coarse nodes and recompute prolongation\n');
+               if verb
+                  fprintf('Update the coarse nodes and recompute prolongation\n');
+               end
                % Update coarsening
                fcnode(fcnode>0) = 1;
                fcnode(fcnode<0) = 0;
@@ -124,7 +143,9 @@ else
                clist = find(fcnode>0);
                % Recompute prolongation
                [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
-               fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+               if verb
+                  fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
+               end
             elseif (param.prolong.updateCF ~= 0)
                error('Wrong value of updateCF: %d\n',updateCF);
             end
@@ -132,63 +153,89 @@ else
          %++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
          v = vecnorm(P');
          [amax,ind] = max(v);
-         fprintf('Max row norm: %15.6e\n',full(amax));
-         fprintf('On row:       %d\n',ind);
+         if verb
+            fprintf('Max row norm: %15.6e\n',full(amax));
+            fprintf('On row:       %d\n',ind);
+         end
       case 'EXTI'
          [P] = cpt_TwoStageProlMEX_ExtI(param.prolong,clist,fclist,fflist,A,S_patt);
       otherwise
-         err_msg = [param.prolong.proltype...
-                   'is not a valid key for prolongation with aggressive coarsening'];
+         err_msg = [char(param.prolong.proltype)...
+                   ' is not a valid key for prolongation with aggressive coarsening'];
          error(err_msg);
    end
 end
-fprintf('Number of nonzeroes per row in P: %f\n',(nnz(P)-size(P,2))/(size(P,1)-size(P,2)));
+if verb
+   fprintf('Number of nonzeroes per row in P: %f\n',(nnz(P)-size(P,2))/(size(P,1)-size(P,2)));
+end
 
 % If the problem is not symmetric force smooth instead of emin
 prol_emin = param.prolong.prol_emin;
 if ~symm_flag && strcmpi(prol_emin,'EMIN')
-   fprintf('Since the problem is not symmetric smoothing is forced instead of EMIN\n');
+   if verb
+      fprintf('Since the problem is not symmetric smoothing is forced instead of EMIN\n');
+   end
    prol_emin = 'smooth';
 end
 
 % Prolongation smoothing
 if strcmpi(prol_emin,'SMOOTH')
-   fprintf('Smooting Prolongation\n');
+   if verb
+      fprintf('Smooting Prolongation\n');
+   end
    [nn,~] = size(P);
-   fprintf('Unsmoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   if verb
+      fprintf('Unsmoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   end
    DA = diag(diag(A))\A;
    lambda_max = eigs(DA,1,'lm','Tolerance',1.e-3,'FailureTreatment','keep');
    omega = 1.9 / lambda_max;
-   fprintf('Max eigenvalue and omega: %10.2f %10.2f\n',lambda_max,omega);
+   if verb
+      fprintf('Max eigenvalue and omega: %10.2f %10.2f\n',lambda_max,omega);
+   end
    P = P - omega*DA*P;
-   fprintf('Smoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   if verb
+      fprintf('Smoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   end
 end
 
-fprintf('Computing initial energy\n');
+if verb
+   fprintf('Computing initial energy\n');
+end
 energy = trace(P'*(A*P));
-fprintf('Energy before orthog: %e\n',energy);
+if verb
+   fprintf('Energy before orthog: %e\n',energy);
+end
 
 % Minimize Energy in Prolongation
 if strcmpi(prol_emin,'EMIN')
 
-   fprintf('Minimizing Energy (MEX)\n');
+   if verb
+      fprintf('Minimizing Energy (MEX)\n');
+   end
 
    % Compute a sparser Strength of connection before EMIN if needed
    coarsen2 = param.coarsen;
    coarsen2.tau = param.prolong.patt_tau;
    coarsen2.tau = 0.01;
    coarsen2.SoC_type = 'DOM';
-   [~,~,~,S_emin,~] = coarsen(coarsen2,A,smootherOp,TV);
-   fprintf('\nDensity of S_emin over S: %10.2f\n',nnz(S_emin)/nnz(S));
+   [~,~,~,S_emin,~] = coarsen(coarsen2,A,smootherOp,TV,verb);
+   if verb
+      fprintf('\nDensity of S_emin over S: %10.2f\n',nnz(S_emin)/nnz(S));
+   end
    [nn,~] = size(P);
-   fprintf('Initial prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   if verb
+      fprintf('Initial prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   end
    patt_pow = param.prolong.patt_pow;
    ntv = size(TV,2);
    Ppatt = mk_prolPatt(patt_pow,S_emin,P,fcnode,A,param.prolong.nnzr_max,ntv);
 
    % Apply EMIN algorithm
-   [P,info] = MEX_EMIN_enhance_prol(level,param.prolong,A,Ppatt,P,TV,fcnode);
-   fprintf('Ener. Min. prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   [P,info] = MEX_EMIN_enhance_prol(level,param.prolong,A,Ppatt,P,TV,fcnode,verb);
+   if verb
+      fprintf('Ener. Min. prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
+   end
 end
 
 % Store in structure

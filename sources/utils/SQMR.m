@@ -1,4 +1,4 @@
-function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec);
+function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec,x0,verb);
 
 %%%%%%%%%%%%%%%%%%%%%
 %% VETTORI SCRATCH
@@ -11,15 +11,22 @@ d    = zeros(nn,1);
 pnew = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
+if nargin == 7
+   pnew = x0;
+end
+
+if nargin < 8
+   verb = true;
+end
+
+A = Afun(speye(nn));
+D = max(diag(A));
+
 clear resvec;
 info=0;
 exit_test = false;
 niter=0;
 bnorm = norm(rhs);
-
-% Initial solution: pnew
-vscr = lprec(rhs);
-pnew = rprec(vscr);
 
 % Initial residual: r
 r = rhs - Afun(pnew);
@@ -43,7 +50,7 @@ while ~exit_test && niter < itmax
    % alpha = rho_0 / (q^T A q)
    vscr = Afun(q);
    sigma = q'*vscr;
-   if abs(sigma) < 1e-20
+   if abs(sigma) < 1e-20*rho0
       fprintf('Small sigma %e\n',sigma)
       info=10;
       break;
@@ -73,14 +80,14 @@ while ~exit_test && niter < itmax
       exit_test = true;
     else
 
+      u = rprec(vscr);
+      rho1 = r'*u;
       % beta = r^T L^-T L^-1 r / rho_0
-      if abs(rho0) < 1e-20
+      if abs(rho0) < 1e-20*rho1
          fprintf('Small rho0 %e\n',rho0)
          info=20;
          break
       end
-      u = rprec(vscr);
-      rho1 = r'*u;
       beta = rho1/rho0;
       rho0 = rho1;
 
@@ -90,9 +97,11 @@ while ~exit_test && niter < itmax
 
    % Store relative residual
    resvec(niter) = resnorm;
-   %if mod(niter,10) == 0
-      fprintf('iter/res: %d %e\n',niter,resnorm);
-   %end
+   if mod(niter,10) == 0
+      if verb
+         fprintf('iter/res: %d %e\n',niter,resnorm);
+      end
+   end
 
 end
 

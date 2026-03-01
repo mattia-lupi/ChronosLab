@@ -1,4 +1,4 @@
-function [S,S_patt] = cpt_SoC_aff(tau,A,S_patt,TV)
+function [S,S_patt] = cpt_SoC_aff(tau,A,S_patt,TV,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to compute affinity-based strength of connection. This version also computes
@@ -31,7 +31,9 @@ ss = zeros(nt,1);
 for ind = 1:nt
 
    if mod(ind,floor(nt/10)) == 0
-      fprintf('Processed %9i entries out of %9i\n',ind,nt)
+      if verb
+         fprintf('Processed %9i entries out of %9i\n',ind,nt)
+      end
    end
 
    v = TV(:,ii(ind));
@@ -50,7 +52,9 @@ S = S + S' + speye(nn);
 
 % Filter SoC
 [ii,jj,ss] = find(S);
-fprintf('Filtering SoC\n');
+if verb
+   fprintf('Filtering SoC\n');
+end
 if tau >= 0
    sf = ss;
    sf(sf <= tau)=0;
@@ -77,8 +81,10 @@ else
       S_patt(S_patt>0)=1;
    end
 end
-fprintf('End Filtering SoC\n')
-fprintf('NNZR(Sf) %10.2f\n',nnz(S)/nn);
-fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+if verb
+   fprintf('End Filtering SoC\n')
+   fprintf('NNZR(Sf) %10.2f\n',nnz(S)/nn);
+   fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+end
 
 return

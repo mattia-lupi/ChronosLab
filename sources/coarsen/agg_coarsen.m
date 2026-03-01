@@ -1,4 +1,4 @@
-function [fcnode,Clist,Fclist,Fflist,S,S_patt] = agg_coarsen(param,A,TV)
+function [fcnode,Clist,Fclist,Fflist,S,S_patt] = agg_coarsen(param,A,TV,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to create the coarse space as a Fine/Coarse indicator and the lists of fine and
@@ -41,32 +41,36 @@ CFc_Ff_node = zeros(size(A,1),1);
 switch upper(SoC_type)
    case 'AFF'
       % Compute strength of connections (use the pattern of A to evaluate affinities)
-      [S,S_patt] = cpt_SoC_aff(tau,A,A,TV);
+      [S,S_patt] = cpt_SoC_aff(SoC_perc,A,A,TV,verb);
    case 'CLA'
       % Compute classicla strength of connections
-      [S,S_patt] = cpt_SoC_cla(tau,A);
+      [S,S_patt] = cpt_SoC_cla(tau,A,verb);
    case 'CLANSY'
       % Compute classicla strength of connections (non-symmetrize)
-      [S,S_patt] = cpt_SoC_nsyCla(tau,A);
+      [S,S_patt] = cpt_SoC_nsyCla(tau,A,verb);
    case 'DOM'
       % Compute strength of connections based on diagonal dominance
-      [S,S_patt] = cpt_SoC_dom(tau,A);
+      [S,S_patt] = cpt_SoC_dom(tau,A,verb);
    case 'ALG'
       % Compute strength of connections based on diagonal dominance
-      [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A);
+      [S,S_patt] = cpt_SoC_AlgDist(tau,smootherOp,A,verb);
    otherwise
       err_msg = [SoC_type ' is not a valid key for SoC'];
       error(err_msg);
 end
-fprintf('NNZR of original matrix:     %10.2f\n',nnz(A)/size(A,1)-1);
+if verb
+   fprintf('NNZR of original matrix:     %10.2f\n',nnz(A)/size(A,1)-1);
+end
 Stmp = S;
 Stmp = Stmp - diag(diag(Stmp));
-fprintf('NNZR of filtered SoC matrix: %10.2f\n',nnz(Stmp)/size(Stmp,1));
+if verb
+   fprintf('NNZR of filtered SoC matrix: %10.2f\n',nnz(Stmp)/size(Stmp,1));
+end
 
 % Compute the Maximum Independent Set
 
 % First stage (same of the usual coarsening)
-[CFc_Ff_node, CFclist, Fflist] = cpt_PMIS(S, CFc_Ff_node);
+[CFc_Ff_node, CFclist, Fflist] = cpt_PMIS(S, CFc_Ff_node,verb);
 
 % Condense the SoC graph for second stage of coarsening
 S_CFc = mk_SoC_FcC(S, CFclist,CFc_Ff_node);
@@ -76,7 +80,7 @@ S_CFc = mk_SoC_FcC(S, CFclist,CFc_Ff_node);
 Fc_C_node = zeros(size(S_CFc,1),1);
 
 % Compute PMIS
-[Fc_C_node, Clist_loc, Fclist_loc] = cpt_PMIS(S_CFc, Fc_C_node);
+[Fc_C_node, Clist_loc, Fclist_loc] = cpt_PMIS(S_CFc, Fc_C_node,verb);
 Clist = CFclist(Clist_loc);
 Fclist = CFclist(Fclist_loc);
 
@@ -89,6 +93,8 @@ fcnode(Clist) = 1;
 fcnode(fcnode>0) = 1:nC;
 fcnode(fcnode==0) = -(1:nFc+nFf);
 
-fprintf('# of Dirichlet nodes: %10d\n',ndir);
+if verb
+   fprintf('# of Dirichlet nodes: %10d\n',ndir);
+end
 
 return

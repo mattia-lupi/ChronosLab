@@ -13,7 +13,7 @@
 % id_conv  : convergece estimator
 %
 
-function [vec,val,iter,resid] = Lanczos(V0,ProdMat,m,ntv)
+function [vec,val,iter,resid] = Lanczos(V0,ProdMat,m,ntv,verb)
 
 % Compress input test space
 startvec = sum(V0,2);
