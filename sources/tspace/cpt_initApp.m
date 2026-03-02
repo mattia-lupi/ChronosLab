@@ -1,4 +1,4 @@
-function TV_out = cpt_initApp(k_type,FT,TV_in)
+function TV_out = cpt_initApp(k_type,FT,TV_in,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to set-up the initial solution in case of LANCZOS and SRQCG. Both methods try
@@ -14,7 +14,9 @@ function TV_out = cpt_initApp(k_type,FT,TV_in)
 %       >=  2   ==>   perform ktype steps of Jacobi
 %
 %-----------------------------------------------------------------------------------------
-
+if nargin < 4
+   verb = 1;
+end
 if k_type == 0
    TV_out = FT\TV_in;
    return
@@ -29,7 +31,7 @@ end
 % Compute diagonal preconditioner
 D_inv = 1 ./ diag(FT);
 D_inv = diag(sparse(D_inv));
-lmax = eigs(D_inv*FT,1,'lm','Display',1,'Tolerance',1.e-3);
+lmax = eigs(D_inv*FT,1,'lm','Display',verb,'Tolerance',1.e-3);
 omega = min(1.0,1.9 / abs(lmax));
 TV_out = omega*D_inv*TV_in;
 for i = 2:k_type

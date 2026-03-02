@@ -80,6 +80,11 @@ else
    A(A==1) = lmax/10;
    %%%%%%%%%%%%%
 
+   if ~exist('rhs') && exist('b')
+      rhs = b;
+      TV0 = ones(size(A,1),1);
+   end
+
    if ~exist('rhs') && strcmp(lower(rhs_build),'rhs_in')
       err_msg = 'Missing the expected right-hand side';
    end
@@ -209,7 +214,7 @@ switch lower(solv_method)
       % Solve the system by GMRES
       fprintf('BEGIN: System solution by GMRES_CJ\n');
       Mfun = @(r) AMG_Vcycle(AMG_prec,A,r);
-      [sol,flag,relres,iter,resvec] = gmres_LEFT(A,rhs,restart,tol,itmax,Mfun);
+      [sol,flag,relres,iter,resvec] = gmres_RIGHT(A,rhs,restart,tol,itmax,Mfun);
       fprintf('END: System solution by GMRES_CJ\n\n');
 
     case 'sqmr'
@@ -220,7 +225,7 @@ switch lower(solv_method)
       Mfun = @(r) AMG_Vcycle(AMG_prec,A,r);
       IDfun = @(x) x;
       [sol,flag,relres,iter,resvec] = SQMR(Afun,rhs,tol,itmax,Mfun,IDfun);
-      fprintf('END: System solution by SQMR\n\n');
+      fprintf('END: System solution by GMRES_CJ\n\n');
 
 
 end

@@ -1,4 +1,4 @@
-function [AMG_hrc] = cpt_aspAMG(param,A,TV0)
+function [AMG_hrc] = cpt_aspAMG(param,A,TV0,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function representing the entry point for the recursive computation of the AMG hierarchy
@@ -14,6 +14,9 @@ function [AMG_hrc] = cpt_aspAMG(param,A,TV0)
 % AMG_hrc:  AMG hierachy, a linked list of all the AMG components at every level
 %
 %-----------------------------------------------------------------------------------------
+if nargin < 4
+   verb = 1;
+end
 
 global AMG_Total_Mem;
 global AMG_Peak_Mem;
@@ -24,7 +27,9 @@ AMG_Peak_Mem = 0;
 level = 0;
 
 % Padd the test space with random vectors if TV0 is not large enough
-fprintf('BEGIN: Initializing initial test space\n');
+if verb
+   fprintf('BEGIN: Initializing initial test space\n');
+end
 n = size(A,1);
 ntv = param.tspace.ntv;
 ntv0 = size(TV0,2);
@@ -34,21 +39,25 @@ TV(:,ntv0+1:ntv) = rand(n,ntv-ntv0);
 
 % Orthonormalize the test space
 [TV,~] = qr(TV,0);
-fprintf('END: Initializing initial test space\n');
+if verb
+   fprintf('END: Initializing initial test space\n');
+end
 
-AMG_hrc = REC_cpt_aspAMG(level,param,A,TV);
+AMG_hrc = REC_cpt_aspAMG(level,param,A,TV,verb);
 
 GB_AMG = whos('AMG_hrc').bytes/(1024^3);
-fprintf('*******************************************************************\n');
-fprintf('******* Total AMG memory occupation (GB): %10.4f *******\n',GB_AMG);
-fprintf('******* Peak memory occupation (GB):      %10.4f *******\n',AMG_Peak_Mem);
-fprintf('*******************************************************************\n');
+if verb
+   fprintf('*******************************************************************\n');
+   fprintf('******* Total AMG memory occupation (GB): %10.4f *******\n',GB_AMG);
+   fprintf('******* Peak memory occupation (GB):      %10.4f *******\n',AMG_Peak_Mem);
+   fprintf('*******************************************************************\n');
+end
 
 return
 
 %-----------------------------------------------------------------------------------------
 
-function [AMG_hrc] = REC_cpt_aspAMG(level,param,A,TV0)
+function [AMG_hrc] = REC_cpt_aspAMG(level,param,A,TV0,verb)
 
 global AMG_Total_Mem;
 global AMG_Peak_Mem;
@@ -68,7 +77,9 @@ amg_times
 % Increase the level counter
 level = level + 1;
 AMG_hrc.level = level;
-fprintf('\n*****   LEVEL: %5d   ***** \n\n',level);
+if verb
+   fprintf('\n*****   LEVEL: %5d   ***** \n\n',level);
+end
 
 % Get the current size
 n = size(A,1);
@@ -77,10 +88,12 @@ lmax_A = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'
 AMG_hrc.lmax_A = lmax_A;
 
 % Print operator info
-fprintf('Operator # of rows:               %10d\n',n);
-fprintf('Operator # of non-zeroes:         %10d\n',nnz(A));
-fprintf('Operator # of non-zeroes per row: %10.2f\n',nnz(A)/n);
-fprintf('Operator max lambda:              %15.6e\n\n',lmax_A);
+if verb
+   fprintf('Operator # of rows:               %10d\n',n);
+   fprintf('Operator # of non-zeroes:         %10d\n',nnz(A));
+   fprintf('Operator # of non-zeroes per row: %10.2f\n',nnz(A)/n);
+   fprintf('Operator max lambda:              %15.6e\n\n',lmax_A);
+end
 
 % Compute the preconditioner for this level
 if n <= param.amg.maxCoarseSZ || level >= param.amg.nLevMax
@@ -91,12 +104,16 @@ if n <= param.amg.maxCoarseSZ || level >= param.amg.nLevMax
    if param.symm
       [L,p,S] = chol(A,'lower');
       if p ~= 0
-         fprintf('ERROR IN FACTORIZING LAST LEVEL\n');
+         if verb
+            fprintf('ERROR IN FACTORIZING LAST LEVEL\n');
+         end
       end
       AMG_hrc.L = L;
       AMG_hrc.S = S;
    else
-      fprintf('Using UNSYMMETRIC factorization\n');
+      if verb
+         fprintf('Using UNSYMMETRIC factorization\n');
+      end
       [L,U,P,Q] = lu(A);
       % P*A*Q = L*U ---> A*x = b ---> P'*LU*Q'*x = b ---> LU*Q'*x = P*b ---> x = Q*(U\(L\(P*b))
       AMG_hrc.L = L;
@@ -114,27 +131,41 @@ else
 
    % Compute the smoother
    time_start = tic;
-   fprintf('BEGIN: Computing the smoother\n');
-   smootherOp = smoother(A, param.symm, param.smoother);
-   fprintf('END: Computing the smoother\n\n');
+   if verb
+      fprintf('BEGIN: Computing the smoother\n');
+   end
+   smootherOp = smoother(A, param.symm, param.smoother,verb);
+   if verb
+      fprintf('END: Computing the smoother\n\n');
+   end
    T_smoo = T_smoo + toc(time_start);
 
    %--------------------------------------------------------------------------------------
 
    % Compute the test space
    tic;
-   fprintf('BEGIN: Computing the test space\n');
+   if verb
+      fprintf('BEGIN: Computing the test space\n');
+   end
    if param.symm
-      [TV, lambda, res] = tspace(TV0, A, smootherOp, param.tspace);
-      fprintf('   i          lambda     res_lam     res_vec\n');
+      [TV, lambda, res] = tspace(TV0, A, smootherOp, param.tspace, verb);
+      if verb
+         fprintf('   i          lambda     res_lam     res_vec\n');
+      end
       nl = numel(lambda);
-      fprintf('%4d %15.6e %11.2e %11.2e\n',[(1:nl)' lambda(end:-1:1) res(end:-1:1,:)]');
+      if verb
+         fprintf('%4d %15.6e %11.2e %11.2e\n',[(1:nl)' lambda(end:-1:1) res(end:-1:1,:)]');
+      end
    else
-      fprintf('Unsymmetric eigensolver not available yet\n');
-      fprintf('The initial test space will be used\n');
+      if verb
+         fprintf('Unsymmetric eigensolver not available yet\n');
+         fprintf('The initial test space will be used\n');
+      end
       TV = TV0;
    end
-   fprintf('END: Computing the test space\n\n');
+   if verb
+      fprintf('END: Computing the test space\n\n');
+   end
    T_tspa = T_tspa + toc;
 
    %--------------------------------------------------------------------------------------
@@ -144,23 +175,29 @@ else
 
    % Compute coarsening
    tic;
-   fprintf('BEGIN: Computing the coarse nodes\n');
+   if verb
+      fprintf('BEGIN: Computing the coarse nodes\n');
+   end
    if ~use_aggressive
-      [fcnode,clist,flist,S,S_patt] = coarsen(param.coarsen,A,smootherOp,TV);
+      [fcnode,clist,flist,S,S_patt] = coarsen(param.coarsen,A,smootherOp,TV,verb);
       num_f = numel(flist);
       num_c = numel(clist);
       fclist = 0;
       fflist = 0;
    else
-      [fcnode,clist,fclist,fflist,S,S_patt] = agg_coarsen(param.coarsen,A,TV);
+      [fcnode,clist,fclist,fflist,S,S_patt] = agg_coarsen(param.coarsen,A,TV,verb);
       num_f = numel(fclist) + numel(fflist);
       num_c = numel(clist);
    end
-   fprintf('END: Computing the coarse nodes\n\n');
+   if verb
+      fprintf('END: Computing the coarse nodes\n\n');
+   end
    T_coar = T_coar + toc;
-   fprintf('Number of FINE nodes:   %10d\n',num_f);
-   fprintf('Number of COARSE nodes: %10d\n',num_c);
-   fprintf('Coarse node percentage: %10.2f\n\n',100*num_c/numel(fcnode));
+   if verb
+      fprintf('Number of FINE nodes:   %10d\n',num_f);
+      fprintf('Number of COARSE nodes: %10d\n',num_c);
+      fprintf('Coarse node percentage: %10.2f\n\n',100*num_c/numel(fcnode));
+   end
    if num_f + num_c ~= numel(fcnode)
       err_msg = 'Number of F/C node is not consistent with level size';
       error(err_msg);
@@ -170,12 +207,18 @@ else
 
    % Compute prolongation
    tprol = tic;
-   fprintf('BEGIN: Computing the prolongation\n');
+   if verb
+      fprintf('BEGIN: Computing the prolongation\n');
+   end
    [P,clist,fcnode,emin_info] = prolong(use_aggressive,level,param.symm,param,...
-                                        clist,fclist,fflist,fcnode,S,S_patt,smootherOp,A,TV);
-   fprintf('END: Computing the prolongation\n\n');
+                                        clist,fclist,fflist,fcnode,S,S_patt,smootherOp,A,TV,verb);
+   if verb
+      fprintf('END: Computing the prolongation\n\n');
+   end
    prol_tot_time = toc(tprol);
-   fprintf('Prolongation time %10.3f [s]\n',prol_tot_time);
+   if verb
+      fprintf('Prolongation time %10.3f [s]\n',prol_tot_time);
+   end
    T_prol = T_prol + prol_tot_time;
 
    % Store EMIN detailed information
@@ -196,7 +239,10 @@ else
    wgt  = param.filter.filt_wgt;
    tol  = param.filter.filt_tol;
    if wgt < 100
-      fprintf('Filtering prolongation\n');
+      if verb
+         fprintf('Filtering prolongation\n');
+      end
+
       % MEX filtering
       Pf = MEX_FiltProl(np,wgt,tol,TVnext,P);
    else
@@ -204,10 +250,14 @@ else
    end
    T_FilProl = T_FilProl + toc;
    [nn,~] = size(P);
-   fprintf('Filtered prolongation non-zeroes per row: %10.2f\n',(nnz(Pf)-nc)/(nn-nc));
-   fprintf('Pf density over P: %f\n', nnz(Pf) / nnz(P));
+   if verb
+      fprintf('Filtered prolongation non-zeroes per row: %10.2f\n',(nnz(Pf)-nc)/(nn-nc));
+      fprintf('Pf density over P: %f\n', nnz(Pf) / nnz(P));
+   end
    if size(P,1) < 10000
-      fprintf('Conditioning of P: %f\n',condest(Pf'*Pf));
+      if verb
+         fprintf('Conditioning of P: %f\n',condest(Pf'*Pf));
+      end
    end
 
    %--------------------------------------------------------------------------------------
@@ -256,29 +306,37 @@ else
    tau = param.filter.filt_tau;
    np = param.filter.np;
    patt_min_flag = param.filter.min_patt;
-   fprintf('Avg nnzr Anext before filtering: %f\n',nnz(Anext)/size(Anext,1));
+   if verb
+      fprintf('Avg nnzr Anext before filtering: %f\n',nnz(Anext)/size(Anext,1));
+   end
    if tau > 0
-      fprintf('Filtering next level operator\n');
+      if verb
+         fprintf('Filtering next level operator\n');
+      end
+
       % MEX filtering
       Anext = MEX_FiltCLEV(np,patt_min_flag,tau,A,Anext,fcnode,Pf,TVnext);
    end
-   fprintf('Avg nnzr Anext after filtering: %f\n',nnz(Anext)/size(Anext,1));
+   if verb
+      fprintf('Avg nnzr Anext after filtering: %f\n',nnz(Anext)/size(Anext,1));
+   end
    T_FilCLev = T_FilCLev + toc;
 
    %--------------------------------------------------------------------------------------
    GB_used = GetWhosMemory;
    AMG_Total_Mem = AMG_Total_Mem + GB_used;
    AMG_Peak_Mem = max(AMG_Peak_Mem,AMG_Total_Mem);
-   fprintf('\n');
-   fprintf('************************************************************\n');
-   fprintf('******* Level %2d memory occupation (GB):  %10.4f *******\n',level,GB_used);
-   fprintf('******* Total memory occupation (GB):     %10.4f *******\n',AMG_Total_Mem);
-   fprintf('******* Peak memory occupation (GB):      %10.4f *******\n',AMG_Peak_Mem);
-   fprintf('************************************************************\n');
-   fprintf('\n');
-
+   if verb
+      fprintf('\n');
+      fprintf('************************************************************\n');
+      fprintf('******* Level %2d memory occupation (GB):  %10.4f *******\n',level,GB_used);
+      fprintf('******* Total memory occupation (GB):     %10.4f *******\n',AMG_Total_Mem);
+      fprintf('******* Peak memory occupation (GB):      %10.4f *******\n',AMG_Peak_Mem);
+      fprintf('************************************************************\n');
+      fprintf('\n');
+   end
    % Compute next level of the hierarchy
-   AMG_hrc.next = REC_cpt_aspAMG(level,param,Anext,TVnext);
+   AMG_hrc.next = REC_cpt_aspAMG(level,param,Anext,TVnext,verb);
 
 end
 

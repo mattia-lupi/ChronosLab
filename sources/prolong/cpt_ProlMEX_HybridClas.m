@@ -20,8 +20,8 @@ np        = params.np;
 
 % Unpack the SoC matrix
 nn_S = size(mat_S,1);
-nt_S = nnz(mat_S);
-[iat_S,ja_S,coef_S] = unpack_csr(mat_S);
+% nt_S = nnz(mat_S);
+[~,~,coef_S] = unpack_csr(mat_S);
 
 % Unpack the system matrix
 nn_A = size(mat_A,1);

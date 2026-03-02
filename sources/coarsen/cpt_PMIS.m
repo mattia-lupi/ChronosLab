@@ -1,4 +1,4 @@
-function [fcnode, clist, flist] = cpt_PMIS(S, fcnode)
+function [fcnode, clist, flist] = cpt_PMIS(S, fcnode,verb)
 
 %  0 --> not assigned
 % -1 --> FINE
@@ -62,7 +62,7 @@ while len_list > 0
       inod_wgt = nod_weight(inod);
 
       % Get the strong neighbours of inod
-      [j_neigh,~,~] = find(S_sym(:,inod));
+      j_neigh = find(S_sym(:,inod));
 
       if sum(fcnode(j_neigh) == 0 & nod_weight(j_neigh) > inod_wgt) > 0
 
@@ -76,7 +76,7 @@ while len_list > 0
 
          % This node will become a coarse node
          % Mark the strongly influenced neighbours of inod as Fine
-         [j_neigh,~,~] = find(S(:,inod));
+         j_neigh = find(S(:,inod));
          fcnode(j_neigh) = -1;
 
          % Mark inod as coarse
@@ -97,7 +97,9 @@ while len_list > 0
 
 end
 time = toc;
-fprintf('Time for MIS: %f\n',time);
+if verb
+   fprintf('Time for MIS: %f\n',time);
+end
 
 % Count and number coarse nodes
 nc = 0;

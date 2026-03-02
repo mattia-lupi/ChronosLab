@@ -1,5 +1,8 @@
-function smootherOp = smoother(A, symm_flag, param)
+function smootherOp = smoother(A, symm_flag, param, verb)
 
+if nargin < 4
+   verb = 1;
+end
 amg_times;
 
 % Mandatory parameters
@@ -26,7 +29,9 @@ switch lower(method)
         % Correct NaN for very ill-conditioned problems
         irow = find(isnan(diag(F)));
         if numel(irow) > 0
-           fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
+           if verb
+              fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
+           end
         end
         for i = 1:numel(irow)
            ii = irow(i);
@@ -40,7 +45,9 @@ switch lower(method)
         opts.disp = 1;
         opts.tol = 5.e-4;
         lambda = eigs(FAFT,size(A,1),1,'la',opts);
-        fprintf('Max Lambda: %10.4f\n',lambda);
+        if verb
+           fprintf('Max Lambda: %10.4f\n',lambda);
+        end
         omega = min(1,1.9 / lambda);
         % Append the smoother
         smootherOp.left = F;
@@ -49,7 +56,9 @@ switch lower(method)
         smootherOp.lambda = lambda;
 
     case 'afsai_nsy'
-        fprintf('Non-Symmetric AFSAI is used\n');
+        if verb
+           fprintf('Non-Symmetric AFSAI is used\n');
+        end
         % Set-up AFSAI_NSY (afsai for nsy systems with mex-cpp code)
         [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A);
         % Compute damping parameter
@@ -58,7 +67,9 @@ switch lower(method)
         opts.disp = 1;
         opts.tol = 5.e-4;
         lambda = eigs(FAFT,size(A,1),1,'lm',opts);
-        fprintf('Max Lambda: %10.4f\n',lambda);
+        if verb
+           fprintf('Max Lambda: %10.4f\n',lambda);
+        end
         omega = min(1,1.9 / lambda);
         % Append the smoother
         smootherOp.left = FL;
@@ -69,14 +80,16 @@ switch lower(method)
     case 'jacobi'
         % Compute Diagonal
         F = 1 ./ sqrt(full(diag(A)));
-	    F = diag(sparse(F));
+	     F = diag(sparse(F));
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
-        opts.issym = 1;
+        % opts.issym = 1;
         if true
            lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
                          'Tolerance',1.e-2,'Display',1,'FailureTreatment','keep');
-           fprintf('Max Lambda: %10.4f\n',lambda);
+           if verb
+              fprintf('Max Lambda: %10.4f\n',lambda);
+           end
            omega = min(1,1.9 / lambda);
         else
            lambda = 2.0;

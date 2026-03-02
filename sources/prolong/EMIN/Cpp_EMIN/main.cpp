@@ -246,7 +246,7 @@ char line[1024];
    ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,maxwgt,prec_type,sol_type,min_lfil,max_lfil,
                        D_lfil,nn_A,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,
                        iat_P,ja_P,coef_P,iat_patt,ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,
-                       emin_info);
+                       emin_info,false);
 
    //---STOP--------------------------------
    auto end = chrono::system_clock::now();

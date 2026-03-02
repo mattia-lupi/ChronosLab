@@ -201,8 +201,8 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
          // Check that this is a FINE node
          if (fcnode[icol] < 0){
 
-            istart_patt = iat_patt[icol];
-            iend_patt = iat_patt[icol+1];
+            istart_patt = BB_scr[icol];
+            iend_patt = BB_scr[icol+1];
             int nr_BB_loc = iend_patt-istart_patt;
 
             // Check that the row is not empty

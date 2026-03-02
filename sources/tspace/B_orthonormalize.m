@@ -7,7 +7,7 @@ else
 end
 XBX = X_in'*BX; XBX = 0.5*(XBX+XBX)';
 cond_XBX = cond(XBX);
-if cond_XBX > 1/(max(size(XBX))*eps);
+if cond_XBX > 1/(max(size(XBX))*eps)
    fprintf('B_orthonormalize: XBX highly ill-conditioned with cond %15.6e\n',cond_XBX);
    X_out = [];
    BX_out = [];

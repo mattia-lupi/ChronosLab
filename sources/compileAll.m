@@ -16,6 +16,10 @@ home = pwd;
 for folder = list
     fprintf('Compiling MEX files in %s\n', folder{1});
     cd(folder{1});
-    compile
+    if strcmp(computer('arch'),'maca64')
+       compileMac
+    else
+       compile
+    end
     cd(home);
 end

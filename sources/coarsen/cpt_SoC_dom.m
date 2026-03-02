@@ -1,4 +1,4 @@
-function [S,S_patt] = cpt_SoC_cla(tau,A)
+function [S,S_patt] = cpt_SoC_dom(tau,A,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to compute strength of connection based on diagonal dominance
@@ -18,7 +18,9 @@ function [S,S_patt] = cpt_SoC_cla(tau,A)
 
 global DEBINFO
 
-fprintf('Computing SoC\n')
+if verb
+   fprintf('Computing SoC\n')
+end
 
 % Get the minimum value of each column
 dd = full(diag(A));
@@ -28,10 +30,12 @@ dd = dd(:);
 [ii,jj,aa] = find(A);
 ss = abs(aa) ./ sqrt(dd(ii).*dd(jj));
 
-fprintf('End Computing SoC\n')
+if verb
+   fprintf('End Computing SoC\n')
 
-fprintf('Filtering SoC\n')
-fprintf('Average NNZR before filtering: %f\n',nnz(A)/size(A,1))
+   fprintf('Filtering SoC\n')
+   fprintf('Average NNZR before filtering: %f\n',nnz(A)/size(A,1))
+end
 if tau >= 0
    sf = ss;
    sf(sf <= tau)=0;
@@ -58,13 +62,17 @@ else
        S_patt(S_patt>0)=1;
    end
 end
-fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
-fprintf('End Filtering SoC\n')
+if verb
+   fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
+   fprintf('End Filtering SoC\n')
 %save('SSS','S','S_patt');
+end
 
 nn = size(S,1);
-fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
-fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+if verb
+   fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
+   fprintf('S density over A:    %10.2f\n',(nnz(S)-nn)/(nnz(A)-nn));
+end
 
 %if DEBINFO.coarsen.draw_dist
 %   % Draw SoC distribution

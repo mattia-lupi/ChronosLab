@@ -20,8 +20,11 @@
 
 function [niter,lambda,blockX,resnorm_vec,lambda_vec,ierr] = ...
          lobpcg(prodA,prodB,prodM,blockY,blockX0,largest_flag,...
-                reslambda_check,itmax,tol,restartControl)
+                reslambda_check,itmax,tol,restartControl,verb)
 
+if nargin < 11
+   verb = 1;
+end
 global DEBUG
 
 % Init error code
@@ -82,7 +85,7 @@ end
 % Check failure in B-orthonormalization
 if isempty(blockX)
    fprintf('Initial approximation is not full-rank\n');
-   ierr = 1
+   ierr = 1;
 end
 
 % Compute initial Ritz vectors
@@ -129,7 +132,9 @@ blockAR = zeros(nn,neig);
 ActBlockAP = zeros(nn,neig);
 
 % Init the main loop
-fprintf('%4s | %5s | %18s | %18s\n','iter','# act','avg resnorm','max delta lambda');
+if verb
+   fprintf('%4s | %5s | %18s | %18s\n','iter','# act','avg resnorm','max delta lambda');
+end
 iter = 0;
 restart = true;
 forcedRestart = false;
@@ -179,8 +184,10 @@ while iter < itmax-1 % MAIN LOOP START
 
    % Dump the number of active vectors
    if mod(iter-1,1) == 0
-      fprintf('%4d | %5d | %18.10e | %18.10e\n',iter-1,n_active,avg_resnorm,...
+      if verb
+         fprintf('%4d | %5d | %18.10e | %18.10e\n',iter-1,n_active,avg_resnorm,...
                max(lambda_relDelta));
+      end
    end
 
    % If no active vectors, break
@@ -263,7 +270,9 @@ while iter < itmax-1 % MAIN LOOP START
    end
    %@@@@@@@@@@@@@@@@@@@@@@@@
    if restart
-      fprintf('restart %d\n',restart);
+      if verb
+         fprintf('restart %d\n',restart);
+      end
    end
    %@@@@@@@@@@@@@@@@@@@@@@@@
 
