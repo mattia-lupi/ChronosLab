@@ -99,7 +99,7 @@ if ~two_stg_prol
          tic;
          [P] = cpt_ProlMEX_EXTI(param.prolong,nc,fcnode_exti,S_patt,A,A_comp);
       otherwise
-         err_msg = [param.prolong.proltype 'is not a valid key for prolongation'];
+         err_msg = [char(param.prolong.proltype) ' is not a valid key for prolongation'];
          error(err_msg);
    end
 else
@@ -158,7 +158,10 @@ else
             fprintf('On row:       %d\n',ind);
          end
       case 'EXTI'
-         [P] = cpt_TwoStageProlMEX_ExtI(param.prolong,clist,fclist,fflist,A,S_patt);
+         % Create a compressed A with only strong connections
+         A_comp = A;
+         A_comp(S_patt <0) = 0;
+         [P] = cpt_TwoStageProlMEX_ExtI(param.prolong,clist,fclist,fflist,A,S_patt,A_comp);
       otherwise
          err_msg = [char(param.prolong.proltype)...
                    ' is not a valid key for prolongation with aggressive coarsening'];

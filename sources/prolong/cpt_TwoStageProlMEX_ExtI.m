@@ -1,4 +1,4 @@
-function [P] = cpt_TwoStageProlMEX_ExtI(param,Clist,Fclist,Fflist,A,S_patt)
+function [P] = cpt_TwoStageProlMEX_ExtI(param,Clist,Fclist,Fflist,A,S_patt,A_comp)
 
 % Count the entries in the lists
 nC = numel(Clist);
