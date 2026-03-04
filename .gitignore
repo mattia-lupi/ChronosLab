@@ -4,12 +4,5 @@
 *.mexmaca64
 *.a
 *.DS_Store
-sources/filter/MEX_CLev_Filter/FilterComp_wrap.mexa64
-sources/filter/MEX_Prol_Filter/FilterProl_wrap.mexa64
-sources/prolong/MEX_BAMG_Prol/cpt_Prolongation_BAMG.mexa64
-sources/prolong/MEX_CLAS_prol/cpt_Prolongation_Classical.mexa64
-sources/prolong/MEX_EXTI_Prol/cpt_Prolongation_EXTI.mexa64
-sources/prolong/MEX_HYBC_prol/cpt_Prolongation_HybridClas.mexa64
-sources/smoother/MEX_NSY_RFSAI/NSY_rFSAI_compute.mexa64
-sources/smoother/MEX_SYM_AFSAI/compute_local_fsai.mexa64
-
+examples/PorFlowMatrix/MESH/*.txt
+examples/PorFlowMatrix/MESH/*.tetra

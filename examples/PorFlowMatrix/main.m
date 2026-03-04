@@ -9,14 +9,12 @@ close all
 
 %file_coord = 'MESH/coord.txt';
 %file_tetra = 'MESH/tetra.txt';
-%file_coord = 'MESH/Cubo_591.coor';
-%file_tetra = 'MESH/Cubo_591.tetra';
+file_coord = 'MESH/Cubo_591.coor';
+file_tetra = 'MESH/Cubo_591.tetra';
 %file_coord = 'MESH/Cubo_4820.coor';
 %file_tetra = 'MESH/Cubo_4820.tetra';
 %file_coord = 'MESH/Cubo_35199.coor';
 %file_tetra = 'MESH/Cubo_35199.tetra';
-file_coord = 'MESH/Cubo_246389.coor';
-file_tetra = 'MESH/Cubo_246389.tetra';
 
 %file_k_perm = 'MESH/perm_aniso.txt';
 file_k_perm = 'MESH/perm_iso.txt';
