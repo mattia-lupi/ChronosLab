@@ -6,3 +6,4 @@
 *.DS_Store
 examples/PorFlowMatrix/MESH/*.txt
 examples/PorFlowMatrix/MESH/*.tetra
+examples/PorFlowMatrix/MESH/*.coord
