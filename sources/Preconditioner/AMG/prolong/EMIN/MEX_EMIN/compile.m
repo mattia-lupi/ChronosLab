@@ -1,14 +1,3 @@
-libFolder = '../Cpp_EMIN/ICHOL';
-libFile = fullfile(libFolder, 'libICHOL.a');
-
-if ~isfile(libFile)
-    [s, m_msg] = system(['make -C ' libFolder]);
-    if s ~= 0
-        disp(m_msg);
-        error('Failed to build libICHOL.');
-    end
-end
-
 mex -O EMIN_Prolong_compute.cpp apply_perm.cpp copy_Prol.cpp count_rowterms.cpp...
        cpt_ichol_K.cpp cpt_Trace_Acc.cpp ddot_par.cpp DebEnv.cpp DEFL_PCG.cpp...
        DEFL_PCG_matfree.cpp dnrm2_par.cpp EMIN_ImpProl.cpp EMIN_matfree.cpp...
