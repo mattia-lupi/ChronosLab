@@ -1,1 +1,1 @@
-mex compute_local_fsai.cpp CXXFLAGS="-fopenmp -fPIC" LDFLAGS="-fopenmp -z noexecstack" -lmwblas -lmwlapack
+mex -R2018a compute_local_fsai.cpp CXXFLAGS="-fopenmp -fPIC" LDFLAGS="-fopenmp -z noexecstack" -lmwblas -lmwlapack

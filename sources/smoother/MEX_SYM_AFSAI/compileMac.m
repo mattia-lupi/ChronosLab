@@ -1,4 +1,4 @@
-% 1. Get Homebrew Paths
+% Get Homebrew Paths
 [status, cmdout] = system('/opt/homebrew/bin/brew --prefix libomp');
 if status ~= 0
     error('Error: Could not find libomp via Homebrew.');
@@ -6,19 +6,20 @@ end
 basePath = strtrim(cmdout);
 omp_inc = ['-I' fullfile(basePath, 'include')];
 
-% 2. Define the STATIC Library Path
+% Define the STATIC Library Path
 omp_static = fullfile(basePath, 'lib', 'libomp.a');
 if ~isfile(omp_static)
     error('Static library libomp.a not found at %s.', omp_static);
 end
 fprintf('Linking statically against: %s\n', omp_static);
 
-% 3. Compile
+% Compile
 mex('-O', ...
+    '-R2018a',...
     omp_inc, ...
     '-lmwblas', ...
     '-lmwlapack', ...
     'CXXFLAGS="$CXXFLAGS -std=c++11 -Xpreprocessor -fopenmp -fPIC -mmacosx-version-min=15.0"', ...
-    'LDFLAGS="$LDFLAGS -Wl,-ld_classic -mmacosx-version-min=15.0"', ...
+    'LDFLAGS="$LDFLAGS -mmacosx-version-min=15.0"', ...
     'compute_local_fsai.cpp', ...
     omp_static);

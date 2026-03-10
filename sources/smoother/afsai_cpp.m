@@ -32,11 +32,8 @@ coef_M = coef_M';
 
 
 % Switch from matlab type to c++ type
-nthread   = int32(nthread); 
-nstep     = int32(nstep); 
-step_size = int32(step_size);
-iat_M     = int64(iat_M);
-ja_M      = int32(ja_M);
+iat_M = int64(iat_M);
+ja_M  = int32(ja_M);
 
 
 % Initialization
