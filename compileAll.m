@@ -13,13 +13,19 @@ list = {'sources/Preconditioner/AMG/smoother/MEX_SYM_AFSAI/', ...
         'sources/Preconditioner/AMG/filter/MEX_Prol_Filter/'};
 
 home = pwd;
-for folder = list
-    fprintf('Compiling MEX files in %s\n', folder{1});
-    cd(folder{1});
-    if strcmp(computer('arch'),'maca64')
-       compileMac
-    else
-       compile
-    end
-    cd(home);
+try
+   for folder = list
+       fprintf('Compiling MEX files in %s\n', folder{1});
+       cd(folder{1});
+       if strcmp(computer('arch'),'maca64')
+          compileMac
+       else
+          compile
+       end
+       cd(home);
+   end
+catch ME
+   cd(home);
+   fprintf(2, 'Compilation failed: %s\n', ME.message);
+   exit(1);
 end
