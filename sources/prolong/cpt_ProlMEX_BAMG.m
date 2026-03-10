@@ -63,19 +63,10 @@ nc_I = nn_C;
 ntv = size(TV,2);
 
 % Convert reals into integers
-level = int32(level);
-np = int32(np);
-mmax = int32(mmax);
-dist_max = int32(dist_max);
-nn_S = int32(nn_S);
-nt_S = int32(nt_S);
 iat_S = int32(iat_S) - 1;
 ja_S = int32(ja_S) - 1;
-ntv = int32(ntv);
 fcnodes = int32(fcnodes);
 coef_S = int32(coef_S);
-nn_I = int32(nn_I);
-nc_I = int32(nc_I);
 
 % Convert TV in proper 1-D array
 TV = TV';

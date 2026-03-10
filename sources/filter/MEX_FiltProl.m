@@ -23,11 +23,8 @@ function mat_PF = Filter_Prol(np,perc,tol,TV,mat_P)
 [nr_TV,ntv] = size(TV);
 
 % Convert reals into integers
-np = int32(np);
-nn_P = int32(nn_P);
 iat_P = int32(iat_P) - 1;
 ja_P = int32(ja_P) - 1;
-ntv = int32(ntv);
 
 % Convert TV in proper 1-D array
 TV = TV';
