@@ -284,11 +284,11 @@ else
    AMG_hrc.TV = TV; clear TV;
    AMG_hrc.fcnode = fcnode;
    AMG_hrc.omega =smootherOp.omega;
-   if strcmp(lower(param.smoother.method),'blk_j')
+   if strcmpi(param.smoother.method,'blk_j')
       AMG_hrc.Snnz = 0;
-   elseif strcmp(lower(param.smoother.method),'bafsai')
+   elseif strcmpi(param.smoother.method,'bafsai')
       AMG_hrc.Snnz = 0;
-   elseif strcmp(lower(param.smoother.method),'ddsw')
+   elseif strcmpi(param.smoother.method,'ddsw')
       AMG_hrc.Snnz = smootherOp.nnz;
    else
       AMG_hrc.Snnz = nnz(smootherOp.right) + nnz(smootherOp.left);
@@ -314,8 +314,14 @@ else
          fprintf('Filtering next level operator\n');
       end
 
+      if level > 1
+         AA = AMG_hrc.A;
+      else
+         AA = A;
+      end
       % MEX filtering
-      Anext = MEX_FiltCLEV(np,patt_min_flag,tau,A,Anext,fcnode,Pf,TVnext);
+      Anext = MEX_FiltCLEV(np,patt_min_flag,tau,AA,Anext,fcnode,AMG_hrc.Pf,TVnext);
+      clear AA;
    end
    if verb
       fprintf('Avg nnzr Anext after filtering: %f\n',nnz(Anext)/size(Anext,1));
