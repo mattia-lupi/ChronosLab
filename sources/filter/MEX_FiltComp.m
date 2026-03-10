@@ -19,14 +19,10 @@ nt_patt = nnz(pattern_min);
 ntv = size(TV,2);
 
 % Convert reals into integers
-np = int32(np);
-nn_A = int32(nn_A);
 iat_A = int32(iat_A) - 1;
 ja_A = int32(ja_A) - 1;
-nt_patt = int32(nt_patt);
 iat_patt = int32(iat_patt) - 1;
 ja_patt = int32(ja_patt) - 1;
-ntv = int32(ntv);
 
 % Convert TV in proper 1-D array
 TV = TV';
