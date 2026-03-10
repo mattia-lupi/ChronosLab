@@ -1,4 +1,4 @@
-% 1. Get Homebrew Paths
+% Get Homebrew Paths
 [status, cmdout] = system('/opt/homebrew/bin/brew --prefix libomp');
 if status ~= 0
     error('Error: Could not find libomp via Homebrew. Make sure it is installed.');
@@ -6,7 +6,7 @@ end
 basePath = strtrim(cmdout);
 omp_inc = ['-I' fullfile(basePath, 'include')];
 
-% 2. Define the STATIC Library Path
+% Define the STATIC Library Path
 % We link libomp.a directly to prevent conflicts with MATLAB's internal OpenMP.
 omp_static = fullfile(basePath, 'lib', 'libomp.a');
 if ~isfile(omp_static)
@@ -15,15 +15,12 @@ end
 
 fprintf('Linking statically against: %s\n', omp_static);
 
-% 3. Compile command for cpt_Prolongation_EXTI
-% Changes:
-% - Removed '-L' and '-lomp' (Dynamic linking).
-% - Added 'omp_static' (Static linking) to the end.
-% - Confirmed usage of -O2 (Optimization) instead of Debug mode.
+% Compile command for cpt_Prolongation_EXTI
 mex('-O', ...
+    '-R2018a',...
     omp_inc, ...
     'CXXFLAGS="$CXXFLAGS -std=c++11 -O2 -Xpreprocessor -fopenmp -fPIC -mmacosx-version-min=15.0 -I./include/"', ...
-    'LDFLAGS="$LDFLAGS -Wl,-ld_classic -mmacosx-version-min=15.0 -O2"', ...
+    'LDFLAGS="$LDFLAGS -mmacosx-version-min=15.0 -O2"', ...
     'cpt_Prolongation_EXTI.cpp', ...
     'EXTI_prolongation.cpp', ...
     'ProlStripe_EXTI.cpp', ...
