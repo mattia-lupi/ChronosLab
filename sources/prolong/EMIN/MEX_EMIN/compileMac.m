@@ -1,4 +1,4 @@
-% 1. Setup Paths for OpenMP (Homebrew)
+% Setup Paths for OpenMP (Homebrew)
 [status, cmdout] = system('/opt/homebrew/bin/brew --prefix libomp');
 if status ~= 0
     error('Error: Could not find libomp via Homebrew. Make sure it is installed.');
@@ -6,15 +6,15 @@ end
 basePath = strtrim(cmdout);
 omp_inc = ['-I' fullfile(basePath, 'include')];
 
-% CRITICAL FIX: Use Static Library to prevent MATLAB Runtime Crash
+% Use Static Library to prevent MATLAB Runtime Crash
 omp_static = fullfile(basePath, 'lib', 'libomp.a');
 if ~isfile(omp_static)
     error('Static library libomp.a not found at %s.', omp_static);
 end
 fprintf('Linking statically against: %s\n', omp_static);
 
-% 2. Setup Paths for GFortran (Homebrew)
-% We need this because libICHOL.a depends on libgfortran
+% Setup Paths for GFortran (Homebrew)
+% Need this because libICHOL.a depends on libgfortran
 [s, gf_path] = system('dirname $(/opt/homebrew/bin/gfortran -print-file-name=libgfortran.dylib)');
 if s ~= 0
     % Try generic command if explicit path fails
@@ -26,7 +26,7 @@ end
 gf_path = strtrim(gf_path);
 fprintf('Found gfortran library at: %s\n', gf_path);
 
-% 3. Check if libICHOL exists, build if missing
+% Check if libICHOL exists, build if missing
 libFolder = '../Cpp_EMIN/ICHOL';
 libFile = fullfile(libFolder, 'libICHOL.a');
 
@@ -41,13 +41,9 @@ if ~isfile(libFile)
     system(['ranlib ' libFile]);
 end
 
-% 4. Compile Command
-% Changes:
-% - REMOVED '-lomp' and omp_lib (Dynamic linking causing crashes).
-% - ADDED 'omp_static' at the end (Static linking).
-% - Kept '-lgfortran' (Fortran must be dynamic).
-% - Kept '-lICHOL'.
+% Compile Command
 mex('-O', ...
+    '-R2018a',...
     omp_inc, ...
     ['-L' gf_path], ...         % Path to gfortran libs
     ['-L' libFolder], ...       % Path to libICHOL.a
@@ -56,7 +52,7 @@ mex('-O', ...
     '-lmwblas', ...
     '-lmwlapack', ...
     'CXXFLAGS="$CXXFLAGS -std=c++11 -O2 -Xpreprocessor -fopenmp -mmacosx-version-min=15.0 -fPIC -I../Cpp_EMIN/include/ -I../Cpp_EMIN/ICHOL"', ...
-    'LDFLAGS="$LDFLAGS -Wl,-ld_classic -mmacosx-version-min=15.0 -O2"', ... 
+    'LDFLAGS="$LDFLAGS -mmacosx-version-min=15.0 -O2"', ... 
     'EMIN_Prolong_compute.cpp', ...
     'apply_perm.cpp', ...
     'copy_Prol.cpp', ...
@@ -98,4 +94,4 @@ mex('-O', ...
     'wrCSRmat.cpp', ...
     'Z_mult.cpp', ...
     'ZT_mult.cpp', ...
-    omp_static); % <--- The Fix (Static OpenMP)
+    omp_static); 
