@@ -1,4 +1,4 @@
-function A = read_ExtBinMat(filename, varargin);
+function A = read_ExtBinMat(filename, varargin)
 
     rect = false;
     if (nargin > 1)
