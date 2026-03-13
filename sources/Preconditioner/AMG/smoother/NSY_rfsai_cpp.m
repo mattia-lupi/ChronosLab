@@ -29,10 +29,6 @@ ja_A   = ja_A';
 coef_A = coef_A';
 
 % Switch from matlab type to c++ type
-nstep     = int32(nstep); 
-step_size = int32(step_size); 
-nn_A      = int32(nn_A);
-% nt_A      = int32(nt_A);
 iat_A     = int32(iat_A) - 1;
 ja_A      = int32(ja_A) - 1;
 

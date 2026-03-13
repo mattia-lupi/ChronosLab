@@ -13,9 +13,6 @@ function [Pout,info] = MEX_EMIN_enhance_prol(level,param,A,Ppatt,Pin,TV,fcnode,v
 %              itmax_emin ==> number of PCG iterations for Energy Minimization
 %              prec_emin  ==> preconditioner for energy minimization
 %              solv_emin  ==> solution algorithm (Restr PCG, nullspace, matrix-free)
-%              min_lfil   ==> minimum fill-in for Cholesky factorization
-%              max_lfil   ==> maximum fill-in for Cholesky factorization
-%              D_lfil     ==> fill-in increase for Cholesky factorization
 % A          : matrix used to compute FSAI
 % Ppatt      : prolongation pattern to be enforced
 % Pin        : initial prolongation
@@ -43,6 +40,27 @@ nt_P = nnz(Pin);
 nt_patt = nnz(Ppatt);
 [iat_patt,ja_patt,~] = unpack_csr(Ppatt);
 
+PRINT_DEBUG = false;
+if PRINT_DEBUG
+   print_SpMat(strcat('matrix_',num2str(level),'.csr'),A);
+   print_SpMat(strcat('pattern_',num2str(level),'.csr'),Ppatt);
+   print_SpMat(strcat('prolong_',num2str(level),'.csr'),Pin);
+   fid = fopen(strcat('fcnode_',num2str(level)),'w');
+   for i = 1 : length(fcnode)
+      fprintf(fid,'%10d\n',fcnode(i));
+   end
+   fclose(fid);
+   fid = fopen(strcat('TV_',num2str(level)),'w');
+   fprintf(fid,'%10d %10d\n',size(TV,1),size(TV,2));
+   for i = 1 : size(TV,1)
+      for j = 1 : size(TV,2)
+         fprintf(fid,'%25.15e',TV(i,j));
+      end
+      fprintf(fid,'\n');
+   end
+   fclose(fid);
+end
+
 % Switch from column to row
 iat_A     = iat_A';
 ja_A      = ja_A';
@@ -69,9 +87,12 @@ condmax   = param.condmax_emin;
 maxwgt    = param.maxwgt_emin; 
 prec      = param.prec_emin; 
 sol_type  = param.solv_emin; 
-min_lfil  = param.min_lfil; 
-max_lfil  = param.max_lfil; 
-D_lfil    = param.D_lfil; 
+nn        = nn;
+nn_C      = nn_C;
+ntv       = ntv;
+nt_A      = nt_A;
+nt_P      = nt_P;
+nt_patt   = nt_patt;
 fcnode    = int32(fcnode);
 iat_A     = int32(iat_A) - 1;
 ja_A      = int32(ja_A) - 1;
@@ -83,9 +104,8 @@ ja_patt   = int32(ja_patt) - 1;
 % Compute Energy Min prolongation --------------------------------------------------------
 [iat_Pout,ja_Pout,coef_Pout,info] = ...
           EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,maxwgt,prec,sol_type,...
-                               min_lfil,max_lfil,D_lfil,nn,nn_C,ntv,nt_A,nt_P,nt_patt,...
-                               fcnode,iat_A,ja_A,coef_A,iat_Pin,ja_Pin,coef_Pin,...
-                               iat_patt,ja_patt,TV);
+                               nn,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,...
+                               iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV);
 
 % Create a sparse matrices for Pout
 nt_Pout = size(ja_Pout,2);
@@ -100,4 +120,3 @@ ja_Pout = double(ja_Pout);
 Pout = sparse(irow_Pout,ja_Pout,coef_Pout,nn,nn_C);
 
 return
-
