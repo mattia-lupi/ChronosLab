@@ -93,9 +93,6 @@ int gather_B_dump(const int np, const int nn, const int nn_C, const int ntv,
 
       } // End loop over columns
 
-      // Exit point
-      exit_pragma: ;
-
    } // End of parallel region
 
    // Free shared scratches

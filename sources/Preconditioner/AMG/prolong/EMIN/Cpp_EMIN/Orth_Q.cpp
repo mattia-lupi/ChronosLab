@@ -1,6 +1,5 @@
 #include "omp.h"
-#include "blas.h"
-#include "lapacke.h"
+#include "emin_blas.h"
 
 // Performs the orthogonalization v_out = v_in - Q*QT*v_in
 void Orth_Q(const int np, const int nn, const int nn_K, const int ntv,
@@ -11,7 +10,7 @@ void Orth_Q(const int np, const int nn, const int nn_K, const int ntv,
    /* form of op(A) & op(B) to use in matrix vector multiplication */
    char const *chn = "N", *cht = "T";
    /* scalar values to use in dgemv */
-   double const one = 1.0, mone = -1.0, zero = 0.0;
+   double const one = 1.0, zero = 0.0;
    lapack_int const oneint = 1;
 
    #pragma omp parallel num_threads(np)

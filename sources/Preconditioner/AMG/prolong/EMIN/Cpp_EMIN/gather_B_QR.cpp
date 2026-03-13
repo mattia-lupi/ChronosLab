@@ -1,8 +1,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <limits>
-#include "blas.h"     // to use: DGEMV
-#include "lapacke.h"  // to use: DGEQRF and DORGQR
+#include "emin_blas.h"     // to use: DGEMV
 //////////////////////////////////
 #include "inl_blas1.h"
 #include <iostream>
@@ -12,7 +11,6 @@ using namespace std;
 
 #include "DebEnv.h"
 #include "parm_EMIN.h"
-#include "solve_RRQR.h"
 
 #define PRINT_LOC_INFO 0
 #define PRINT_LOC_INFO_ALL 0
@@ -141,9 +139,7 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
       lapack_int l_nn = static_cast<lapack_int>(max(ntv,nrmax_blk));
       lapack_int l_mm = static_cast<lapack_int>(ntv);
       lapack_int l_kk = static_cast<lapack_int>(ntv);
-      double query_work_1;
-      double query_work_2;
-      double query_work_3;
+      double query_work;
       double *SIGMA = nullptr;      // (DI DIMENSIONE l_nn == nr_BB_loc)
       double *dummy_U = nullptr;    // (FASULLO NON VIENE USATO)
       double *VT = nullptr;         // (DI DIMENSIONE l_mm*l_mm = ntv*ntv)  
@@ -151,28 +147,15 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
       double *work = nullptr;
 
       lapack_int lwork = -1;
-      ierr_lapack = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,BB_scr,l_nn,tau,
-                                        &query_work_1,lwork);
-      if (ierr_lapack != 0){
-         #pragma omp atomic write
-         ierr = 4;
-      }
-      ierr_lapack = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_mm,l_kk,BB_scr,l_nn,tau,
-                                        &query_work_2,lwork);
-      if (ierr_lapack != 0){
-         #pragma omp atomic write
-         ierr = 4;
-      }
-      ierr_lapack = LAPACKE_dgesvd_work(LAPACK_COL_MAJOR,'o','s',l_nn,l_mm,BB_scr,l_nn,
-                                        SIGMA,dummy_U,l_nn,VT,l_mm,&query_work_3,lwork);
+      char const *cho = "o", *chs = "s";
+      dgesvd(cho,chs,&l_nn,&l_mm,BB_scr,&l_nn,SIGMA,dummy_U,&l_nn,VT,&l_mm,
+             &query_work,&lwork,&ierr_lapack);
       if (ierr_lapack != 0){
          #pragma omp atomic write
          ierr = 4;
       }
       if (ierr > 0) goto exit_pragma;
-      query_work_1 = max(query_work_1,query_work_2);
-      query_work_3 = max(query_work_3,static_cast<double>(ntv));
-      lwork = static_cast<lapack_int>(max(query_work_1,query_work_3));
+      lwork = static_cast<lapack_int>(max(query_work,static_cast<double>(ntv)));
 
       // Allocate private workspace
       SIGMA = (double*) malloc( max(ntv,nrmax_blk)*sizeof(double) );
@@ -201,8 +184,8 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
          // Check that this is a FINE node
          if (fcnode[icol] < 0){
 
-            istart_patt = BB_scr[icol];
-            iend_patt = BB_scr[icol+1];
+            istart_patt = iat_patt[icol];
+            iend_patt = iat_patt[icol+1];
             int nr_BB_loc = iend_patt-istart_patt;
 
             // Check that the row is not empty
@@ -261,14 +244,13 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
                //----------------------------------+
 
                bool FAIL_QR = false;
-               int i_lpk_1, i_lpk_2, i_lpk_3;
+               lapack_int i_lpk_1, i_lpk_2, i_lpk_3;
                if (nr_BB_loc >= ntv){
 
                   // Perform QR on BB
                   l_nn = static_cast<lapack_int>(nr_BB_loc);
                   lapack_int l_ll = l_nn;
-                  i_lpk_1 = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,
-                                    &(BB_scr[ind_BB]),l_ll,&(tau[ind_tau]),work,lwork);
+                  dgeqrf(&l_nn,&l_mm,&(BB_scr[ind_BB]),&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_1);
 
                   // Check conditioning of the resulting R
                   double max_DR = 0.0;
@@ -322,12 +304,11 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
                      //-----------------+
 
                      // Solve transposed triangular system g = inv(RR')*g
-                     i_lpk_2 = LAPACKE_dtrtrs_work(LAPACK_COL_MAJOR,'U','T','N',l_mm,1,
-                                       &(BB_scr[ind_BB]),l_ll,g_scr,l_mm);
+                     char const *chu = "U";
+                     dtrtrs(chu,cht,chn,&l_mm,&oneint,&(BB_scr[ind_BB]),&l_ll,g_scr,&l_mm,&i_lpk_2);
 
                      // Transform QQ from Householder rotation to standard form
-                     i_lpk_3 = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_mm,l_kk,
-                                       &(BB_scr[ind_BB]),l_ll,&(tau[ind_tau]),work,lwork);
+                     dorgqr(&l_nn,&l_mm,&l_kk,&(BB_scr[ind_BB]),&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_3);
                      if (i_lpk_1 || i_lpk_2 || i_lpk_3){
                         #pragma omp atomic write
                         ierr = 4;
@@ -382,13 +363,12 @@ int gather_B_QR(const int np, const double condmax, const double maxwgt, const i
                   if (DEBUG){
                      fprintf(DebEnv.t_logfile[mythid],"PRIMA DI DGESVD\n");
                      fprintf(DebEnv.t_logfile[mythid],"l_nn %ld l_mm %ld l_ll %ld lwork %ld\n",
-                                     l_nn,l_mm,l_ll,lwork);
+                             (long int) l_nn,(long int) l_mm,(long int) l_ll,(long int) lwork);
                      fflush(DebEnv.t_logfile[mythid]);
                   }
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                  i_lpk_1 = LAPACKE_dgesvd_work(LAPACK_COL_MAJOR,'o','s',l_nn,l_mm,
-                                                &(BB_scr[ind_BB]),l_ll,SIGMA,dummy_U,
-                                                l_ll,VT,l_mm,work,lwork);
+                  dgesvd(cho,chs,&l_nn,&l_mm,&(BB_scr[ind_BB]),&l_ll,SIGMA,dummy_U,&l_ll,VT,
+                         &l_mm,work,&lwork,&i_lpk_1);
                   if (i_lpk_1){
                      #pragma omp atomic write
                      ierr = 4;

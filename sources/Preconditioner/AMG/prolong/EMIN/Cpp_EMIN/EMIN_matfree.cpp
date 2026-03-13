@@ -20,7 +20,6 @@ using namespace std;
 #include "gather_f.h"
 #include "cpt_Trace_Acc.h"
 #include "print_Q.h"
-#include "ichol_mf.h"
 #include "Prol_add_Cnodes.h"
 #include "DEFL_PCG_matfree.h"
 
@@ -38,9 +37,6 @@ using namespace std;
  * maxwgt:                          max weight allowed for a P row.
  * prec_type:                       preconditioner for energy minimization
  * sol_type:                        solution method for energy minimization
- * min_lfil:                        minimum fill-in for Cholesky factorization
- * max_lfil:                        maximum fill-in for Cholesky factorization
- * D_lfil:                          fill-in increase for Cholesky factorization
  * nn:                              size of the system matrix.
  * nn_C:                            number of coarse nodes.
  * ntv:                             number of test vectors.
@@ -75,13 +71,13 @@ using namespace std;
 
 int EMIN_matfree(const int np, const int itmax, const double en_tol, const double condmax,
                  const double maxwgt, const int prec_type, const int sol_type,
-                 const int min_lfil, const int max_lfil, const int D_lfil, const int nn,
-                 const int nn_C, const int ntv, const int nt_A, const int nt_P,
-                 const int nt_patt, const int *fcnode, const int *iat_A, const int *ja_A,
-                 const double *coef_A, const int *iat_Pin, const int *ja_Pin,
-                 const double *coef_Pin, const int *iat_patt, const int *ja_patt,
-                 const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
-                 double *info){
+                 const int nn, const int nn_C, const int ntv, const int nt_A,
+                 const int nt_P, const int nt_patt, const int *fcnode, const int *iat_A,
+                 const int *ja_A, const double *coef_A, const int *iat_Pin,
+                 const int *ja_Pin, const double *coef_Pin, const int *iat_patt,
+                 const int *ja_patt, const double *const *TV, int *&iat_Pout,
+                 int *&ja_Pout, double *&coef_Pout, double *info)
+{
 
    // Init error code
    int ierr = 0;
@@ -106,7 +102,6 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    // ----- Compute the preconditioner ---------------------------------------------------
 
    int nnz_J = 0;
-   struct ichol_mf ic_var;
    double *D_inv = nullptr;
    double time_prec_K = 0.0;
    if (prec_type == DIAG){
@@ -127,28 +122,6 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
          fflush(dfile);
          fclose(dfile);
       }
-   } else if (prec_type == ICHOL){
-      // Estimate maximum scratch space for a block
-      start = chrono::system_clock::now();
-      int max_nrows_blk = 0;
-      #pragma omp parallel num_threads(np) reduction(max:max_nrows_blk)
-      for (int j = 0; j < nn_C; j++){
-         max_nrows_blk = std::max(max_nrows_blk,iat_Tpatt[j+1]-iat_Tpatt[j]);
-      }
-      int max_nnzr_blk = 0;
-      #pragma omp parallel num_threads(np) reduction(max:max_nnzr_blk)
-      for (int i = 0; i < nn; i++){
-         max_nnzr_blk = std::max(max_nnzr_blk,iat_A[i+1]-iat_A[i]);
-      }
-      // Store parameters in ic_var
-      ic_var.min_lfil  = min_lfil;
-      ic_var.max_lfil  = max_lfil;
-      ic_var.D_lfil    = D_lfil;
-      ic_var.max_nrows = max_nrows_blk;
-      ic_var.max_nnzr  = max_nnzr_blk;
-      end = chrono::system_clock::now();
-      elaps_sec = end - start;
-      time_prec_K = elaps_sec.count();
    }
 
    // ----- Copy the initial prolongation into the one with extended pattern
@@ -207,6 +180,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    }
    end = chrono::system_clock::now();
    elaps_sec = end - start;
+   free(c2glo);
    double time_gath_B = elaps_sec.count();
    if (DUMP_PREC){
       FILE *corrPfile = fopen("corrProl.csr","w");
@@ -239,7 +213,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    if (DP == nullptr) return ierr = 1;
    ierr = DEFL_PCG_matfree(np,prec_type,sol_type,nn,nn_C,nt_patt,ntv,perm,iperm,D_inv,
                            iat_A,ja_A,coef_A,Tr_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
-                           mat_Q,coef_P0,vec_f,itmax,en_tol,ic_var,iter,DP);
+                           mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP);
    if (ierr != 0) return ierr = 5;
    end = chrono::system_clock::now();
    elaps_sec = end - start;

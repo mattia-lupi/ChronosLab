@@ -1,7 +1,6 @@
 // Preconditioner types
 #define DIAG 1
-#define ICHOL 2
-#define SGS 3
+#define SGS 2
 
 // Solver types
 #define NULL_SPACE 1

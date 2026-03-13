@@ -1,0 +1,13 @@
+1                                            // BINREAD
+20                                           // np
+10                                           // itmax
+1.e-4                                        // en_tol
+1.e+100                                      // condmax
+1.e+100                                      // maxwgt
+1                                            // prec_type
+4                                            // sol_type
+matrix.bin                                   // MAT_file
+prolong.bin                                  // PROL_file
+pattern.bin                                  // PATT_file
+TV                                           // TV_file
+fcnode                                       // FC_file

@@ -11,7 +11,6 @@ using namespace std;
 #include "Orth_Q.h"
 #include "ddot_par.h"
 #include "dnrm2_par.h"
-#include "icholRF_apply.h"
 
 /*****************************************************************************************
  *
@@ -125,8 +124,6 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       if (prec_type == DIAG){
          #pragma omp parallel for num_threads(np)
             for (int i = 0; i < nn_K; i++) wscr[i] = D_inv[i]*vscr[i];
-      } else if (prec_type == ICHOL){
-         icholRF_apply(np,nn_C,iat_Tpatt, it_U,jcol_U,coef_U,D_inv,vscr,wscr);
       }
       // 3 - Permute wscr from col-major to row-major
       apply_perm(np,nn_K,perm,wscr,vscr);

@@ -15,7 +15,6 @@ using namespace std;
 #include "Transp_Patt.h"
 #include "EMIN_matfree.h"
 #include "gather_K.h"
-#include "cpt_ichol_K.h"
 #include "copy_Prol.h"
 #include "gather_B_QR.h"
 #include "gather_B_Z.h"
@@ -42,9 +41,6 @@ using namespace std;
  * maxwgt:                          max weight allowed for a P row.
  * prec_type:                       preconditioner for energy minimization
  * sol_type:                        solver for energy minimization
- * min_lfil:                        minimum fill-in for Cholesky factorization
- * max_lfil:                        maximum fill-in for Cholesky factorization
- * D_lfil:                          fill-in increase for Cholesky factorization
  * nn:                              size of the system matrix.
  * nn_C:                            number of coarse nodes.
  * ntv:                             number of test vectors.
@@ -91,13 +87,12 @@ using namespace std;
 
 int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const double condmax,
                  const double maxwgt, const int prec_type, const int sol_type,
-                 const int min_lfil, const int max_lfil, const int D_lfil, const int nn,
-                 const int nn_C, const int ntv, const int nt_A, const int nt_P,
-                 const int nt_patt, const int *fcnode, const int *iat_A, const int *ja_A,
-                 const double *coef_A, const int *iat_Pin, const int *ja_Pin,
-                 const double *coef_Pin, const int *iat_patt, const int *ja_patt,
-                 const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
-                 double *info)
+                 const int nn, const int nn_C, const int ntv, const int nt_A,
+                 const int nt_P, const int nt_patt, const int *fcnode, const int *iat_A,
+                 const int *ja_A, const double *coef_A, const int *iat_Pin,
+                 const int *ja_Pin, const double *coef_Pin, const int *iat_patt,
+                 const int *ja_patt, const double *const *TV, int *&iat_Pout,
+                 int *&ja_Pout, double *&coef_Pout, double *info)
 {
 
    // Init error code
@@ -124,10 +119,10 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
       //** SOLUTION IN MATRIX FREE MODE **
       //**********************************
 
-      ierr = EMIN_matfree(np,itmax,en_tol,condmax,maxwgt,prec_type,sol_type,min_lfil,
-                          max_lfil,D_lfil,nn,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,
-                          ja_A,coef_A,iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV,
-                          iat_Pout,ja_Pout,coef_Pout,info);
+      ierr = EMIN_matfree(np,itmax,en_tol,condmax,maxwgt,prec_type,sol_type,nn,nn_C,
+                          ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,iat_Pin,
+                          ja_Pin,coef_Pin,iat_patt,ja_patt,TV,iat_Pout,ja_Pout,
+                          coef_Pout,info);
 
    } else {
 
@@ -180,7 +175,6 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
 
       // ----- Compute the preconditioner for K ------------------------------------------
 
-      if (dump) cout << "---- ICHOL K ----" << endl << endl;
       start = chrono::system_clock::now();
       int *it_U = nullptr, *jcol_U = nullptr;
       double *coef_U = nullptr, *D_inv = nullptr;
@@ -191,18 +185,6 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
          #pragma omp parallel for num_threads(np)
          for (int i = 0; i < nn_K; i++) D_inv[i] = 1.0 / coef_K[iat_K[i]];
          nnz_PK = nn_K;
-      } else if (prec_type == ICHOL){
-         // Compute an incomplete factorization of K
-         ierr = cpt_ichol_K(np,min_lfil,max_lfil,D_lfil,nn_C,iat_Tpatt,nnmax_blk,ntmax_blk,
-                            nn_K,iat_K,ja_K,coef_K,avg_lfil,it_U,jcol_U,coef_U,D_inv);
-         if (ierr != 0) return ierr = 3;
-         if (DUMP_PREC){
-            FILE *ufile = fopen("U_mat","w");
-            wrCSRmat(ufile,false,nn_K,it_U,jcol_U,coef_U);
-            fflush(ufile);
-            fclose(ufile);
-         }
-         nnz_PK = it_U[nn_K] + nn_K;
       } else {
          // Preconditioner not available
          cout << "Preconditioner not available" << endl;

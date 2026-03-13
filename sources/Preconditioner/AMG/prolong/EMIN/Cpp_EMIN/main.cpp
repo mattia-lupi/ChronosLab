@@ -6,7 +6,6 @@
 #include <math.h>
 #include <libgen.h>  // to use: basename
 #include <chrono>    // to use: system_clock,duration
-#include "lapacke.h"  // to use: dpotrf,dpotrs
 using namespace std;
 
 #include "DebEnv.h"
@@ -41,7 +40,6 @@ double condmax;
 double en_tol;
 double maxwgt;
 int prec_type, sol_type;
-int min_lfil, max_lfil, D_lfil;
 int ierr, k, kk;
 char MAT_file[charStrLen]="";
 char PROL_file[charStrLen]="";
@@ -78,12 +76,6 @@ char line[1024];
       read_err = read_err || (fget_ret == nullptr);
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &sol_type);
       read_err = read_err || (fget_ret == nullptr);
-      fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &min_lfil);
-      read_err = read_err || (fget_ret == nullptr);
-      fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &max_lfil);
-      read_err = read_err || (fget_ret == nullptr);
-      fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &D_lfil);
-      read_err = read_err || (fget_ret == nullptr);
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%s",  MAT_file);
       read_err = read_err || (fget_ret == nullptr);
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%s",  PROL_file);
@@ -112,9 +104,6 @@ char line[1024];
    cout << "MAXWGT:    " << maxwgt << endl;
    cout << "PREC_TYPE: " << prec_type << endl;
    cout << "SOL_TYPE:  " << sol_type << endl;
-   cout << "MIN_LFIL:  " << min_lfil << endl;
-   cout << "MAX_LFIL:  " << max_lfil << endl;
-   cout << "D_LFIL:    " << D_lfil << endl;
    cout << "MAT_file:  " << MAT_file << endl;
    cout << "PROL_file: " << PROL_file << endl;
    cout << "PATT_file: " << PATT_file << endl;
@@ -214,7 +203,7 @@ char line[1024];
    // Open the input file
    ifstream fileFC(FC_file);
    // Allocate fcnode
-   int *fcnode   = (int*) malloc( nn_A*sizeof(int) );
+   int *fcnode = (int*) malloc( nn_A*sizeof(int) );
    for (int i = 0; i < nn_A; i++) fileFC >> fcnode[i];
    // Close the input file
    fileFC.close();
@@ -243,10 +232,9 @@ char line[1024];
    int *ja_Pnew;
    double *coef_Pnew;
    double emin_info[EMIN_INFO_SZ];
-   ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,maxwgt,prec_type,sol_type,min_lfil,max_lfil,
-                       D_lfil,nn_A,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,
-                       iat_P,ja_P,coef_P,iat_patt,ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,
-                       emin_info,false);
+   ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,maxwgt,prec_type,sol_type,nn_A,nn_C,ntv,
+                       nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,
+                       iat_patt,ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info);
 
    //---STOP--------------------------------
    auto end = chrono::system_clock::now();
@@ -256,6 +244,21 @@ char line[1024];
    cout << endl << endl;
    cout << "Time for Enengy Minimization [sec]: " << elapsed_seconds.count() << endl;
    cout << endl;
+
+   free(iat_A);
+   free(ja_A);
+   free(coef_A);
+   free(iat_P);
+   free(ja_P);
+   free(coef_P);
+   free(iat_patt);
+   free(ja_patt);
+   free(fcnode);
+   free(TVbuf);
+   free(TV);
+   free(iat_Pnew);
+   free(ja_Pnew);
+   free(coef_Pnew);
 
    //cout << "Printing Final Prolongation" << endl;
    //FILE *pfile = fopen("Prol_EMIN.csr","w"); if (!pfile) exit(1);

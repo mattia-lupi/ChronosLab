@@ -1,15 +1,14 @@
 #include "omp.h"
-#include "blas.h"
-#include "lapacke.h"
+#include "emin_blas.h"
 
 void Z_mult(const int np, const int nblk, const int ntv, const int *pt_blk,
             const int *pt_Z, const int *pt_col_Z, const double *mat_Z,
             const double *vec_in, double* vec_out){
 
    /* form of op(A) & op(B) to use in matrix vector multiplication */
-   char const *chn = "N", *cht = "T";
+   char const *chn = "N";
    /* scalar values to use in dgemv */
-   double const one = 1.0, mone = -1.0, zero = 0.0;
+   double const one = 1.0, zero = 0.0;
    lapack_int const oneint = 1;
 
     #pragma omp parallel for num_threads(np)

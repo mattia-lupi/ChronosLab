@@ -11,8 +11,6 @@ using namespace std;
 #include "Orth_Q.h"
 #include "ddot_par.h"
 #include "dnrm2_par.h"
-#include "ichol_mf.h"
-#include "ichol_matfree.h"
 #include "KP_spmat.h"
 #include "LinvP_spmat.h"
 #include "UinvDP_spmat.h"
@@ -34,7 +32,7 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
                      const int *iat_patt, const int *ja_patt, const int *iat_Tpatt,
                      const int *ja_Tpatt, const double *mat_Q, const double *vec_P0,
                      const double *vec_f, const int itmax, const double energy_tol,
-                     struct ichol_mf ic_var, int &iter, double *vec_DP){
+                     int &iter, double *vec_DP){
 
    // Init error code
    int ierr = 0;
@@ -65,23 +63,6 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       if (WNALL == nullptr) return ierr = 1;
       WNALLA = (int*) malloc( (np*nn)*sizeof(int) );
       if (WNALLA == nullptr) return ierr = 1;
-   }
-   if (prec_type == ICHOL){
-      // Allocate scratch for ICHOL application
-      int nn_max = ic_var.max_nrows;
-      int nt_max = nn_max*ic_var.max_nnzr;
-      int iwk_U = nt_max + nn_max * (ic_var.max_lfil+1);
-      int idim_K = nn_max + 1 + nt_max;
-      int rdim_K = ic_var.max_nnzr*ic_var.max_nrows;
-      int idim_IC = nn_max + 1 + iwk_U;
-      int rdim_IC = nn_max + iwk_U;
-      int ireg_scr_size = iwk_U + nn_max;
-      int iext_scr_size = iwk_U + 4*nn_max;
-      ic_var.I_dim = idim_K + idim_IC + ireg_scr_size + iext_scr_size;
-      ic_var.R_dim = rdim_K + rdim_IC;
-      ic_var.I_scr = (int*) malloc( np*ic_var.I_dim*sizeof(int) );
-      ic_var.R_scr = (double*) malloc( np*ic_var.R_dim*sizeof(double) );
-      if (ic_var.I_scr == nullptr || ic_var.R_scr == nullptr) return ierr = 1;
    }
 
    // Init vec_DP to zero
@@ -144,7 +125,6 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
    // Init residual
    #pragma omp parallel for num_threads(np)
    for (int i = 0; i < nn_K; i++) res[i] = rhs[i];
-   double bnorm = dnrm2_par(np,nn_K,rhs,ridv);
 
    // Init PCG
    iter = 0;
@@ -164,8 +144,6 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       if (prec_type == DIAG){
          #pragma omp parallel for num_threads(np)
             for (int i = 0; i < nn_K; i++) wscr[i] = D_inv[i]*vscr[i];
-      } else if (prec_type == ICHOL){
-         ichol_matfree(np,nn_C,ic_var,iat_A,ja_A,coef_A,iat_Tpatt,ja_Tpatt,vscr,wscr);
       } else if (prec_type == SGS){
         // symmetric Gauss-Seidel U^-1 * D * L^-1 * vscr
         // works in place
@@ -253,8 +231,6 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
    free(ridv);
    free(WNALL);
    free(WNALLA);
-   free(ic_var.I_scr);
-   free(ic_var.R_scr);
 
    return ierr;
 

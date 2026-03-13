@@ -1,8 +1,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <string.h>
-#include "blas.h"     // to use: DGEMV
-#include "lapacke.h"  // to use: DGEQRF and DORGQR
+#include "emin_blas.h"     // to use: DGEMV
 //////////////////////////////////
 #include <iostream>
 #include <stdio.h>
@@ -137,14 +136,12 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
       double *work = nullptr;
 
       lapack_int lwork = -1;
-      ierr_lapack = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,BB_scr,l_nn,tau,
-                                        &query_work_1,lwork);
+      dgeqrf(&l_nn,&l_mm,BB_scr,&l_nn,tau,&query_work_1,&lwork,&ierr_lapack);
       if (ierr_lapack != 0){
          #pragma omp atomic write
          ierr = 4;
       }
-      ierr_lapack = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_nn,l_kk,BB_scr,l_nn,tau,
-                                        &query_work_2,lwork);
+      dorgqr(&l_nn,&l_nn,&l_kk,BB_scr,&l_nn,tau,&query_work_2,&lwork,&ierr_lapack);
       if (ierr_lapack != 0){
          #pragma omp atomic write
          ierr = 4;
@@ -208,7 +205,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
                /* form of op(A) & op(B) to use in matrix vector multiplication */
                char const *chn = "N", *cht = "T";
                /* scalar values to use in dgemv */
-               double const one = 1.0, mone = -1.0, zero = 0.0;
+               double const one = 1.0, mone = -1.0;
                lapack_int const oneint = 1;
 
                // Compute g = g - BB^T*coef_P0
@@ -220,17 +217,15 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
                // Perform QR on BB
                l_nn = static_cast<lapack_int>(nr_BB_loc);
                lapack_int l_ll = l_nn;
-               int i_lpk_1, i_lpk_2, i_lpk_3;
-               i_lpk_1 = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR,l_nn,l_mm,BB_scr,
-                                 l_ll,&(tau[ind_tau]),work,lwork);
+               lapack_int i_lpk_1, i_lpk_2, i_lpk_3;
+               dgeqrf(&l_nn,&l_mm,BB_scr,&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_1);
 
                // Solve transposed triangular system
-               i_lpk_2 = LAPACKE_dtrtrs_work(LAPACK_COL_MAJOR,'U','T','N',l_mm,1,
-                                 BB_scr,l_ll,&(g_scr[ind_g]),l_mm);
+               char const *chu = "U";
+               dtrtrs(chu,cht,chn,&l_mm,&oneint,BB_scr,&l_ll,&(g_scr[ind_g]),&l_mm,&i_lpk_2);
 
                // Transform QQ from Householder rotation to standard form
-               i_lpk_3 = LAPACKE_dorgqr_work(LAPACK_COL_MAJOR,l_nn,l_nn,l_kk,
-                                 BB_scr,l_ll,&(tau[ind_tau]),work,lwork);
+               dorgqr(&l_nn,&l_nn,&l_kk,BB_scr,&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_3);
                if (i_lpk_1 || i_lpk_2 || i_lpk_3){
                   #pragma omp atomic write
                   ierr = 4;
