@@ -84,7 +84,6 @@ np        = param.np;
 itmax     = param.itmax_emin; 
 energ_tol = param.energ_tol; 
 condmax   = param.condmax_emin; 
-maxwgt    = param.maxwgt_emin; 
 prec      = param.prec_emin; 
 sol_type  = param.solv_emin; 
 nn        = nn;
@@ -103,7 +102,7 @@ ja_patt   = int32(ja_patt) - 1;
 
 % Compute Energy Min prolongation --------------------------------------------------------
 [iat_Pout,ja_Pout,coef_Pout,info] = ...
-          EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,maxwgt,prec,sol_type,...
+          EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,prec,sol_type,...
                                nn,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,...
                                iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV);
 

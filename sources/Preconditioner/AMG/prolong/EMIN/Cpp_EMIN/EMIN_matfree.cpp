@@ -34,7 +34,6 @@ using namespace std;
  * np:                              number of openMP threads.
  * itmax:                           number of EnerMinCG iterations.
  * condmax:                         max conditioning allowed for a B block.
- * maxwgt:                          max weight allowed for a P row.
  * prec_type:                       preconditioner for energy minimization
  * sol_type:                        solution method for energy minimization
  * nn:                              size of the system matrix.
@@ -70,13 +69,12 @@ using namespace std;
  *****************************************************************************************/
 
 int EMIN_matfree(const int np, const int itmax, const double en_tol, const double condmax,
-                 const double maxwgt, const int prec_type, const int sol_type,
-                 const int nn, const int nn_C, const int ntv, const int nt_A,
-                 const int nt_P, const int nt_patt, const int *fcnode, const int *iat_A,
-                 const int *ja_A, const double *coef_A, const int *iat_Pin,
-                 const int *ja_Pin, const double *coef_Pin, const int *iat_patt,
-                 const int *ja_patt, const double *const *TV, int *&iat_Pout,
-                 int *&ja_Pout, double *&coef_Pout, double *info)
+                 const int prec_type, const int sol_type, const int nn, const int nn_C,
+                 const int ntv, const int nt_A, const int nt_P, const int nt_patt,
+                 const int *fcnode, const int *iat_A, const int *ja_A, const double *coef_A,
+                 const int *iat_Pin, const int *ja_Pin, const double *coef_Pin,
+                 const int *iat_patt, const int *ja_patt, const double *const *TV,
+                 int *&iat_Pout, int *&ja_Pout, double *&coef_Pout, double *info)
 {
 
    // Init error code
@@ -152,8 +150,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
       fclose(Bfile);
       free(mat_B);
    }
-   ierr = gather_B_QR(np,condmax,maxwgt,nn,nn_C,ntv,fcnode,iat_patt,ja_patt,TV,
-                      mat_Q,coef_P0);
+   ierr = gather_B_QR(np,condmax,nn,nn_C,ntv,fcnode,iat_patt,ja_patt,TV,mat_Q,coef_P0);
    if (ierr != 0) return ierr = 4;
    int nnz_Q = ntv*iat_patt[nn];
 
