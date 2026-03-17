@@ -13,8 +13,6 @@
 
 #pragma once
 
-using namespace std;
-
 /**
  * @brief Counts the number of non-zeroes assigned to a thread in each row.
  * @param [in] nequ number of equations.

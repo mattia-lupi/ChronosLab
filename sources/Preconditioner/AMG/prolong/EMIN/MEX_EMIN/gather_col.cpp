@@ -1,1 +1,0 @@
-../Cpp_EMIN/gather_col.cpp

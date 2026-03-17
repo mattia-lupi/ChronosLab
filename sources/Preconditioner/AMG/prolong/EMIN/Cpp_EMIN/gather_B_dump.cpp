@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <limits>
-using namespace std;
 
 #include "DebEnv.h"
 #include "parm_EMIN.h"

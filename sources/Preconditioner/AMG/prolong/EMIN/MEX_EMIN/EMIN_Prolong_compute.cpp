@@ -6,7 +6,7 @@
 // MATLAB signature:
 //   [iat_Pout, ja_Pout, coef_Pout, info] =
 //       EMIN_Prolong_compute(level,np,itmax,en_tol,condmax,prec,sol_type,
-//                            min_lfil,max_lfil,D_lfil,nn,nn_C,ntv,nt_A,nt_P,
+//                            min_lfil,max_lfil,D_lfil,nn,nn_C,ntv,
 //                            nt_patt,fcnode,iat_A,ja_A,coef_A,iat_Pin,ja_Pin,
 //                            coef_Pin,iat_patt,ja_patt,TV);
 //
@@ -122,9 +122,7 @@ public:
         const int    nn        = static_cast<int>   (TypedArray<double>(inputs[ 7])[0]);
         const int    nn_C      = static_cast<int>   (TypedArray<double>(inputs[ 8])[0]);
         const int    ntv       = static_cast<int>   (TypedArray<double>(inputs[ 9])[0]);
-        const int    nt_A      = static_cast<int>   (TypedArray<double>(inputs[10])[0]);
-        const int    nt_P      = static_cast<int>   (TypedArray<double>(inputs[11])[0]);
-        const int    nt_patt   = static_cast<int>   (TypedArray<double>(inputs[12])[0]);
+        const int    nt_patt   = static_cast<int>   (TypedArray<double>(inputs[10])[0]);
 
         // -----------------------------------------------------------------------
         // Read input arrays
@@ -132,16 +130,16 @@ public:
         // -----------------------------------------------------------------------
         if (dump) mprint("- Get input arrays\n");
 
-        const TypedArray<int32_t> fcnode_arr   = inputs[13];
-        const TypedArray<int32_t> iat_A_arr    = inputs[14];
-        const TypedArray<int32_t> ja_A_arr     = inputs[15];
-        const TypedArray<double>  coef_A_arr   = inputs[16];
-        const TypedArray<int32_t> iat_Pin_arr  = inputs[17];
-        const TypedArray<int32_t> ja_Pin_arr   = inputs[18];
-        const TypedArray<double>  coef_Pin_arr = inputs[19];
-        const TypedArray<int32_t> iat_patt_arr = inputs[20];
-        const TypedArray<int32_t> ja_patt_arr  = inputs[21];
-        const TypedArray<double>  TVbuf_arr    = inputs[22];
+        const TypedArray<int32_t> fcnode_arr   = inputs[11];
+        const TypedArray<int32_t> iat_A_arr    = inputs[12];
+        const TypedArray<int32_t> ja_A_arr     = inputs[13];
+        const TypedArray<double>  coef_A_arr   = inputs[14];
+        const TypedArray<int32_t> iat_Pin_arr  = inputs[15];
+        const TypedArray<int32_t> ja_Pin_arr   = inputs[16];
+        const TypedArray<double>  coef_Pin_arr = inputs[17];
+        const TypedArray<int32_t> iat_patt_arr = inputs[18];
+        const TypedArray<int32_t> ja_patt_arr  = inputs[19];
+        const TypedArray<double>  TVbuf_arr    = inputs[20];
 
         std::vector<int32_t> fcnode_vec  (fcnode_arr.begin(),   fcnode_arr.end());
         std::vector<int32_t> iat_A_vec   (iat_A_arr.begin(),    iat_A_arr.end());
@@ -206,7 +204,7 @@ public:
         double  *coef_Pout_raw = nullptr;
 
         int ierr = EMIN_ImpProl(np, itmax, en_tol, condmax,
-                                prec, sol_type, nn, nn_C, ntv, nt_A, nt_P, 
+                                prec, sol_type, nn, nn_C, ntv,
                                 nt_patt, fcnode_vec.data(),
                                 iat_A_vec.data(),    ja_A_vec.data(),   coef_A_vec.data(),
                                 iat_Pin_vec.data(),  ja_Pin_vec.data(), coef_Pin_vec.data(),
@@ -287,9 +285,9 @@ private:
     // [FIX-C] ArgumentList methods are not const — take non-const refs
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
-        if (inputs.size() != 23)
+        if (inputs.size() != 21)
             throwError("EMIN_Prolong:badInputCount",
-                       "Expected 23 input arguments, got " +
+                       "Expected 21 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
         if (outputs.size() != 4)
@@ -297,23 +295,23 @@ private:
                        "Expected 4 output arguments, got " +
                        std::to_string(outputs.size()) + ".");
 
-        // Inputs 0–12: real double scalars
-        for (std::size_t i = 0; i < 13; ++i)
+        // Inputs 0–10: real double scalars
+        for (std::size_t i = 0; i < 11; ++i)
             if (inputs[i].getType() != ArrayType::DOUBLE ||
                 inputs[i].getNumberOfElements() != 1)
                 throwError("EMIN_Prolong:badScalar",
                            "Input argument " + std::to_string(i + 1) +
                            " must be a real double scalar.");
 
-        // Inputs 13–15, 17–18, 20–21: int32 arrays
-        for (std::size_t i : {13u, 14u, 15u, 17u, 18u, 20u, 21u})
+        // Inputs 11–13, 15–16, 18–19: int32 arrays
+        for (std::size_t i : {11u, 12u, 13u, 15u, 16u, 18u, 19u})
             if (inputs[i].getType() != ArrayType::INT32)
                 throwError("EMIN_Prolong:badArray",
                            "Input argument " + std::to_string(i + 1) +
                            " must be an int32 array.");
 
-        // Inputs 16, 19, 22: double arrays (coef_A, coef_Pin, TV)
-        for (std::size_t i : {16u, 19u, 22u})
+        // Inputs 14, 17, 20: double arrays (coef_A, coef_Pin, TV)
+        for (std::size_t i : {14u, 17u, 20u})
             if (inputs[i].getType() != ArrayType::DOUBLE)
                 throwError("EMIN_Prolong:badArray",
                            "Input argument " + std::to_string(i + 1) +

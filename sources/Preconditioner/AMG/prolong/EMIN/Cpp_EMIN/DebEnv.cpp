@@ -67,7 +67,7 @@ void DebugEnvironment::OpenDebugLog(const char *mode){
       OPEN_LOG = true;
 
       // Open the log unit associated to ranks
-      string logfile_name = "EMIN_MAIN_Logfile";
+      std::string logfile_name = "EMIN_MAIN_Logfile";
       r_logfile = fopen(logfile_name.data(),mode);
 
       // Resize the log unit for threads
@@ -75,10 +75,10 @@ void DebugEnvironment::OpenDebugLog(const char *mode){
 
       // Open the log unit associated to threads and ranks
       for (iReg i = 0; i < nthreads; i++){
-         stringstream ss;
-         ss << setw(2) << setfill('0') << i;
-         string myid_label = ss.str();
-         string logfile_name = "EMIN_thid_Logfile." + myid_label;
+         std::stringstream ss;
+         ss << std::setw(2) << std::setfill('0') << i;
+         std::string myid_label = ss.str();
+         std::string logfile_name = "EMIN_thid_Logfile." + myid_label;
          t_logfile[i] = fopen(logfile_name.data(),mode);
       }
 

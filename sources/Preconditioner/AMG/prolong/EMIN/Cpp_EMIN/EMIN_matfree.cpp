@@ -2,7 +2,6 @@
 #include <omp.h>
 #include <cmath>
 #include <chrono>
-using namespace std;
 
 #if defined PRINT
 #define dump true
@@ -39,8 +38,6 @@ using namespace std;
  * nn:                              size of the system matrix.
  * nn_C:                            number of coarse nodes.
  * ntv:                             number of test vectors.
- * nt_A:                            number of non-zeroes of the system matrix.
- * nt_P:                            number of non-zeroes of the input prolongation.
  * nt_patt:                         number of non-zeroes of the non-zero pattern.
  * fcnode:                          F/C indicator.
  * iat_A, ja_A, coef_A:             system matrix.
@@ -70,19 +67,19 @@ using namespace std;
 
 int EMIN_matfree(const int np, const int itmax, const double en_tol, const double condmax,
                  const int prec_type, const int sol_type, const int nn, const int nn_C,
-                 const int ntv, const int nt_A, const int nt_P, const int nt_patt,
-                 const int *fcnode, const int *iat_A, const int *ja_A, const double *coef_A,
-                 const int *iat_Pin, const int *ja_Pin, const double *coef_Pin,
-                 const int *iat_patt, const int *ja_patt, const double *const *TV,
-                 int *&iat_Pout, int *&ja_Pout, double *&coef_Pout, double *info)
+                 const int ntv, const int nt_patt, const int *fcnode, const int *iat_A,
+                 const int *ja_A, const double *coef_A, const int *iat_Pin, const int *ja_Pin,
+                 const double *coef_Pin, const int *iat_patt, const int *ja_patt,
+                 const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
+                 double *info)
 {
 
    // Init error code
    int ierr = 0;
 
    // --- Local variables for timing -----------------------------------------------------
-   chrono::time_point<std::chrono::system_clock> start, end;
-   chrono::duration<double> elaps_sec;
+   std::chrono::time_point<std::chrono::system_clock> start, end;
+   std::chrono::duration<double> elaps_sec;
 
    // ------ Transpose the pattern ----------------------------------------------------
 
@@ -104,14 +101,14 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    double time_prec_K = 0.0;
    if (prec_type == DIAG){
       // Compute a Jacobi preconditioner for K
-      start = chrono::system_clock::now();
+      start = std::chrono::system_clock::now();
       D_inv = (double*) malloc( nt_patt*sizeof(double) );
       double *scr = (double*) malloc( nn*sizeof(double) );
       if (D_inv == nullptr || scr == nullptr) return ierr = 3;
-      load_Jacobi(np,nn,nt_patt,iat_Tpatt,ja_Tpatt,iat_A,ja_A,coef_A,scr,D_inv);
+      load_Jacobi(np,nn,nt_patt,ja_Tpatt,iat_A,ja_A,coef_A,scr,D_inv);
       free(scr);
       nnz_J = nt_patt;
-      end = chrono::system_clock::now();
+      end = std::chrono::system_clock::now();
       elaps_sec = end - start;
       time_prec_K = elaps_sec.count();
       if (DUMP_PREC){
@@ -123,7 +120,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    }
 
    // ----- Copy the initial prolongation into the one with extended pattern
-   if (dump) cout << "---- COPY PROL ----" << endl << endl;
+   if (dump) std::cout << "---- COPY PROL ----" << std::endl << std::endl;
    double *coef_P0 = (double*) calloc( nt_patt , sizeof(double) );
    if (coef_P0 == nullptr) return ierr = 1;
    copy_Prol(np,nn,fcnode,iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,coef_P0); 
@@ -137,8 +134,8 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    }
 
    // ----- Assemble and decompose with QR the constraint part B ----------------------
-   if (dump) cout << "---- gather_B_Qr ----" << endl << endl;
-   start = chrono::system_clock::now();
+   if (dump) std::cout << "---- gather_B_Qr ----" << std::endl << std::endl;
+   start = std::chrono::system_clock::now();
    double *mat_Q = nullptr;
    double *vec_f = nullptr;
    if (DUMP_PREC){
@@ -175,7 +172,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
        gather_f(iend-istart,&(ja_Tpatt[istart]),iend_A-istart_A,&(ja_A[istart_A]),
                 &(coef_A[istart_A]),&(vec_f[istart]));
    }
-   end = chrono::system_clock::now();
+   end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    free(c2glo);
    double time_gath_B = elaps_sec.count();
@@ -203,8 +200,8 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    int iter;
 
    // Compute prolongation correction with PCG
-   if (dump) cout << "---- DEFL_PCG_matfree ----" << endl << endl;
-   start = chrono::system_clock::now();
+   if (dump) std::cout << "---- DEFL_PCG_matfree ----" << std::endl << std::endl;
+   start = std::chrono::system_clock::now();
    // Allocate prolongation correction
    double *DP = (double*) malloc( nt_patt*sizeof(double) );
    if (DP == nullptr) return ierr = 1;
@@ -212,11 +209,11 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
                            iat_A,ja_A,coef_A,Tr_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
                            mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP);
    if (ierr != 0) return ierr = 5;
-   end = chrono::system_clock::now();
+   end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    double time_PCG = elaps_sec.count();
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-   cout << "PCG TIME "<< time_PCG << endl;
+   std::cout << "PCG TIME "<< time_PCG << std::endl;
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
    // Update prolongation with DP

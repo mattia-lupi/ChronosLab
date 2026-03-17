@@ -5,7 +5,6 @@
 //////////////////////////////////
 #include <iostream>
 #include <stdio.h>
-using namespace std;
 //////////////////////////////////
 #include "gather_f.h"
 
@@ -72,7 +71,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
             nc += lenc;
             nt += len*lenc;
          }
-         nrmax_blk = max(nrmax_blk,len);
+         nrmax_blk = std::max(nrmax_blk,len);
       }
       pt_THpart[mythid+1] = nt;
       pt_THcol[mythid+1] = nc;
@@ -126,7 +125,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
 
       // Query work space for DGEQRF and DORGQR
       lapack_int ierr_lapack;
-      lapack_int l_nn = static_cast<lapack_int>(max(ntv,nrmax_blk));
+      lapack_int l_nn = static_cast<lapack_int>(std::max(ntv,nrmax_blk));
       lapack_int l_mm = static_cast<lapack_int>(ntv);
       lapack_int l_kk = static_cast<lapack_int>(ntv);
       double query_work_1;
@@ -148,7 +147,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
       }
       #pragma omp barrier
       if (ierr > 0) goto exit_pragma;
-      lwork = static_cast<lapack_int>(max(query_work_1,query_work_2));
+      lwork = static_cast<lapack_int>(std::max(query_work_1,query_work_2));
 
       // Allocate private workspace
       BB_scr = (double*) malloc( (nrmax_blk*nrmax_blk)*sizeof(double) );

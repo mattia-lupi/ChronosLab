@@ -1,1 +1,0 @@
-../Cpp_EMIN/mkiat_Tglo.cpp

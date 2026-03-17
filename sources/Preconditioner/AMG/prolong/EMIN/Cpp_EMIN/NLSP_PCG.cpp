@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
-using namespace std;
 
 #include "parm_EMIN.h"
 #include "spmatv_blk.h"
@@ -26,12 +25,9 @@ using namespace std;
 int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
              const int nn_K, const int ntv, const int *perm, const int *iperm,
              const double Tr_A, const int *iat_K, const int *ja_K, const double *coef_K,
-             const int *it_U, const int *jcol_U, const double *coef_U,
-             const double *D_inv, const int *iat_patt, const int *ja_patt,
-             const int *iat_Tpatt, const int *ja_Tpatt,
-             const int *pt_Z, const int *pt_col_Z, const double *mat_Z,
-             const double *vec_f, const int itmax, int &iter, double &relres,
-             double *vec_P){
+             const double *D_inv, const int *iat_patt, const int *iat_Tpatt,
+             const int *pt_Z, const int *pt_col_Z, const double *mat_Z, const double *vec_f,
+             const int itmax, int &iter, double &relres, double *vec_P){
 
    // Init error code
    int ierr = 0;
@@ -62,11 +58,11 @@ int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    #if COMP_ENRG
    double init_energy = Tr_A + ddot_par(np,nn_K,vscr,wscr,ridv) -
                                2.0*ddot_par(np,nn_K,vscr,vec_f,ridv);
-   cout << setprecision(10) << scientific;
-   cout << "INIT ENERGY:  " << init_energy << endl;
-   cout << "TRACCIA: " << Tr_A << endl;
-   cout << "P0KP0: " << ddot_par(np,nn_K,vscr,wscr,ridv) << endl;
-   cout << "-2*f'*P0: " << -2.0*ddot_par(np,nn_K,vscr,vec_f,ridv) << endl;
+   std::cout << std::setprecision(10) << std::scientific;
+   std::cout << "INIT ENERGY:  " << init_energy << std::endl;
+   std::cout << "TRACCIA: " << Tr_A << std::endl;
+   std::cout << "P0KP0: " << ddot_par(np,nn_K,vscr,wscr,ridv) << std::endl;
+   std::cout << "-2*f'*P0: " << -2.0*ddot_par(np,nn_K,vscr,vec_f,ridv) << std::endl;
    #endif
    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    // 3 - Compute wscr <-- vec_f - wscr = vec_f - K*vec_P
@@ -164,23 +160,23 @@ int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
          apply_perm(np,nn_K,perm,vscr,wscr);
          ZT_mult(np,nn,ntv,iat_patt,pt_Z,pt_col_Z,mat_Z,wscr,vscr);
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         cout << endl << endl;
-         cout << "P Aff P " << ddot_par(np,nequ,vscr,sol,ridv) << endl;
-         cout << "P rhs " << ddot_par(np,nequ,rhs,sol,ridv) << endl;
+         std::cout << std::endl << std::endl;
+         std::cout << "P Aff P " << ddot_par(np,nequ,vscr,sol,ridv) << std::endl;
+         std::cout << "P rhs " << ddot_par(np,nequ,rhs,sol,ridv) << std::endl;
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
          #pragma omp parallel for num_threads(np)
          for (int i = 0; i < nequ; i++)
             vscr[i] -= 2.0*rhs[i];
          double DE = ddot_par(np,nequ,vscr,sol,ridv);
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         cout << "DE   " << DE << endl << endl;
+         std::cout << "DE   " << DE << std::endl << std::endl;
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         cout << fixed << setw(6) << iter << " ";
-         cout << setprecision(6) << scientific;
-         cout << resiter << "   " << init_energy << "   " << DE << "   " << init_energy+DE << endl;
+         std::cout << std::fixed << std::setw(6) << iter << " ";
+         std::cout << std::setprecision(6) << std::scientific;
+         std::cout << resiter << "   " << init_energy << "   " << DE << "   " << init_energy+DE << std::endl;
       #else
-         cout << setprecision(6) << scientific;
-         cout << iter << " " << resiter << endl;
+         std::cout << std::setprecision(6) << std::scientific;
+         std::cout << iter << " " << resiter << std::endl;
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

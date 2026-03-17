@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
-using namespace std;
 
 #include "parm_EMIN.h"
 #include "spmatv_blk.h"
@@ -25,11 +24,9 @@ using namespace std;
 int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
              const int nn_K, const int ntv, const int *perm, const int *iperm,
              const double Tr_A, const int *iat_K, const int *ja_K, const double *coef_K,
-             const int *it_U, const int *jcol_U, const double *coef_U,
-             const double *D_inv, const int *iat_patt, const int *ja_patt,
-             const int *iat_Tpatt, const int *ja_Tpatt, const double *mat_Q,
-             const double *vec_P0, const double *vec_f, const int itmax, int &iter,
-             double &relres, double *vec_DP){
+             const double *D_inv, const int *iat_patt, const int *iat_Tpatt,
+             const double *mat_Q, const double *vec_P0, const double *vec_f,
+             const int itmax, int &iter, double &relres, double *vec_DP){
 
    // Init error code
    int ierr = 0;
@@ -73,11 +70,11 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    // Compute initial energy
    init_energy = Tr_A + ddot_par(np,nn_K,vscr,wscr,ridv) -
                         2.0*ddot_par(np,nn_K,vscr,vec_f,ridv);
-   cout << setprecision(10) << scientific;
-   cout << "INIT ENERGY:  " << init_energy << endl;
-   cout << "TRACCIA: " << Tr_A << endl;
-   cout << "P0KP0: " << ddot_par(np,nn_K,vscr,wscr,ridv) << endl;
-   cout << "-2*f'*P0: " << -2.0*ddot_par(np,nn_K,vscr,vec_f,ridv) << endl;
+   std::cout << std::setprecision(10) << std::scientific;
+   std::cout << "INIT ENERGY:  " << init_energy << std::endl;
+   std::cout << "TRACCIA: " << Tr_A << std::endl;
+   std::cout << "P0KP0: " << ddot_par(np,nn_K,vscr,wscr,ridv) << std::endl;
+   std::cout << "-2*f'*P0: " << -2.0*ddot_par(np,nn_K,vscr,vec_f,ridv) << std::endl;
    #endif
    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    // 3 - Subtract vec_f to wscr: wscr <-- wscr - vec_f
@@ -94,7 +91,7 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    // 4 - Permute wscr from col-major to row-major
    apply_perm(np,nn_K,perm,wscr,vscr);
    // 5 - Multiply by Q: rhs <-- (I - Q*Q')*vscr
-   Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,rhs);
+   Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,rhs);
 
    // Init residual
    #pragma omp parallel for num_threads(np)
@@ -128,7 +125,7 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       // 3 - Permute wscr from col-major to row-major
       apply_perm(np,nn_K,perm,wscr,vscr);
       // 4 - Multiply by Q: zvec <-- (I - Q*QT)*vscr
-      Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,zvec);
+      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
 
       // Compute gamma <-- resT*zvec
       gamma = ddot_par(np,nn_K,res,zvec,ridv);
@@ -162,7 +159,7 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       // 3 - Permute wscr from col-major to row-major
       apply_perm(np,nn_K,perm,wscr,vscr);
       // 4 - Multiply by Q: QKpvec <-- (I - Q*QT)*vscr
-      Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,QKpvec);
+      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,QKpvec);
 
       // Compute alpha
       alpha = ddot_par(np,nn_K,QKpvec,pvec,ridv);
@@ -208,10 +205,10 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       double const rhs_DP = ddot_par(np,nn_K,vscr,rhs_sav,ridv);
       double const DE = ddot_par(np,nn_K,vscr,tvec,ridv) - 2.0*rhs_DP;
       double const dDE = std::abs((DE-DE_old)/DE_old);
-      cout << fixed << setw(6) << iter << " ";
-      cout << setprecision(6) << scientific;
-      cout << resiter << "   " << init_energy << "   " << DE << "   " <<
-              dDE <<  "   " << init_energy+DE << endl;
+      std::cout << std::fixed << std::setw(6) << iter << " ";
+      std::cout << std::setprecision(6) << std::scientific;
+      std::cout << resiter << "   " << init_energy << "   " << DE << "   " <<
+              dDE <<  "   " << init_energy+DE << std::endl;
       DE_old = DE;
 
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -27,5 +27,4 @@ try
 catch ME
    cd(home);
    fprintf(2, 'Compilation failed: %s\n', ME.message);
-   exit(1);
 end

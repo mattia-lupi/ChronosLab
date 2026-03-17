@@ -1,1 +1,0 @@
-../Cpp_EMIN/ddot_par.cpp

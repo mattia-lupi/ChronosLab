@@ -7,7 +7,7 @@ PCXXFLAGS     = -O1 -pg -std=c++11 $(INCLUDE)
 
 INCLUDE       = -I. -I./include 
 
-DFLAGS        = -O0 -std=c++11 -g $(OPENMP) -Wall $(INCLUDE)
+DFLAGS        = -O0 -std=c++11 -g $(OPENMP) -Wextra -Wall $(INCLUDE)
 
 DEST	      = .
 

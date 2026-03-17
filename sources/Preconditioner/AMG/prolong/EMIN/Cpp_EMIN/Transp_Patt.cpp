@@ -1,9 +1,5 @@
 #include <stdlib.h>
 #include <omp.h>
-//////////////////////////////////////////
-#include <iostream>
-using namespace std;
-//////////////////////////////////////////
 
 #include "count_rowterms.h"
 #include "mkiat_Tloc.h"
@@ -81,15 +77,15 @@ int Transp_Patt(const int nthreads, const int nrows, const int ncols, const int 
       }
 
       // Each processor compute its part of iat_T
-      mkiat_Tloc(nrowsth_T,ncols,nthreads,firstrow_T,WI1,&iat_T[firstrow_T],WI2[mythid]);
+      mkiat_Tloc(nrowsth_T,nthreads,firstrow_T,WI1,&iat_T[firstrow_T],WI2[mythid]);
       #pragma omp barrier
 
       // Update iat_T and WI1 pointers
-      mkiat_Tglo(mythid,nrowsth_T,ncols,nthreads,firstrow_T,WI1,WI2,&iat_T[firstrow_T]);
+      mkiat_Tglo(mythid,nrowsth_T,nthreads,firstrow_T,WI1,WI2,&iat_T[firstrow_T]);
       #pragma omp barrier
 
       // Transpose column indices
-      mvjcol(firstrow,nrowsth,ncols,nterm,nterm,&iat[firstrow],ja,ja_T,WI1[mythid],perm);
+      mvjcol(firstrow,nrowsth,&iat[firstrow],ja,ja_T,WI1[mythid],perm);
 
       // Create inverse permutation
       #pragma omp barrier

@@ -1,1 +1,0 @@
-../Cpp_EMIN/mult_K_col.cpp

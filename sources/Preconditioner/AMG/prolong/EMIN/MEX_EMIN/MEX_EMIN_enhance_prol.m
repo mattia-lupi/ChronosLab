@@ -28,12 +28,10 @@ function [Pout,info] = MEX_EMIN_enhance_prol(level,param,A,Ppatt,Pin,TV,fcnode,v
 
 % Unpack the input matrix
 nn = size(A,1);
-nt_A = nnz(A);
 [iat_A,ja_A,coef_A] = unpack_csr(A);
 
 % Unpack the input prolongation
 nn_C = size(Pin,2);
-nt_P = nnz(Pin);
 [iat_Pin,ja_Pin,coef_Pin] = unpack_csr(Pin);
 
 % Unpack the input pattern
@@ -89,8 +87,6 @@ sol_type  = param.solv_emin;
 nn        = nn;
 nn_C      = nn_C;
 ntv       = ntv;
-nt_A      = nt_A;
-nt_P      = nt_P;
 nt_patt   = nt_patt;
 fcnode    = int32(fcnode);
 iat_A     = int32(iat_A) - 1;
@@ -103,7 +99,7 @@ ja_patt   = int32(ja_patt) - 1;
 % Compute Energy Min prolongation --------------------------------------------------------
 [iat_Pout,ja_Pout,coef_Pout,info] = ...
           EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,prec,sol_type,...
-                               nn,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,...
+                               nn,nn_C,ntv,nt_patt,fcnode,iat_A,ja_A,coef_A,...
                                iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV);
 
 % Create a sparse matrices for Pout

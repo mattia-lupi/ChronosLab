@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
-using namespace std;
 
 #include "parm_EMIN.h"
 #include "mult_K_matfree.h"
@@ -83,9 +82,9 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // Compute initial energy
       init_energy = Tr_A + ddot_par(np,nn_K,vscr,wscr,ridv) -
                            2.0*ddot_par(np,nn_K,vscr,vec_f,ridv);
-      cout << setprecision(6) << scientific;
-      cout << "Initial Energy:  " << init_energy << endl;
-      cout << "Trace of A:      " << Tr_A << endl;
+      std::cout << std::setprecision(6) << std::scientific;
+      std::cout << "Initial Energy:  " << init_energy << std::endl;
+      std::cout << "Trace of A:      " << Tr_A << std::endl;
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       // 3 - Subtract vec_f to wscr: wscr <-- wscr - vec_f
@@ -107,9 +106,9 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // Compute initial energy
       init_energy = Tr_A + ddot_par(np,nn_K,vec_P0,vscr,ridv) -
                            2.0*ddot_par(np,nn_K,vec_P0,wscr,ridv);
-      cout << setprecision(6) << scientific;
-      cout << "Initial Energy:  " << init_energy << endl;
-      cout << "Trace of A:      " << Tr_A << endl;
+      std::cout << std::setprecision(6) << std::scientific;
+      std::cout << "Initial Energy:  " << init_energy << std::endl;
+      std::cout << "Trace of A:      " << Tr_A << std::endl;
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       // 3 - Subtract vec_f to vscr: vscr <-- vscr - vec_f
@@ -120,7 +119,7 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // 4 - No need for permutation
    }
    // 5 - Multiply by Q: rhs <-- (I - Q*Q')*vscr
-   Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,rhs);
+   Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,rhs);
 
    // Init residual
    #pragma omp parallel for num_threads(np)
@@ -156,7 +155,7 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // 3 - Permute wscr from col-major to row-major
       apply_perm(np,nn_K,perm,wscr,vscr);
       // 4 - Multiply by Q: zvec <-- (I - Q*QT)*vscr
-      Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,zvec);
+      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
 
       // Compute gamma <-- resT*zvec
       gamma = ddot_par(np,nn_K,res,zvec,ridv);
@@ -189,7 +188,7 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
          // 3 - No need for permutation
       }
       // 4 - Multiply by Q: QKpvec <-- (I - Q*QT)*vscr
-      Orth_Q(np,nn,nn_K,ntv,iat_patt,ja_patt,mat_Q,vscr,v_ntv,QKpvec);
+      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,QKpvec);
 
       // Compute alpha
       alpha = ddot_par(np,nn_K,QKpvec,pvec,ridv);

@@ -4,9 +4,7 @@
 #include <fstream>   // to use: ifstream,ofstream
 #include <sstream>   // to use: stringstream
 #include <math.h>
-#include <libgen.h>  // to use: basename
 #include <chrono>    // to use: system_clock,duration
-using namespace std;
 
 #include "DebEnv.h"
 #include "readMat.h"
@@ -93,19 +91,19 @@ char line[1024];
    }
 
    // Dump input
-   cout << "BINREAD:   " << BINREAD << endl;
-   cout << "NP:        " << np << endl;
-   cout << "ITMAX:     " << itmax << endl;
-   cout << "EN. Toll.: " << en_tol << endl;
-   cout << "CONDMAX:   " << condmax << endl;
-   cout << "PREC_TYPE: " << prec_type << endl;
-   cout << "SOL_TYPE:  " << sol_type << endl;
-   cout << "MAT_file:  " << MAT_file << endl;
-   cout << "PROL_file: " << PROL_file << endl;
-   cout << "PATT_file: " << PATT_file << endl;
-   cout << "TV_file:   " << TV_file << endl;
-   cout << "FC_file:   " << FC_file << endl;
-   cout << endl;
+   std::cout << "BINREAD:   " << BINREAD << std::endl;
+   std::cout << "NP:        " << np << std::endl;
+   std::cout << "ITMAX:     " << itmax << std::endl;
+   std::cout << "EN. Toll.: " << en_tol << std::endl;
+   std::cout << "CONDMAX:   " << condmax << std::endl;
+   std::cout << "PREC_TYPE: " << prec_type << std::endl;
+   std::cout << "SOL_TYPE:  " << sol_type << std::endl;
+   std::cout << "MAT_file:  " << MAT_file << std::endl;
+   std::cout << "PROL_file: " << PROL_file << std::endl;
+   std::cout << "PATT_file: " << PATT_file << std::endl;
+   std::cout << "TV_file:   " << TV_file << std::endl;
+   std::cout << "FC_file:   " << FC_file << std::endl;
+   std::cout << std::endl;
 
    // Set variables for DEBUG
    DebEnv.SetDebEnv(np,"w");
@@ -117,11 +115,11 @@ char line[1024];
    ierr = readCSRmat(&nn_A, &kk, &nt_A, &iat_A, &ja_A, &coef_A, MAT_file, BINREAD);
    if (ierr != 0) exit(ierr);
 
-   cout << "Matrix read" << endl;
+   std::cout << "Matrix read" << std::endl;
 
    // Print the input matrix
    if (DUMP_MATIN){
-      cout << "Printing input Matrix" << endl;
+      std::cout << "Printing input Matrix" << std::endl;
       FILE *ofile = fopen("mat_input.csr","w"); if (!ofile) exit(1);
       for (int i = 0; i < nn_A; i++){
           for (int j = iat_A[i]; j < iat_A[i+1]; j++){
@@ -138,11 +136,11 @@ char line[1024];
    ierr = readCSRmat(&nn_P, &kk, &nt_P, &iat_P, &ja_P, &coef_P, PROL_file, BINREAD);
    if (ierr != 0) exit(ierr);
 
-   cout << "Prolongation read" << endl;
+   std::cout << "Prolongation read" << std::endl;
 
    // Print the input prolongation
    if (DUMP_MATIN){
-      cout << "Printing input Prolongation" << endl;
+      std::cout << "Printing input Prolongation" << std::endl;
       FILE *ofile = fopen("prol_input.csr","w"); if (!ofile) exit(1);
       for (int i = 0; i < nn_P; i++){
           for (int j = iat_P[i]; j < iat_P[i+1]; j++){
@@ -160,11 +158,11 @@ char line[1024];
                      PATT_file, BINREAD);
    if (ierr != 0) exit(ierr);
 
-   cout << "Pattern read" << endl;
+   std::cout << "Pattern read" << std::endl;
 
    // Print the input pattern
    if (DUMP_MATIN){
-      cout << "Printing input pattern" << endl;
+      std::cout << "Printing input pattern" << std::endl;
       FILE *ofile = fopen("patt_input.csr","w"); if (!ofile) exit(1);
       for (int i = 0; i < nn_patt; i++){
           for (int j = iat_patt[i]; j < iat_patt[i+1]; j++){
@@ -178,7 +176,7 @@ char line[1024];
    // Read the test space
    int ntv;
    // Open the input file
-   ifstream fileTV(TV_file);
+   std::ifstream fileTV(TV_file);
    // Read header
    k = 0;
    fileTV >> kk >> ntv;
@@ -193,17 +191,17 @@ char line[1024];
    }
    // Close the input fileTV
    fileTV.close();
-   cout << "TSPACE read " << ntv << endl;
+   std::cout << "TSPACE read " << ntv << std::endl;
 
    // Read fcnode
    // Open the input file
-   ifstream fileFC(FC_file);
+   std::ifstream fileFC(FC_file);
    // Allocate fcnode
    int *fcnode = (int*) malloc( nn_A*sizeof(int) );
    for (int i = 0; i < nn_A; i++) fileFC >> fcnode[i];
    // Close the input file
    fileFC.close();
-   cout << "FCNODE read " << endl;
+   std::cout << "FCNODE read " << std::endl;
 
    // Count coarse nodes and adjust indices of coarse nodes
    int nn_C = 0;
@@ -213,15 +211,15 @@ char line[1024];
          nn_C++;
       }
    }
-   cout << "nn_C: " << nn_C << endl;
+   std::cout << "nn_C: " << nn_C << std::endl;
 
    // --- Local variables for time printing ----------------------------------------------
-   chrono::duration<double> elapsed_seconds;
+   std::chrono::duration<double> elapsed_seconds;
 
    // *** Improve prolongation through Energy Minimization *******************************
 
    //---START-------------------------------
-   auto start = chrono::system_clock::now();
+   auto start = std::chrono::system_clock::now();
    //---------------------------------------
 
    int *iat_Pnew;
@@ -229,17 +227,17 @@ char line[1024];
    double *coef_Pnew;
    double emin_info[EMIN_INFO_SZ];
    ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,prec_type,sol_type,nn_A,nn_C,ntv,
-                       nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,
-                       iat_patt,ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info);
+                       nt_patt,fcnode,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,iat_patt,
+                       ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info);
 
    //---STOP--------------------------------
-   auto end = chrono::system_clock::now();
+   auto end = std::chrono::system_clock::now();
    elapsed_seconds = end - start;
    //---------------------------------------
 
-   cout << endl << endl;
-   cout << "Time for Enengy Minimization [sec]: " << elapsed_seconds.count() << endl;
-   cout << endl;
+   std::cout << std::endl << std::endl;
+   std::cout << "Time for Enengy Minimization [sec]: " << elapsed_seconds.count() << std::endl;
+   std::cout << std::endl;
 
    free(iat_A);
    free(ja_A);

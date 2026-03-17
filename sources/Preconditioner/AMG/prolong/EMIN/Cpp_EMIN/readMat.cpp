@@ -1,10 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <libgen.h>
-/////////////////////
-//#include <iostream>
-//using namespace std;
-/////////////////////
 
 /* Header structure */
 struct header { int nr,nt; };

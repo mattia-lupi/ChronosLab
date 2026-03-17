@@ -1,8 +1,4 @@
 #include "omp.h"
-//////////////////////////////////////////////
-#include <iostream>
-using namespace std;
-//////////////////////////////////////////////
 
 typedef int iReg;
 typedef int iExt;
@@ -68,18 +64,13 @@ void KP_spmat(const iReg nthreads, const iReg nrows_A, const iExt* iat_A,
                   // Column in the list, sum this contribution
                   coef_C[ind_C+pos] += WRA * coef_B[k];
                }
-
             }
-
          }
 
          // Sparse resetting of the list
          for ( iReg j = 0; j < nn_row; j ++ ) {
             WN[ja_B[ind_C+j]] = -1;
          }
-
       }
-
    }
-
 }

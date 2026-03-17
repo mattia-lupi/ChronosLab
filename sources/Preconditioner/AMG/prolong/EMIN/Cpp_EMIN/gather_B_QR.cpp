@@ -7,7 +7,6 @@
 #include <iostream>
 #include <stdio.h>
 //////////////////////////////////
-using namespace std;
 
 #include "DebEnv.h"
 #include "parm_EMIN.h"
@@ -90,7 +89,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
       FILE *reslog;
       if (DEBUG){
          int NRMAX = 0;
-         for (int i = 0; i < nn; i++) NRMAX = max(NRMAX,iat_patt[i+1]-iat_patt[i]);
+         for (int i = 0; i < nn; i++) NRMAX = std::max(NRMAX,iat_patt[i+1]-iat_patt[i]);
          BB_blk = (double*) malloc(NRMAX*6*sizeof(double));
          QQ_blk = (double*) malloc(NRMAX*6*sizeof(double));
          v1 = (double*) malloc(NRMAX*sizeof(double));
@@ -124,7 +123,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
       for (int i = firstcol+1; i <= lastcol; i++){
          istart = iend;
          iend = iat_patt[i];
-         nrmax_blk = max(nrmax_blk,iend-istart);
+         nrmax_blk = std::max(nrmax_blk,iend-istart);
       }
       //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
       if (DEBUG){
@@ -136,7 +135,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
 
       // Query work space for DGEQRF and DORGQR
       lapack_int ierr_lapack;
-      lapack_int l_nn = static_cast<lapack_int>(max(ntv,nrmax_blk));
+      lapack_int l_nn = static_cast<lapack_int>(std::max(ntv,nrmax_blk));
       lapack_int l_mm = static_cast<lapack_int>(ntv);
       lapack_int l_kk = static_cast<lapack_int>(ntv);
       double query_work;
@@ -155,10 +154,10 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
          ierr = 4;
       }
       if (ierr > 0) goto exit_pragma;
-      lwork = static_cast<lapack_int>(max(query_work,static_cast<double>(ntv)));
+      lwork = static_cast<lapack_int>(std::max(query_work,static_cast<double>(ntv)));
 
       // Allocate private workspace
-      SIGMA = (double*) malloc( max(ntv,nrmax_blk)*sizeof(double) );
+      SIGMA = (double*) malloc( std::max(ntv,nrmax_blk)*sizeof(double) );
       VT = (double*) malloc( ntv*ntv*sizeof(double) );
       tau = (double*) malloc( (ncolth*ntv)*sizeof(double) );
       work = (double*) malloc( lwork*sizeof(double) );
@@ -254,10 +253,10 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
 
                   // Check conditioning of the resulting R
                   double max_DR = 0.0;
-                  double min_DR = numeric_limits<double>::max();
+                  double min_DR = std::numeric_limits<double>::max();
                   for (int kk = 0; kk < l_mm; kk++){
-                     max_DR = max(max_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
-                     min_DR = min(min_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
+                     max_DR = std::max(max_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
+                     min_DR = std::min(min_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
                   }
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
                   if (DEBUG){
@@ -289,9 +288,9 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                         k++;
                      }
                      //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                     if ( PRINT_LOC_INFO ) cout << icol <<
+                     if ( PRINT_LOC_INFO ) std::cout << icol <<
                         " conditioning larger than threshold: "
-                        << max_DR / min_DR << " > " << condmax << endl;
+                        << max_DR / min_DR << " > " << condmax << std::endl;
                      if (DEBUG) fprintf(DebEnv.t_logfile[mythid],
                             "%6d COND_LRG: max %15.6e min %15.6e cond %15.6e\n",
                             icol,max_DR,min_DR,max_DR / min_DR);
@@ -328,7 +327,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                      if (DEBUG){
                         fprintf(DebEnv.t_logfile[mythid],"\nQ:\n");
                         for (int i = 0; i < nr_BB_loc; i++){
-                           for (int j = 0; j < min(ntv,nr_BB_loc); j++)
+                           for (int j = 0; j < std::min(ntv,nr_BB_loc); j++)
                               fprintf(DebEnv.t_logfile[mythid]," %17.10e",BB_scr[ind_BB+j*nr_BB_loc+i]);
                            fprintf(DebEnv.t_logfile[mythid],"\n");
                         }
@@ -354,7 +353,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                if ( (nr_BB_loc < ntv) || FAIL_QR){
 
                   if ( PRINT_LOC_INFO )
-                     cout << icol << " Solution for RANK deficient system " << endl;
+                     std::cout << icol << " Solution for RANK deficient system " << std::endl;
 
                   // Compute SVD of BB
                   l_nn = static_cast<lapack_int>(nr_BB_loc);
@@ -380,7 +379,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   if (nr_BB_loc > 1){
                      while (SIGMA[0] < condmax *abs(SIGMA[rank_BB])){
                         rank_BB++;
-                        if (rank_BB == min(ntv,nr_BB_loc)){
+                        if (rank_BB == std::min(ntv,nr_BB_loc)){
                            break;
                         }
                      }
@@ -395,16 +394,16 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                              SIGMA[0]/SIGMA[rank_BB-1],rank_BB);
                      fprintf(DebEnv.t_logfile[mythid],"\nU = Q:\n");
                      for (int i = 0; i < nr_BB_loc; i++){
-                        for (int j = 0; j < min(ntv,nr_BB_loc); j++)
+                        for (int j = 0; j < std::min(ntv,nr_BB_loc); j++)
                            fprintf(DebEnv.t_logfile[mythid]," %15.6e",BB_scr[ind_BB+j*nr_BB_loc+i]);
                         fprintf(DebEnv.t_logfile[mythid],"\n");
                      }
                      fprintf(DebEnv.t_logfile[mythid],"\nSIGMA:\n");
-                     for (int j = 0; j < min(ntv,nr_BB_loc); j++)
+                     for (int j = 0; j < std::min(ntv,nr_BB_loc); j++)
                         fprintf(DebEnv.t_logfile[mythid]," %15.6e",SIGMA[j]);
                      fprintf(DebEnv.t_logfile[mythid],"\n");
                      fprintf(DebEnv.t_logfile[mythid],"\nVT:\n");
-                     for (int i = 0; i < min(nr_BB_loc,ntv); i++){
+                     for (int i = 0; i < std::min(nr_BB_loc,ntv); i++){
                         for (int j = 0; j < ntv; j++)
                            fprintf(DebEnv.t_logfile[mythid]," %15.6e",VT[j*ntv+i]);
                         fprintf(DebEnv.t_logfile[mythid],"\n");

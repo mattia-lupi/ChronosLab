@@ -1,5 +1,5 @@
 BAMG                 %  proltype     (BAMG, EXTI, CLAS, HYBC )
-SMOOTH               %  prol_emin    (EMIN, SMOOTH, NONE)
+EMIN                 %  prol_emin    (EMIN, SMOOTH, NONE)
 20                   %  np           (MEX only)
 100                  %  itmax_Vol    (BAMG, MEX_BAMG)
 0.01                 %  toll_Vol     (BAMG, MEX_BAMG)
