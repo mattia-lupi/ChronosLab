@@ -4,7 +4,6 @@
 #include <fstream>
 #include <sstream>  // std::stringstream
 #include <string>   // std::string
-using namespace std;
 #define DEBUG false
 //#define DEBUG true
 //////////////////////////////////////////////////
@@ -19,13 +18,13 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
                       int &nt_PF_loc, int *&iat_PF, int *&ja_PF, double *&coef_PF){
 
    ////////////////////////////
-   ofstream ofile;
+   std::ofstream ofile;
    if (DEBUG){
    int myid = omp_get_thread_num();
-   stringstream ss;
+   std::stringstream ss;
    ss << myid;
-   string myid_label = ss.str();
-   string logfile_name = "PLOGFILE_" + myid_label + ".txt";
+   std::string myid_label = ss.str();
+   std::string logfile_name = "PLOGFILE_" + myid_label + ".txt";
    ofile.open (logfile_name);
    }
    ////////////////////////////
@@ -36,7 +35,7 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
    for (int irow = 0; irow < nrows; irow++){
       int istart_P = iend_P;
       iend_P = iat_P[irow+1];
-      mmax = max(mmax,iend_P-istart_P);
+      mmax = std::max(mmax,iend_P-istart_P);
    }
 
    // Query workspace for dgelsy
@@ -50,14 +49,14 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
    ierr_lapack = LAPACKE_dgelsy_work(LAPACK_COL_MAJOR,static_cast<lapack_int>(ntv),
                  static_cast<lapack_int>(mmax),1,dummy_double,
                  static_cast<lapack_int>(ntv),dummy_double,
-                 static_cast<lapack_int>(max(ntv,mmax)),dummy_int,rcond,&rank_out,
+                 static_cast<lapack_int>(std::max(ntv,mmax)),dummy_int,rcond,&rank_out,
                  &db_lwork,-1);
    if (ierr_lapack != 0) return 2;
    optimal_lwork = static_cast<int>(db_lwork);
    ///////////////////////////////////////
    if (DEBUG){
-   ofile << "mmax " << mmax << endl;
-   ofile << "optimal_lwork " << optimal_lwork << endl;
+   ofile << "mmax " << mmax << std::endl;
+   ofile << "optimal_lwork " << optimal_lwork << std::endl;
    ofile.flush();
    }
    ///////////////////////////////////////
@@ -98,17 +97,17 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
       }
       int k_retain = nt - k_remove;
       if (k_retain < ntv){
-         k_retain = min(nt,ntv);
+         k_retain = std::min(nt,ntv);
          k_remove = nt - k_retain;
       }
       ///////////////////////////////////////
       if (DEBUG){
-      ofile << "IROW " << irow << endl;
-      ofile << "row_nrm " << row_nrm << endl;
-      ofile << "threshold " << threshold << endl;
-      ofile << "k_remove " << k_remove << endl;
-      ofile << "k_retain " << k_retain << endl;
-      ofile << "nt " << nt << endl;
+      ofile << "IROW " << irow << std::endl;
+      ofile << "row_nrm " << row_nrm << std::endl;
+      ofile << "threshold " << threshold << std::endl;
+      ofile << "k_remove " << k_remove << std::endl;
+      ofile << "k_retain " << k_retain << std::endl;
+      ofile << "nt " << nt << std::endl;
       }
       ///////////////////////////////////////
 
@@ -118,7 +117,7 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
 
          // Exit if there are no entries to remove
          if (k_remove == 0) {
-            fill_n(&(coef_PF[ind_PF]),nt,0.0);
+            std::fill_n(&(coef_PF[ind_PF]),nt,0.0);
             break;
          }
 
@@ -128,9 +127,9 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
             int jcol = ja_P[istart_P+i];
             double fac = coef_P[istart_P+i];
             ///////////////////////////////////
-            //ofile << "FAC: " << fac << " JCOL " << jcol << endl;
+            //ofile << "FAC: " << fac << " JCOL " << jcol << std::endl;
             //for (int i = 0; i < ntv; i++) ofile << TV[jcol][i] << " ";
-            //ofile << endl;
+            //ofile << std::endl;
             ///////////////////////////////////
             for (int i = 0; i < ntv; i++) coef_PF[ind_PF+i] += fac*TV[jcol][i];
          }
@@ -145,17 +144,17 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
 
          ///////////////////////////////////////
          if (DEBUG){
-         ofile << "PRIMA DI LAPACK" << endl;
-         ofile << "SYS:" << endl;
+         ofile << "PRIMA DI LAPACK" << std::endl;
+         ofile << "SYS:" << std::endl;
          for (int i = 0; i < ntv; i++){
             for (int j = 0; j < (k_retain); j++){
                ofile << full_SYS[j*ntv+i] << " ";
             }
-            ofile << endl;
+            ofile << std::endl;
          }
-         ofile << "RHS:" << endl;
-         for (int i = 0; i < ntv; i++) ofile << coef_PF[ind_PF+i] << endl;
-         ofile << "optimal_lwork " << optimal_lwork << endl;
+         ofile << "RHS:" << std::endl;
+         for (int i = 0; i < ntv; i++) ofile << coef_PF[ind_PF+i] << std::endl;
+         ofile << "optimal_lwork " << optimal_lwork << std::endl;
          ofile.flush();
          }
          ///////////////////////////////////////
@@ -165,14 +164,14 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
          ierr_lapack = LAPACKE_dgelsy_work(LAPACK_COL_MAJOR,static_cast<lapack_int>(ntv),
                        static_cast<lapack_int>(k_retain),1,full_SYS,
                        static_cast<lapack_int>(ntv),&(coef_PF[ind_PF]),
-                       static_cast<lapack_int>(max(k_retain,ntv)),JPVT,rcond,
+                       static_cast<lapack_int>(std::max(k_retain,ntv)),JPVT,rcond,
                        &rank_out,lapack_WORK,optimal_lwork);
-         ofile << "ierr_lapack " << ierr_lapack << "rank_out " << rank_out<< endl;
+         ofile << "ierr_lapack " << ierr_lapack << "rank_out " << rank_out<< std::endl;
          if (ierr_lapack != 0) return 2;
          ////////////////////////////////////////////
          if (DEBUG){
-         ofile << "SOL: " << k_retain << endl;
-         for (int i = 0; i < k_retain; i++) ofile << coef_PF[ind_PF+i] << endl;
+         ofile << "SOL: " << k_retain << std::endl;
+         for (int i = 0; i < k_retain; i++) ofile << coef_PF[ind_PF+i] << std::endl;
          }
          ////////////////////////////////////////////
 
@@ -181,20 +180,20 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
 
          ////////////////////////////////////////////
          if (DEBUG){
-            ofile << "nrm_h: " << nrm_h << endl;
-            ofile << "nrm_h " << nrm_h << " " << abs_tol << endl;
+            ofile << "nrm_h: " << nrm_h << std::endl;
+            ofile << "nrm_h " << nrm_h << " " << abs_tol << std::endl;
          }
          ////////////////////////////////////////////
 
          // Check if the solution is correct and do not alter previous row_norm
          if ( nrm_h > abs_tol || rank_out < ntv){
             int k_add = 1 + static_cast<int>(0.3*static_cast<double>(k_retain));
-            k_retain = min(k_add+k_retain,nt);
+            k_retain = std::min(k_add+k_retain,nt);
             k_remove = nt - k_retain;
             ////////////////////////////////////////////
             if (DEBUG){
-               ofile << "AUMENTO" << endl;
-               ofile << "k_retain new: " << k_retain << endl;
+               ofile << "AUMENTO" << std::endl;
+               ofile << "k_retain new: " << k_retain << std::endl;
             }
             ////////////////////////////////////////////
          } else {
@@ -209,7 +208,7 @@ int FilterProl_stripe(const double perc, const double tol, const int firstrow,
          coef_PF[ind_PF+i] += coef_P[istart_P+k_remove+i];
          ///////////////////////////////////////////////
          if (DEBUG){
-         ofile << ja_PF[ind_PF+i] << " |  " << coef_PF[ind_PF+i] << endl;
+         ofile << ja_PF[ind_PF+i] << " |  " << coef_PF[ind_PF+i] << std::endl;
          }
          ///////////////////////////////////////////////
       }

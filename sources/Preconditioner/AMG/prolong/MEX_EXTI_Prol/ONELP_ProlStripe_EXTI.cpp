@@ -15,13 +15,12 @@
 #include <cmath>      // to use: abs
 #include <algorithm>  // to use: fill_n,min
 #include <limits>     // to use: numeric_limits<double>epsilon()
-using namespace std;
 
 #include "ir_heapsort.h"
 
 const double ONE  = 1.0;
 const double ZERO = 0.0;
-const double EPS = numeric_limits<double>::epsilon();
+const double EPS = std::numeric_limits<double>::epsilon();
 
 int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
                           const int nn_A, const int nt_A, const int ntmax_P,
@@ -37,7 +36,7 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
    double avg_nnz = 20.0*static_cast<double>(nt_A) / static_cast<double>(lastrow-firstrow);
    int size_scr = static_cast<int>(avg_nnz);
    int *WI         = new int [nn_A](); if (WI == NULL) return 1;
-   fill_n(WI,nn_A,0);
+   std::fill_n(WI,nn_A,0);
    int *ja_FS      = new int [size_scr](); if (ja_FS == NULL) return 1;
    double *coef_FS = new double [size_scr](); if (coef_FS == NULL) return 1;
    int *list_weak  = new int [size_scr](); if (list_weak == NULL) return 1;
@@ -188,7 +187,7 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                      int kcol = ja_C[k];
                      if (kcol == inod){
                         // This is the current FINE node --> save its coefficient
-                        a_ki_bar = min(ZERO,coef_C[k]);
+                        a_ki_bar = std::min(ZERO,coef_C[k]);
                         // Update the extended sum
                         ext_sum += a_ki_bar;
                         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
@@ -203,7 +202,7 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                         // Consider only COARSE neighbors
                         if (fcnodes[kcol] >= 0){
                            // Update the extended sum and store an auxiliary coef
-                           double a_kj_bar = min(ZERO,coef_C[k]);
+                           double a_kj_bar = std::min(ZERO,coef_C[k]);
                            ja_FS[n_FS] = kcol;
                            coef_FS[n_FS] = a_kj_bar;
                            n_FS++;

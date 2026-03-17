@@ -8,8 +8,8 @@
 void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt delta,
             const iReg n, const iReg m, rExt **A, iReg &rank, iReg *list){
 
-   iReg maxrank = min(n,m);
-   maxrank = min(maxrank,mmax);
+   iReg maxrank = std::min(n,m);
+   maxrank = std::min(maxrank,mmax);
    rExt wrot[m];
 
    // Set the initial guess for the rank

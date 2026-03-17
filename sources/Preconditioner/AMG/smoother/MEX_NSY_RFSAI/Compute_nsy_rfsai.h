@@ -4,7 +4,6 @@
 #include <cstring>   // to use: memcpy
 //#include <fstream>   // to use: ifstream,ofstream
 //#include <math.h>
-using namespace std;
 
 #include "extract_diag.h"
 #include "cpt_nsy_rfsai.h"

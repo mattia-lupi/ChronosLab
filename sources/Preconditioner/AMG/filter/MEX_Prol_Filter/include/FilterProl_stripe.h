@@ -14,7 +14,6 @@
 
 #include "lapacke.h"
 #include <algorithm> // tu use: max,min
-using namespace std;
 
 #include "abs_norm.h"
 #include "ir_heapsort.h"

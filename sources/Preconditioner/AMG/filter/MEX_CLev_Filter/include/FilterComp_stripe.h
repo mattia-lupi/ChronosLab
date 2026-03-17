@@ -14,7 +14,6 @@
 
 #include "lapacke.h"
 #include <algorithm> // tu use: max
-using namespace std;
 
 #include "abs_ri_heapsort.h"
 #include "bin_search.h"

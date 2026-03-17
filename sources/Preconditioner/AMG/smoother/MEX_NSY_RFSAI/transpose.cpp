@@ -11,12 +11,12 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
    int *ISCR = (int*) malloc((ncols+1) * sizeof(int));
    if (iat_T == nullptr || ja_T == nullptr || coef_T == nullptr || ISCR == nullptr){
       // Allocation error
-      cout << "Allocation Error in transpose" << endl;
+      std::cout << "Allocation Error in transpose" << std::endl;
       return 1;
    }
    
    // Initialize pointers
-   fill_n(iat_T,ncols+1,0);
+   std::fill_n(iat_T,ncols+1,0);
 
    // Count non-zeroes for each column of the input matrix
    for ( int i = 0; i < nrows; i++ ){

@@ -33,7 +33,6 @@
 
 #include <stdlib.h>  // to use: exit
 #include "omp.h"
-using namespace std;
 
 #include "MIS.h"
 #include "ProlStripe_HybridClas.h"

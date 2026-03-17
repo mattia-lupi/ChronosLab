@@ -4,7 +4,6 @@
 #include <fstream>
 #include <sstream>  // std::stringstream
 #include <string>   // std::string
-using namespace std;
 #define DEBUG false
 //#define DEBUG true
 ////////////////////////////////////////////////
@@ -19,13 +18,13 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
                       const int ntv, const double *const *TV, int &nt_AC_loc,
                       int *&iat_out, int *&ja_out, double *&coef_out){
    ////////////////////////////
-   ofstream ofile;
+   std::ofstream ofile;
    if (DEBUG){
    int myid = omp_get_thread_num();
-   stringstream ss;
+   std::stringstream ss;
    ss << myid;
-   string myid_label = ss.str();
-   string logfile_name = "LOGFILE_" + myid_label + ".txt";
+   std::string myid_label = ss.str();
+   std::string logfile_name = "LOGFILE_" + myid_label + ".txt";
    ofile.open (logfile_name);
    }
    ////////////////////////////
@@ -36,7 +35,7 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
    for (int irow = 0; irow < nrows; irow++){
       int istart_A = iend_A;
       iend_A = iat_A[irow+1];
-      mmax = max(mmax,iend_A-istart_A);
+      mmax = std::max(mmax,iend_A-istart_A);
    }
 
    // Set-up the length of the pattern
@@ -44,7 +43,7 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
    ////////////////////////////
    if (DEBUG){
       if (patt_min){
-         cout << "PATT_MIN ERA TRUE" << endl;
+         std::cout << "PATT_MIN ERA TRUE" << std::endl;
       }
    }
    ////////////////////////////
@@ -60,14 +59,14 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
    ierr_lapack = LAPACKE_dgelsy_work(LAPACK_COL_MAJOR,static_cast<lapack_int>(ntv),
                  static_cast<lapack_int>(mmax),1,dummy_double,
                  static_cast<lapack_int>(ntv),dummy_double,
-                 static_cast<lapack_int>(max(ntv,mmax)),dummy_int,rcond,&rank_out,
+                 static_cast<lapack_int>(std::max(ntv,mmax)),dummy_int,rcond,&rank_out,
                  &db_lwork,-1);
    if (ierr_lapack != 0) return 2;
    optimal_lwork = static_cast<int>(db_lwork);
    ///////////////////////////////////////
    if (DEBUG){
-   ofile << "mmax " << mmax << endl;
-   ofile << "optimal_lwork " << optimal_lwork << endl;
+   ofile << "mmax " << mmax << std::endl;
+   ofile << "optimal_lwork " << optimal_lwork << std::endl;
    ofile.flush();
    }
    ///////////////////////////////////////
@@ -95,9 +94,9 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       threshold *= tau / 2.0;
       ///////////////////////////////////////
       if (DEBUG){
-      ofile << "IROW " << irow << endl;
-      ofile << "nt " << nt << endl;
-      ofile << "threshold " << threshold << endl;
+      ofile << "IROW " << irow << std::endl;
+      ofile << "nt " << nt << std::endl;
+      ofile << "threshold " << threshold << std::endl;
       ofile.flush();
       }
       ///////////////////////////////////////
@@ -108,9 +107,9 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       if (DEBUG){
       ofile << "ja_A  ";
       for (int i = 0; i < nt; i++) ofile << ja_A[istart_A+i] << " ";
-      ofile << endl;
+      ofile << std::endl;
       for (int i = 0; i < nt; i++) ofile << coef_A[istart_A+i] << " ";
-      ofile << endl;
+      ofile << std::endl;
       ofile.flush();
       }
       ///////////////////////////////////////
@@ -128,7 +127,7 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
             trash += abs(coef_A[istart_A+k_remove]);
          }
          //////////////////////////////////
-         //ofile << "TRASH" << k_remove << " " << trash << endl;
+         //ofile << "TRASH" << k_remove << " " << trash << std::endl;
          //////////////////////////////////
       }
       // Move the diagonal in the part to retain if it is not there yet
@@ -139,8 +138,8 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       }
       ///////////////////////////////////////
       if (DEBUG){
-      if (ind_diag >= 0) ofile << "ind_diag POSITIVE" << ind_diag << endl;
-      ofile << "k_remove " << k_remove << endl;
+      if (ind_diag >= 0) ofile << "ind_diag POSITIVE" << ind_diag << std::endl;
+      ofile << "k_remove " << k_remove << std::endl;
       ofile.flush();
       }
       ///////////////////////////////////////
@@ -154,11 +153,11 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
             int pos = bin_search<int,int>(jcol,k_remove,&(ja_A[istart_A]));
             /////////////////////////////////////////////
             if (DEBUG){
-            ofile << "CERCO "<< jcol << "IN:" << endl;
+            ofile << "CERCO "<< jcol << "IN:" << std::endl;
             for (int j = istart_A; j < istart_A + k_remove; j++)
                ofile << " " << ja_A[j];
-            ofile << endl;
-            ofile << "TROVATO "<< pos << " " << ja_A[istart_A+pos] << endl;
+            ofile << std::endl;
+            ofile << "TROVATO "<< pos << " " << ja_A[istart_A+pos] << std::endl;
             }
             /////////////////////////////////////////////
             if (ja_A[istart_A+pos] == jcol){
@@ -175,13 +174,13 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       ir_heapsort(&(ja_A[istart_A+k_remove]),&(coef_A[istart_A+k_remove]),k_retain);
       ///////////////////////////////////////
       if (DEBUG){
-      ofile << "k_remove / k_retain" << k_remove << " " << k_retain << endl;
+      ofile << "k_remove / k_retain" << k_remove << " " << k_retain << std::endl;
       for (int i = 0; i < k_retain; i++) ofile << ja_A[istart_A+k_remove+i] << " ";
-      ofile << endl;
+      ofile << std::endl;
       for (int i = 0; i < k_retain; i++) ofile << coef_A[istart_A+k_remove+i] << " ";
-      ofile << endl;
+      ofile << std::endl;
       ofile.flush();
-      ofile << "RHS CREATE: " << endl;
+      ofile << "RHS CREATE: " << std::endl;
       }
       ///////////////////////////////////////
 
@@ -191,9 +190,9 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
          int jcol = ja_A[istart_A+i];
          double fac = coef_A[istart_A+i];
          ///////////////////////////////////
-         //ofile << "FAC: " << fac << " JCOL " << jcol << endl;
+         //ofile << "FAC: " << fac << " JCOL " << jcol << std::endl;
          //for (int i = 0; i < ntv; i++) ofile << TV[jcol][i] << " ";
-         //ofile << endl;
+         //ofile << std::endl;
          ///////////////////////////////////
          for (int i = 0; i < ntv; i++) coef_out[ind_out+i] += fac*TV[jcol][i];
       }
@@ -211,17 +210,17 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       }
       ///////////////////////////////////////
       if (DEBUG){
-      ofile << "PRIMA DI LAPACK" << endl;
-      ofile << "SYS:" << endl;
+      ofile << "PRIMA DI LAPACK" << std::endl;
+      ofile << "SYS:" << std::endl;
       for (int i = 0; i < ntv; i++){
          for (int j = 0; j < k_retain; j++){
             ofile << full_SYS[j*ntv+i] << " ";
          }
-         ofile << endl;
+         ofile << std::endl;
       }
-      ofile << "RHS:" << endl;
-      for (int i = 0; i < ntv; i++) ofile << coef_out[ind_out+i] << endl;
-      ofile << "optimal_lwork " << optimal_lwork << endl;
+      ofile << "RHS:" << std::endl;
+      for (int i = 0; i < ntv; i++) ofile << coef_out[ind_out+i] << std::endl;
+      ofile << "optimal_lwork " << optimal_lwork << std::endl;
       ofile.flush();
       }
       ///////////////////////////////////////
@@ -231,15 +230,15 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
       ierr_lapack = LAPACKE_dgelsy_work(LAPACK_COL_MAJOR,static_cast<lapack_int>(ntv),
                     static_cast<lapack_int>(k_retain),1,full_SYS,
                     static_cast<lapack_int>(ntv),&(coef_out[ind_out]),
-                    static_cast<lapack_int>(max(k_retain,ntv)),JPVT,rcond,
+                    static_cast<lapack_int>(std::max(k_retain,ntv)),JPVT,rcond,
                     &rank_out,lapack_WORK,optimal_lwork);
-      ofile << "ierr_lapack " << ierr_lapack << "rank_out " << rank_out<< endl;
+      ofile << "ierr_lapack " << ierr_lapack << "rank_out " << rank_out<< std::endl;
       if (ierr_lapack != 0) return 2;
       ////////////////////////////////////////////
       if (DEBUG){
-      ofile << "SOL: " << k_retain << endl;
-      for (int i = 0; i < k_retain; i++) ofile << coef_out[ind_out+i] << endl;
-      ofile << "TRATTENUTI" << endl;
+      ofile << "SOL: " << k_retain << std::endl;
+      for (int i = 0; i < k_retain; i++) ofile << coef_out[ind_out+i] << std::endl;
+      ofile << "TRATTENUTI" << std::endl;
       }
       ////////////////////////////////////////////
 
@@ -249,7 +248,7 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
          coef_out[ind_out+i] += coef_A[istart_A+k_remove+i];
          ///////////////////////////////////////////////
          if (DEBUG){
-         ofile << ja_out[ind_out+i] << " |  " << coef_out[ind_out+i] << endl;
+         ofile << ja_out[ind_out+i] << " |  " << coef_out[ind_out+i] << std::endl;
          }
          ///////////////////////////////////////////////
       }
@@ -266,12 +265,12 @@ int FilterComp_stripe(const double tau, const int shift, const int nrows,
 
    /////////////////////////////
    if (DEBUG){
-   ofile << "----------------------------------------------" << endl;
+   ofile << "----------------------------------------------" << std::endl;
    //for (int i = 0; i < nrows_A; i++){
       //for (int j = 0; j < ntv; j++){
          //ofile << TV[i][j] << " ";
       //}
-      //ofile << endl;
+      //ofile << std::endl;
    //}
    ofile.close();
    }

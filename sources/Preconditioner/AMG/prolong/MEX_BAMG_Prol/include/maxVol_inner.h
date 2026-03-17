@@ -19,8 +19,6 @@
 
 #include "SWAP.h"        // to swap two integers
 
-using namespace std;
-
 /**
  * @brief Inner function of maxVol, list(n+r) list of best columns whose first r are the best.
  */

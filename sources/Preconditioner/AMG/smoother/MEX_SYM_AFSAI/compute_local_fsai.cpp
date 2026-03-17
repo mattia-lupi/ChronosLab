@@ -9,17 +9,17 @@ void compute_local_fsai(iReg nthread, iReg n_step, iReg step_size, rExt tau, rEx
                         iExt *iat_G, iReg *ja_G, rExt *coef_G){
 
 // Set the chunk size for the parallel do (this way each thread should execute 20 loops)
-iReg chunk_size = nrows / (20*nthread); chunk_size = max(1,chunk_size);
+iReg chunk_size = nrows / (20*nthread); chunk_size = std::max(1,chunk_size);
 
 // Allocate scratches
 iExt kmax    = 1 + (iExt) n_step * (iExt) step_size;
 iExt nzmax_G = (iExt) nrows * kmax;
 
-vector<iExt> nt_slice; nt_slice.resize(nthread);
-vector<iExt> istart_scr; istart_scr.resize(nrows);
-vector<iExt> istop_scr; istop_scr.resize(nrows);
-vector<iReg> ja_scr; ja_scr.resize(nzmax_G);
-vector<rExt> coef_scr; coef_scr.resize(nzmax_G);
+std::vector<iExt> nt_slice; nt_slice.resize(nthread);
+std::vector<iExt> istart_scr; istart_scr.resize(nrows);
+std::vector<iExt> istop_scr; istop_scr.resize(nrows);
+std::vector<iReg> ja_scr; ja_scr.resize(nzmax_G);
+std::vector<rExt> coef_scr; coef_scr.resize(nzmax_G);
 
 // Set pointers to the beginning of each row
 iExt ind = 1;

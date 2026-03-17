@@ -1,5 +1,4 @@
-#include <iostream>  // to use: cout,endl
-using namespace std;
+#include <cstdio>
 
 //#define DEBUG true
 #define DEBUG false

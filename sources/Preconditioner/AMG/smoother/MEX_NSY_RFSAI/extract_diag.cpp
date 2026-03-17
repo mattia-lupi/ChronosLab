@@ -1,3 +1,4 @@
+#include <iostream>
 #include "extract_diag.h"
 
 void extract_diag(const int nrows, const int *const iat, const int *const ja,
@@ -7,7 +8,7 @@ void extract_diag(const int nrows, const int *const iat, const int *const ja,
    diag = (double*) malloc(nrows * sizeof(double));
    if (diag == nullptr){
       // Allocation error
-      cout << "Allocation Error in extract_diag" << endl;
+      std::cout << "Allocation Error in extract_diag" << std::endl;
       return;
    }
    

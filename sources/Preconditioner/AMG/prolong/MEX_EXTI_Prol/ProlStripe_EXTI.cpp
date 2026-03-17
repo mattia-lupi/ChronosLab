@@ -15,13 +15,12 @@
 #include <cmath>      // to use: abs
 #include <algorithm>  // to use: fill_n,min
 #include <limits>     // to use: numeric_limits<double>epsilon()
-using namespace std;
 
 #include "ir_heapsort.h"
 
 const double ONE  = 1.0;
 const double ZERO = 0.0;
-const double EPS = numeric_limits<double>::epsilon();
+const double EPS = std::numeric_limits<double>::epsilon();
 
 int ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
                     const int nn_A, const int nt_A, const int ntmax_P,
@@ -34,7 +33,7 @@ int ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
    double avg_nnz = 1.2*static_cast<double>(nt_A) / static_cast<double>(lastrow-firstrow);
    int size_scr = static_cast<int>(avg_nnz)*static_cast<int>(avg_nnz);
    int *WI         = new int [nn_A](); if (WI == NULL) return 1;
-   fill_n(WI,nn_A,0);
+   std::fill_n(WI,nn_A,0);
    int *ja_CC      = new int [size_scr](); if (ja_CC == NULL) return 1;
    int *ja_FS      = new int [size_scr](); if (ja_FS == NULL) return 1;
    int *pos_kj     = new int [size_scr](); if (pos_kj == NULL) return 1;
@@ -240,7 +239,7 @@ int ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
             int knod = ja_FS[k];
             double a_ik = coef_FS[k];
             // Init the extended sum with the entry corresponding to inod
-            double ext_sum = min(ZERO,a_ik);
+            double ext_sum = std::min(ZERO,a_ik);
             //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             //if (inod == DBNODE){
             //   cout << "FNEIGH " << knod << " INIT ESUM " << ext_sum << endl;
@@ -253,7 +252,7 @@ int ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
                int lcol = ja_A[l];
                if ( WI[lcol] > 0){
                   // This is a node in the interpolatory set
-                  double a_kl = min(ZERO,coef_A[l]);
+                  double a_kl = std::min(ZERO,coef_A[l]);
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                   //if (inod == DBNODE){
                   //   cout << "ESUM ADD " << lcol << " VAL " << a_kl << endl;
@@ -268,7 +267,7 @@ int ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
             // Check that extended sum is not null
             if ( abs(ext_sum) > EPS*a_ii ){
                // Update denominator
-               denom += a_ik*min(ZERO,a_ik) / ext_sum;
+               denom += a_ik*std::min(ZERO,a_ik) / ext_sum;
                // Update all the weights
                for (int jj = 0; jj < ind; jj++){
                   int jpos = pos_kj[jj];

@@ -5,7 +5,6 @@
 #include <string>   // std::string
 #include <iomanip>  // std::setw
 #include <vector>   // std::vector
-using namespace std;
 
 #include "precision.h"
 
@@ -46,12 +45,12 @@ class DebugEnvironment {
    /**
     * @brief OMP threads log files.
     */
-   vector<FILE*> t_logfile;
+   std::vector<FILE*> t_logfile;
 
    /**
     * @brief List of AMG levels to be printed.
     */
-   vector<iReg> iLevPrint;
+   std::vector<iReg> iLevPrint;
 
    //-------------------------------------------------------------------------------------
 

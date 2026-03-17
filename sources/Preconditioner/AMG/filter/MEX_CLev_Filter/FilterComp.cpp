@@ -1,9 +1,3 @@
-/////////////////////////////////
-//#include <iostream>
-//using namespace std;
-/////////////////////////////////
-
-
 #include <stdlib.h>
 #include <omp.h>
 #include "FilterComp_stripe.h"

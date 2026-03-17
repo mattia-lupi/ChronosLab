@@ -2,7 +2,6 @@
 
 #include <math.h>    // to use: fabs
 #include <algorithm> // to use: min
-using namespace std;
 
 #include "DEBUG.h"
 #include "ri_sortsplit_nsy.h"

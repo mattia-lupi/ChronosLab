@@ -7,10 +7,6 @@
 #include <algorithm>  // to use: min
 #include <lapacke.h>  // to use: dpotrf,dpotrs
 #include <omp.h>      // omp_get_wtime
-#include <iostream>
-#include <iomanip>
-
-using namespace std;
 
 //----------------------------------------------------------------------------------------
 
@@ -64,6 +60,3 @@ void cpt_afsai_coef(iReg chunk_size, iReg n_step, iReg step_size, rExt tau, rExt
                     const iExt * const iat, const iReg * const ja, iExt * const istart_G,
                     iExt * const istop_G, iReg * const ja_G, const rExt * const coef_A,
                     rExt * const coef_G);
-
-
-

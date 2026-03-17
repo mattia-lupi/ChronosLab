@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm> // tu use: max
-using namespace std;
 
 #include "swapi.h"
 #include "swapr.h"

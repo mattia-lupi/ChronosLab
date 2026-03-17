@@ -8,7 +8,7 @@
 void get_cond(const rExt condmax, const iReg n, const iReg m, rExt **A,
               iReg &rank, rExt &cond){
 
-   iReg maxrank = min(n,m);
+   iReg maxrank = std::min(n,m);
    rExt wrot[m];
 
    // Set the initial guess for the rank

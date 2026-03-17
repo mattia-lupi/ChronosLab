@@ -21,8 +21,6 @@
 #include "mk_HouHolVec.h"
 #include "Apply_HouHol_Rot.h"
 
-using namespace std;
-
 /**
  * @brief Retrieves rank and conditioning of an input matrix A of size n x m using a rank
  *        revealing QR based on Householder rotations.

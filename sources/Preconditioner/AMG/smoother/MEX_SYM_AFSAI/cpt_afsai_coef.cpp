@@ -273,7 +273,7 @@ for (iReg i = 1; i < mrow+1; i ++){
 /////////////////////////////////////////////////////////////////////
 
 // Keep only the largest lfil entries
-iReg ncut = min(lfil,ind_WR);
+iReg ncut = std::min(lfil,ind_WR);
 ri_sortsplit(ind_WR,ncut,WR,&IWN[mrow]);
 
 /////////////////////////////////////////////////////////////////////
@@ -320,12 +320,12 @@ if ( sizeof(iReg) != sizeof(iBlas) || sizeof(iReg) != sizeof(iLapack) ){
 iReg mmax = n_step * step_size;
 
 // Allocate local work arrays
-vector<iReg> IWN(nequ,0);
-vector<iReg> JWN(nequ,0);
-vector<rExt> WR(nequ,0);
-vector<rExt> full_A(mmax*mmax,0);
-vector<rExt> rhs(mmax+1,0);
-vector<rExt> rhs_sav(mmax+1,0);
+std::vector<iReg> IWN(nequ,0);
+std::vector<iReg> JWN(nequ,0);
+std::vector<rExt> WR(nequ,0);
+std::vector<rExt> full_A(mmax*mmax,0);
+std::vector<rExt> rhs(mmax+1,0);
+std::vector<rExt> rhs_sav(mmax+1,0);
 
 // Initialize number of entries
 nterm_G = 0;

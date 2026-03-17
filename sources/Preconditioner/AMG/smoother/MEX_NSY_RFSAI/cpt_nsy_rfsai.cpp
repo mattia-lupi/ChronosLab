@@ -39,7 +39,7 @@ int cpt_nsy_rfsai(const int nstep, const int step_size, const double eps, const 
    if ( rhs_L_sav == nullptr || rhs_U_sav == nullptr ) return 2;
 
    // Init JWN
-   fill_n(JWN,nn_A,0);
+   std::fill_n(JWN,nn_A,0);
 
    // Initialize pointer to the beginning of the row
    int ind_FL = 0;
@@ -227,7 +227,7 @@ int cpt_nsy_rfsai(const int nstep, const int step_size, const double eps, const 
       // Check zero diagonal
       double check_val = fabs(scal_fac / diag_entry);
       if ( check_val < 1.0e-10 ){
-         cout << "SMALL DIAGONAL = " << check_val << " IN ROW: " << irow << endl;
+         std::cout << "SMALL DIAGONAL = " << check_val << " IN ROW: " << irow << std::endl;
       }
 
       // Scale lower part

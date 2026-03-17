@@ -1,7 +1,5 @@
 #include <omp.h>
-#include <vector>
 #include <iomanip>
-using namespace std;
 
 #include "precision.h"    // to use: iReg, iExt, rExt
 #include "DebEnv.h"
@@ -16,8 +14,8 @@ using namespace std;
 int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
            iReg nn_S, const iExt *const iat_S, const iReg *const ja_S, const iReg ntv,
            const iReg *const fcnodes, const rExt *const *const TV,
-           iExt &nt_I, vector<iExt> &vec_iat_I, vector<iReg> &vec_ja_I,
-           vector<rExt> &vec_coef_I, vector<iReg> &vec_c_mark ) {
+           iExt &nt_I, std::vector<iExt> &vec_iat_I, std::vector<iReg> &vec_ja_I,
+           std::vector<rExt> &vec_coef_I, std::vector<iReg> &vec_c_mark ) {
 
    // Init error code
    int ierr = 0;
@@ -26,7 +24,7 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
    DebEnv.nthreads = nthreads;
 
    // Allocate some internal scratch
-   vector<iExt> vec_ridv_i;
+   std::vector<iExt> vec_ridv_i;
    try {
       vec_ridv_i.resize(nthreads+1);
    } catch (linsol_error) {
@@ -46,7 +44,7 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
 
    // Scratches to count entries (used only in verbosity mode)
    iReg len_count = params.dist_max+4;
-   vector<iReg> dist_count;
+   std::vector<iReg> dist_count;
    //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    if (params.verbosity >= VLEV_MEDIUM){
       dist_count.assign(len_count,0);
@@ -92,13 +90,13 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
       firstrow_0    = nn_L;
       firstrow     += nn_L;
       iReg lastrow  = firstrow + nn_loc;
-      iExt nt_Imax  = max(params.mmax,ntv)*nn_loc;
+      iExt nt_Imax  = std::max(params.mmax,ntv)*nn_loc;
       iExt nt_I_loc;
 
       // Allocate local scratches
-      vector<iExt> vec_iat_scr;
-      vector<iReg> vec_ja_scr;
-      vector<rExt> vec_coef_scr;
+      std::vector<iExt> vec_iat_scr;
+      std::vector<iReg> vec_ja_scr;
+      std::vector<rExt> vec_coef_scr;
       try {
          vec_iat_scr.resize(nn_loc+1);
          vec_ja_scr.resize(nt_Imax);
@@ -187,23 +185,23 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
       for (iReg i = 0; i <= params.dist_max+2; i++) tot_count += dist_count[i];
       rExt r_tot_count = 100.0 / static_cast<rExt>(tot_count);
       for (iReg i = 0; i < params.dist_max; i++)
-         cout << "# of nodes interp at dist " << setw(4) << i+1 << ":  " <<
-         setw(12) << dist_count[i] << " | " << setprecision(2) << setw(6) <<
-         static_cast<rExt>(dist_count[i]) * r_tot_count << "%" << endl;
-      cout << "# of nodes with high error:      " <<
-      setw(12) << dist_count[params.dist_max] << " | " << setprecision(2) <<
-      setw(6) << static_cast<rExt>(dist_count[params.dist_max]) * r_tot_count <<
-      "%" << endl;
-      cout << "# of nodes with large weights:   " << setw(12) <<
-      dist_count[params.dist_max+1] << " | " << setprecision(2) << setw(6) <<
-      static_cast<rExt>(dist_count[params.dist_max+1]) * r_tot_count << "%" << endl;
-      cout << "# of nodes without neighbours:   " << setw(12) <<
-      dist_count[params.dist_max+2] << " | " << setprecision(2) << setw(6) <<
-      static_cast<rExt>(dist_count[params.dist_max+2]) * r_tot_count << "%" << endl;
-      cout << "---------------------------" << endl;
+         std::cout << "# of nodes interp at dist " << std::setw(4) << i+1 << ":  " <<
+         std::setw(12) << dist_count[i] << " | " << std::setprecision(2) << std::setw(6) <<
+         static_cast<rExt>(dist_count[i]) * r_tot_count << "%" << std::endl;
+      std::cout << "# of nodes with high error:      " <<
+      std::setw(12) << dist_count[params.dist_max] << " | " << std::setprecision(2) <<
+      std::setw(6) << static_cast<rExt>(dist_count[params.dist_max]) * r_tot_count <<
+      "%" << std::endl;
+      std::cout << "# of nodes with large weights:   " << std::setw(12) <<
+      dist_count[params.dist_max+1] << " | " << std::setprecision(2) << std::setw(6) <<
+      static_cast<rExt>(dist_count[params.dist_max+1]) * r_tot_count << "%" << std::endl;
+      std::cout << "# of nodes without neighbours:   " << std::setw(12) <<
+      dist_count[params.dist_max+2] << " | " << std::setprecision(2) << std::setw(6) <<
+      static_cast<rExt>(dist_count[params.dist_max+2]) * r_tot_count << "%" << std::endl;
+      std::cout << "---------------------------" << std::endl;
       //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-      cout << "NOT FULL-RANK " << setprecision(2) << setw(6) 
-           << static_cast<rExt>(dist_count[params.dist_max+3]) * r_tot_count << "%" << endl;
+      std::cout << "NOT FULL-RANK " << std::setprecision(2) << std::setw(6) 
+           << static_cast<rExt>(dist_count[params.dist_max+3]) * r_tot_count << "%" << std::endl;
       //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
    }
 

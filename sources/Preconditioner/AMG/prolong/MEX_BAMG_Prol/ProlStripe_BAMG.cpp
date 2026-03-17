@@ -2,7 +2,6 @@
 #include <math.h>    // tu use: abs in clapack
 #include <algorithm> // tu use: max
 #include <lapacke.h>
-using namespace std;
 
 #include "DebEnv.h"
 #include "precision.h"    // to use: iReg, rExt
@@ -60,10 +59,10 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
    optimal_lwork = static_cast<int>(db_lwork);
 
    // Allocate some scratch vectors
-   vector<iReg> vec_int_list;
-   vector<iReg> vec_neigh;
-   vector<iReg> vec_WI;
-   vector<rExt> vec_WR;
+   std::vector<iReg> vec_int_list;
+   std::vector<iReg> vec_neigh;
+   std::vector<iReg> vec_WI;
+   std::vector<rExt> vec_WR;
    try {
       vec_int_list.resize(nn_S);
       vec_neigh.resize(nn_S);
@@ -78,8 +77,8 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
    rExt *WR = vec_WR.data();
 
    // Allocate temporary space for "compressed" test space (restricted to neighbours only)
-   vector<rExt*> vec_TVcomp;
-   vector<rExt>  vec_TVbuf;
+   std::vector<rExt*> vec_TVcomp;
+   std::vector<rExt>  vec_TVbuf;
    try {
       vec_TVcomp.resize(nn_S+1);
       vec_TVbuf.resize(ntvecs*(nn_S+1));

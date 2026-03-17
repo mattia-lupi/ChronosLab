@@ -2,8 +2,6 @@
 #include <algorithm> // to use: fill_n
 #include <lapacke.h>  // to use: dgetrf,dgetrs
 
-using namespace std;
-
 #include "DEBUG.h"
 #include "KapGrad_NSY.h"
 #include "gather_fullsys.h"
