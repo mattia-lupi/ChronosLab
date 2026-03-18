@@ -36,7 +36,7 @@ LPFLAGS	      = -O1 -pg
 
 LDDFLAGS      = -O0 -g $(OPENMP)
 
-LIBRARIES     = -llapacke -llapack -lblas -lgfortran
+LIBRARIES     = -llapacke -llapack -lblas
 
 LIBS          = $(LIBRARIES)
 
@@ -52,7 +52,7 @@ OBJS	      = DEFL_PCG.o DEFL_PCG_matfree.o DebEnv.o EMIN_ImpProl.o\
 		gather_B_Z.o gather_B_dump.o gather_K.o gather_col.o gather_f.o\
 		load_Jacobi.o main.o mkiat_Tglo.o mkiat_Tloc.o mult_K_col.o\
 		mult_K_matfree.o mvjcol.o print_Q.o print_Z.o readMat.o\
-		spmatv.o spmatv_blk.o wrCSRmat.o
+		spmatv_blk.o wrCSRmat.o
 
 PRINT	      = pr
 
@@ -68,8 +68,8 @@ SRCS	      = DEFL_PCG.cpp DEFL_PCG_matfree.cpp DebEnv.cpp EMIN_ImpProl.cpp\
 		gather_B_QR.cpp gather_B_Z.cpp gather_B_dump.cpp gather_K.cpp\
 		gather_col.cpp gather_f.cpp load_Jacobi.cpp main.cpp\
 		mkiat_Tglo.cpp mkiat_Tloc.cpp mult_K_col.cpp mult_K_matfree.cpp\
-		mvjcol.cpp print_Q.cpp print_Z.cpp readMat.cpp spmatv.cpp\
-		spmatv_blk.cpp wrCSRmat.cpp
+		mvjcol.cpp print_Q.cpp print_Z.cpp readMat.cpp spmatv_blk.cpp\
+		wrCSRmat.cpp
 all:		$(PROGRAM)
 
 $(PROGRAM):     $(OBJS) 
