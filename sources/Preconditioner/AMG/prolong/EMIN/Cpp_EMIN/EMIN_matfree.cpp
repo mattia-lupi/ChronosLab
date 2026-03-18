@@ -216,7 +216,9 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    elaps_sec = end - start;
    double time_PCG = elaps_sec.count();
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-   cout << "PCG TIME "<< time_PCG << endl;
+   if(verb){
+      cout << "PCG TIME "<< time_PCG << endl;
+   }
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
    // Update prolongation with DP
