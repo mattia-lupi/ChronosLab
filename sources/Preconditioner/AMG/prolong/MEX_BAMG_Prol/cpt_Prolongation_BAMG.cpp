@@ -8,7 +8,7 @@
 //       cpt_Prolongation_BAMG(level, np, itmax_vol, dist_min, dist_max, mmax,
 //                             maxcond, maxrownrm, tol_vol, eps_prol,
 //                             nn_S, nt_S, iat_S, ja_S, coef_S,
-//                             ntv, fcnodes, TV, nn_I, nc_I)
+//                             ntv, fcnodes, TV, nn_I, nc_I, verb)
 //
 // Build command:
 //   See compile.m — ensure -R2018a is on its own line
@@ -58,14 +58,11 @@
 #include "BAMG_params.h"
 #include "DebEnv.h"
 
-#include <cstdlib>    // malloc(), free()
+#include <cstdlib>
 #include <string>
 #include <vector>
-#include <algorithm>  // std::copy
+#include <algorithm>
 
-//----------------------------------------------------------------------------------------
-// Convenience aliases
-//----------------------------------------------------------------------------------------
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
@@ -115,7 +112,7 @@ public:
 };
 
 //----------------------------------------------------------------------------------------
-// Computational wrapper — unchanged logic, lives in the MEX file as before
+// Computational wrapper
 //----------------------------------------------------------------------------------------
 int cpt_Prolongation_BAMG_wrapper(const int level, const BAMG_params params,
                                   const int nthreads,
@@ -199,6 +196,7 @@ public:
         const int    ntv        = static_cast<int>   (TypedArray<double>(inputs[15])[0]);
         const int    nn_I       = static_cast<int>   (TypedArray<double>(inputs[18])[0]);
         const int    nc_I       = static_cast<int>   (TypedArray<double>(inputs[19])[0]);
+        const int    verb       = static_cast<int>   (TypedArray<double>(inputs[20])[0]);
 
         // -----------------------------------------------------------------------
         // [FIX-B][NEW-3] Copy input arrays into std::vector for raw pointer access.
@@ -230,7 +228,7 @@ public:
         // Fill BAMG_params struct
         // -----------------------------------------------------------------------
         BAMG_params params;
-        params.verbosity  = VERB_LEV;
+        params.verbosity  = verb + 2;
         params.itmax_vol  = itmax_vol;
         params.dist_min   = dist_min;
         params.dist_max   = dist_max;
@@ -323,9 +321,9 @@ private:
     // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
-        if (inputs.size() != 20)
+        if (inputs.size() != 21)
             throwError("BAMG_Prol:badInputCount",
-                       "Expected 20 input arguments, got " +
+                       "Expected 21 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
         if (outputs.size() != 5)
@@ -333,8 +331,8 @@ private:
                        "Expected 5 output arguments, got " +
                        std::to_string(outputs.size()) + ".");
 
-        // Scalar double inputs: 0–11, 15, 18, 19
-        for (std::size_t i : {0u,1u,2u,3u,4u,5u,6u,7u,8u,9u,10u,11u,15u,18u,19u})
+        for (std::size_t i : {0u,1u,2u,3u,4u,5u,6u,7u,8u,9u,
+                               10u,11u,15u,18u,19u,20u})
             if (inputs[i].getType() != ArrayType::DOUBLE ||
                 inputs[i].getNumberOfElements() != 1)
                 throwError("BAMG_Prol:badScalar",

@@ -106,6 +106,7 @@ char line[1024];
    std::cout << std::endl;
 
    // Set variables for DEBUG
+   bool verb = 1;
    DebEnv.SetDebEnv(np,"w");
 
    // Read the matrix
@@ -228,7 +229,7 @@ char line[1024];
    double emin_info[EMIN_INFO_SZ];
    ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,prec_type,sol_type,nn_A,nn_C,ntv,
                        nt_patt,fcnode,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,iat_patt,
-                       ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info);
+                       ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info,verb);
 
    //---STOP--------------------------------
    auto end = std::chrono::system_clock::now();

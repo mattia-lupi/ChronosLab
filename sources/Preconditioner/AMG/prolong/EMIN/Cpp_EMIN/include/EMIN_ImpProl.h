@@ -6,4 +6,4 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
                  const int *ja_A, const double *coef_A, const int *iat_Pin, const int *ja_Pin,
                  const double *coef_Pin, const int *iat_patt, const int *ja_patt,
                  const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
-                 double *info);
+                 double *info, bool verb);

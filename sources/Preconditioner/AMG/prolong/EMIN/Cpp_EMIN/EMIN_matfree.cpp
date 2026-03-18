@@ -71,7 +71,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
                  const int *ja_A, const double *coef_A, const int *iat_Pin, const int *ja_Pin,
                  const double *coef_Pin, const int *iat_patt, const int *ja_patt,
                  const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
-                 double *info)
+                 double *info, bool verb)
 {
 
    // Init error code
@@ -207,13 +207,15 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    if (DP == nullptr) return ierr = 1;
    ierr = DEFL_PCG_matfree(np,prec_type,sol_type,nn,nn_C,nt_patt,ntv,perm,iperm,D_inv,
                            iat_A,ja_A,coef_A,Tr_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
-                           mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP);
+                           mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP,verb);
    if (ierr != 0) return ierr = 5;
    end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    double time_PCG = elaps_sec.count();
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-   std::cout << "PCG TIME "<< time_PCG << std::endl;
+   if(verb){
+      std::cout << "PCG TIME "<< time_PCG << std::endl;
+   }
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
    // Update prolongation with DP

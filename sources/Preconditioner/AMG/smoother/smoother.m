@@ -42,7 +42,7 @@ switch lower(method)
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
         opts.issym = 1;
-        opts.disp = 1;
+        opts.disp = verb;
         opts.tol = 5.e-4;
         lambda = eigs(FAFT,size(A,1),1,'la',opts);
         if verb
@@ -64,7 +64,7 @@ switch lower(method)
         % Compute damping parameter
         FAFT = @(x) FL*(A*(FU*x));
         opts.issym = 0;
-        opts.disp = 1;
+        opts.disp = verb;
         opts.tol = 5.e-4;
         lambda = eigs(FAFT,size(A,1),1,'lm',opts);
         if verb
@@ -86,7 +86,7 @@ switch lower(method)
         % opts.issym = 1;
         if true
            lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
-                         'Tolerance',1.e-2,'Display',1,'FailureTreatment','keep');
+                         'Tolerance',1.e-2,'Display',verb,'FailureTreatment','keep');
            if verb
               fprintf('Max Lambda: %10.4f\n',lambda);
            end

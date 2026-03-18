@@ -149,11 +149,9 @@ else
    end
    if param.symm
       [TV, lambda, res] = tspace(TV0, A, smootherOp, param.tspace, verb);
-      if verb
-         fprintf('   i          lambda     res_lam     res_vec\n');
-      end
       nl = numel(lambda);
-      if verb
+      if verb && ~strcmpi(param.tspace.method,'NONE')
+         fprintf('   i          lambda     res_lam     res_vec\n');
          fprintf('%4d %15.6e %11.2e %11.2e\n',[(1:nl)' lambda(end:-1:1) res(end:-1:1,:)]');
       end
    else

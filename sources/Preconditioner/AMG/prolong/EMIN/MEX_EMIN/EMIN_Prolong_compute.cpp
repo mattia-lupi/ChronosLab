@@ -123,6 +123,7 @@ public:
         const int    nn_C      = static_cast<int>   (TypedArray<double>(inputs[ 8])[0]);
         const int    ntv       = static_cast<int>   (TypedArray<double>(inputs[ 9])[0]);
         const int    nt_patt   = static_cast<int>   (TypedArray<double>(inputs[10])[0]);
+        bool         verb      = static_cast<bool>  (TypedArray<double>(inputs[21])[0]);
 
         // -----------------------------------------------------------------------
         // Read input arrays
@@ -211,7 +212,7 @@ public:
                                 iat_patt_vec.data(), ja_patt_vec.data(),
                                 TV,
                                 iat_Pout_raw, ja_Pout_raw, coef_Pout_raw,
-                                info);
+                                info,verb);
 
         // TV_owner destructs here — free() called on the pointer array only;
         // the rows were views into TVbuf_vec (stack-managed), not separately alloc'd.
@@ -285,9 +286,9 @@ private:
     // [FIX-C] ArgumentList methods are not const — take non-const refs
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
-        if (inputs.size() != 21)
+        if (inputs.size() != 22)
             throwError("EMIN_Prolong:badInputCount",
-                       "Expected 21 input arguments, got " +
+                       "Expected 22 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
         if (outputs.size() != 4)
@@ -302,6 +303,12 @@ private:
                 throwError("EMIN_Prolong:badScalar",
                            "Input argument " + std::to_string(i + 1) +
                            " must be a real double scalar.");
+
+        // Inputs 22: real double scalar
+        if (inputs[21].getType() != ArrayType::DOUBLE ||
+                inputs[21].getNumberOfElements() != 1)
+                throwError("EMIN_Prolong:badScalar",
+                           "Input argument 22 must be a real double scalar.");
 
         // Inputs 11–13, 15–16, 18–19: int32 arrays
         for (std::size_t i : {11u, 12u, 13u, 15u, 16u, 18u, 19u})
