@@ -106,7 +106,7 @@ public:
         // -----------------------------------------------------------------------
         // Read input scalars
         // -----------------------------------------------------------------------
-        mprint("- get input scalars\n");
+        // mprint("- get input scalars\n");
 
         const iReg nthread   = static_cast<iReg>(TypedArray<double>(inputs[0])[0]);
         const iReg n_step    = static_cast<iReg>(TypedArray<double>(inputs[1])[0]);
@@ -123,7 +123,7 @@ public:
         //   ja_M   → int32_t  (mxINT32_CLASS — was iReg* via mxGetData void* cast)
         //   coef_M → double
         // -----------------------------------------------------------------------
-        mprint("- get input arrays\n");
+        // mprint("- get input arrays\n");
 
         const TypedArray<int64_t> iat_M_arr  = inputs[8];
         const TypedArray<int32_t> ja_M_arr   = inputs[9];
@@ -148,7 +148,7 @@ public:
         //   After the kernel, exact-size TypedArrays are constructed for output.
         //   No mxDestroyArray() needed — vectors self-destruct.
         // -----------------------------------------------------------------------
-        mprint("- allocate work arrays\n");
+        // mprint("- allocate work arrays\n");
 
         const iExt kmax    = 1 + static_cast<iExt>(n_step) * static_cast<iExt>(step_size);
         const iExt nzmax_G = static_cast<iExt>(nrows) * kmax;
@@ -161,7 +161,7 @@ public:
         // -----------------------------------------------------------------------
         // Call the computational kernel
         // -----------------------------------------------------------------------
-        mprint("- compute G terms\n");
+        // mprint("- compute G terms\n");
 
         compute_local_fsai(nthread, n_step, step_size, tau, eps,
                            nrows, nrows_M, nterm_M,
@@ -182,7 +182,7 @@ public:
         //             directly into fresh TypedArrays of the exact size.
         //             The oversized vectors self-destruct at end of scope.
         // -----------------------------------------------------------------------
-        mprint("- resize output arrays\n");
+        // mprint("- resize output arrays\n");
 
         const std::size_t sz_rows1 = static_cast<std::size_t>(nrows) + 1;
         const std::size_t sz_nt    = static_cast<std::size_t>(nterm_G_val);

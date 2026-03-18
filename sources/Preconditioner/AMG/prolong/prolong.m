@@ -35,7 +35,7 @@ if ~two_stg_prol
    % Standard prolongation
    switch upper(param.prolong.proltype)
       case 'BAMG'
-         [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
+         [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV,verb);
          if verb 
             fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
          end
@@ -232,7 +232,7 @@ if strcmpi(prol_emin,'EMIN')
    end
    patt_pow = param.prolong.patt_pow;
    ntv = size(TV,2);
-   Ppatt = mk_prolPatt(patt_pow,S_emin,P,fcnode,A,param.prolong.nnzr_max,ntv);
+   Ppatt = mk_prolPatt(patt_pow,S_emin,P,fcnode,A,param.prolong.nnzr_max,ntv,verb);
 
    % Apply EMIN algorithm
    [P,info] = MEX_EMIN_enhance_prol(level,param.prolong,A,Ppatt,P,TV,fcnode,verb);

@@ -1,4 +1,5 @@
 #include "omp.h"
+#include "mex.h"
 #include <math.h>
 #include <algorithm>
 #include <iostream>
@@ -32,7 +33,7 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
                      const int *iat_patt, const int *ja_patt, const int *iat_Tpatt,
                      const int *ja_Tpatt, const double *mat_Q, const double *vec_P0,
                      const double *vec_f, const int itmax, const double energy_tol,
-                     int &iter, double *vec_DP){
+                     int &iter, double *vec_DP,bool verb){
 
    // Init error code
    int ierr = 0;
@@ -83,9 +84,11 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // Compute initial energy
       init_energy = Tr_A + ddot_par(np,nn_K,vscr,wscr,ridv) -
                            2.0*ddot_par(np,nn_K,vscr,vec_f,ridv);
-      cout << setprecision(6) << scientific;
-      cout << "Initial Energy:  " << init_energy << endl;
-      cout << "Trace of A:      " << Tr_A << endl;
+      if(verb){
+         cout << setprecision(6) << scientific;
+         cout << "Initial Energy:  " << init_energy << endl;
+         cout << "Trace of A:      " << Tr_A << endl;
+      }
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       // 3 - Subtract vec_f to wscr: wscr <-- wscr - vec_f
@@ -107,9 +110,11 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       // Compute initial energy
       init_energy = Tr_A + ddot_par(np,nn_K,vec_P0,vscr,ridv) -
                            2.0*ddot_par(np,nn_K,vec_P0,wscr,ridv);
-      cout << setprecision(6) << scientific;
-      cout << "Initial Energy:  " << init_energy << endl;
-      cout << "Trace of A:      " << Tr_A << endl;
+      if(verb){
+         cout << setprecision(6) << scientific;
+         cout << "Initial Energy:  " << init_energy << "\n";
+         cout << "Trace of A:      " << Tr_A << "\n";
+      }
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       // 3 - Subtract vec_f to vscr: vscr <-- vscr - vec_f
@@ -206,11 +211,15 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
 
       if (iter==1){
          DE0 = DEk;
-         printf("%4s %15s %15s\n","iter","Energy","DE");
+         if(verb){
+            mexPrintf("%4s %15s %15s\n","iter","Energy","DE");
+         }
       }
       double const dDE = DEk/DE0;
       DE -= DEk;
-      printf("%4d %15.6e %15.6e\n",iter,init_energy+DE,dDE);
+      if(verb){
+         mexPrintf("%4d %15.6e %15.6e\n",iter,init_energy+DE,dDE);
+      }
 
       // Check convergence
       exit_test = (iter == itmax) || (dDE < energy_tol);

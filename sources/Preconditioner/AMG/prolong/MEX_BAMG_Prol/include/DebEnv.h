@@ -15,7 +15,7 @@ using namespace std;
 #define DEBUG false
 
 // Flag to activate debug locally in BAMG
-#define BAMG_DEBUG true
+#define BAMG_DEBUG false
 
 #define VERB_LEV 2
 

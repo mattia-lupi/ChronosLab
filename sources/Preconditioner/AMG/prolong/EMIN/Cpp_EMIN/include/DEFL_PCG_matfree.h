@@ -5,4 +5,4 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
                      const int *iat_patt, const int *ja_patt, const int *iat_Tpatt,
                      const int *ja_Tpatt, const double *mat_Q, const double *vec_P0,
                      const double *vec_f, const int itmax, const double en_tol,
-                     int &iter, double *vec_DP);
+                     int &iter, double *vec_DP,bool verb);

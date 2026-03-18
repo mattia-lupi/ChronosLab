@@ -70,6 +70,7 @@ ja_Pin    = ja_Pin';
 coef_Pin  = coef_Pin';
 iat_patt  = iat_patt';
 ja_patt   = ja_patt';
+verb = double(verb);
 
 % Convert TV in proper 1-D array
 ntv = size(TV,2);
@@ -104,7 +105,7 @@ ja_patt   = int32(ja_patt) - 1;
 [iat_Pout,ja_Pout,coef_Pout,info] = ...
           EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,prec,sol_type,...
                                nn,nn_C,ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,...
-                               iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV);
+                               iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV,verb);
 
 % Create a sparse matrices for Pout
 nt_Pout = size(ja_Pout,2);

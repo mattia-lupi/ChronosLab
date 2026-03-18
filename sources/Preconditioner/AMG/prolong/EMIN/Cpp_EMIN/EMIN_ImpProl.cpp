@@ -90,7 +90,7 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
                  const int *fcnode, const int *iat_A, const int *ja_A, const double *coef_A,
                  const int *iat_Pin, const int *ja_Pin, const double *coef_Pin,
                  const int *iat_patt, const int *ja_patt, const double *const *TV,
-                 int *&iat_Pout, int *&ja_Pout, double *&coef_Pout, double *info)
+                 int *&iat_Pout, int *&ja_Pout, double *&coef_Pout, double *info, bool verb)
 {
 
    // Init error code
@@ -120,7 +120,7 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
       ierr = EMIN_matfree(np,itmax,en_tol,condmax,prec_type,sol_type,nn,nn_C,
                           ntv,nt_A,nt_P,nt_patt,fcnode,iat_A,ja_A,coef_A,iat_Pin,
                           ja_Pin,coef_Pin,iat_patt,ja_patt,TV,iat_Pout,ja_Pout,
-                          coef_Pout,info);
+                          coef_Pout,info,verb);
 
    } else {
 

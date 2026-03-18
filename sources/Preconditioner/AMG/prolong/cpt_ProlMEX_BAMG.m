@@ -1,4 +1,4 @@
-function [mat_I,c_mark] = cpt_ProlMEX_BAMG(level,params,nn_C,fcnodes,mat_S,TV)
+function [mat_I,c_mark] = cpt_ProlMEX_BAMG(level,params,nn_C,fcnodes,mat_S,TV,verb)
 %------------------------------------------------------------------------------------------
 %
 % Computes the prolongation using the BAMG algorithm (
@@ -67,6 +67,7 @@ iat_S = int32(iat_S) - 1;
 ja_S = int32(ja_S) - 1;
 fcnodes = int32(fcnodes);
 coef_S = int32(coef_S);
+verb = double(verb);
 
 % Convert TV in proper 1-D array
 TV = TV';
@@ -75,7 +76,7 @@ TV = TV(:);
 [nt_I,iat_I,ja_I,coef_I,c_mark] = ...
                         cpt_Prolongation_BAMG(level,np,itmax_vol,dist_min,dist_max,...
                         mmax,maxcond,maxrownrm,tol_vol,eps_prol,nn_S,nt_S,...
-                        iat_S,ja_S,coef_S,ntv,fcnodes,TV,nn_I,nc_I);
+                        iat_S,ja_S,coef_S,ntv,fcnodes,TV,nn_I,nc_I,verb);
 
 % Create a sparse matrix for the prolongation
 irow_I = zeros(nt_I,1);

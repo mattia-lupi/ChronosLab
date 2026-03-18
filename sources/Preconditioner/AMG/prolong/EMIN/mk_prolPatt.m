@@ -1,4 +1,4 @@
-function P_patt = mk_prolPatt(kpow,S,P,fcnode,A,nnzr,nnzr_min)
+function P_patt = mk_prolPatt(kpow,S,P,fcnode,A,nnzr,nnzr_min,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Creates the power pattern for prolongation set-up. The output pattern do not include
@@ -20,7 +20,9 @@ if FLAG_unitary
    pp = 1;
    P_patt = sparse(ii,jj,pp,nn,mm);
 end
-fprintf('Power 1 nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
+if verb
+   fprintf('Power 1 nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
+end
 
 if nargin == 4
 
@@ -28,15 +30,18 @@ if nargin == 4
    S(S ~= 0) = 1;
    for ipow = 2:kpow
       P_patt = S*P_patt;
-      fprintf('Power %d nnzr: %10.2f\n',ipow,nnz(P_patt)/nn);
+      if verb
+         fprintf('Power %d nnzr: %10.2f\n',ipow,nnz(P_patt)/nn);
+      end
    end
    % Remove coarse nodes
    ind_c = find(fcnode > 0);
    tmp = P_patt';
    tmp(:,ind_c) = 0;
    P_patt = tmp';
-   fprintf('Final nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
-
+   if verb
+      fprintf('Final nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
+   end
 else
 
    % Save initial pattern
@@ -47,14 +52,18 @@ else
    for ipow = 2:kpow
       P_patt = S*P_patt;
       P_patt = drop_patt(nnzr,P_patt,P_patt_0);
-      fprintf('Power %d nnzr: %10.2f\n',ipow,nnz(P_patt)/nf);
+      if verb
+         fprintf('Power %d nnzr: %10.2f\n',ipow,nnz(P_patt)/nf);
+      end
    end
    % Remove coarse nodes
    ind_c = find(fcnode > 0);
    tmp = P_patt';
    tmp(:,ind_c) = 0;
    P_patt = tmp';
-   fprintf('Final nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
+   if verb
+      fprintf('Final nnzr: %10.2f\n',(nnz(P_patt)-mm) / (nn-mm));
+   end
 
    % Make sure that each prolongation row has at least nnzr_min entries
    % Use matrix A to increase connectivity
@@ -75,7 +84,9 @@ else
    nn_poor = numel(ind_poor);
 
    % If there are poorly connected nodes
-   fprintf('There are %d poorly connected nodes\n',nn_poor);
+   if verb
+      fprintf('There are %d poorly connected nodes\n',nn_poor);
+   end
    %if (nn_poor > 0)
    if (nn_poor > 0 && false) %@@@@@@@@ STARE ATTENTI A QUESTA CORREZIONE
       of = fopen('BAD_LIST','w');
