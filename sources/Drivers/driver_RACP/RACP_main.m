@@ -65,6 +65,23 @@ fprintf('END INPUT\n\n');
 
 %-----------------------------------------------------------------------------------------
 
+% Check rhs input
+if strcmpi(rhs_build,'unit_rhs')
+   rhs = ones(size(A,1),1);
+elseif strcmpi(rhs_build,'unit_sol')
+   xx = ones(size(A,1),1);
+   rhs = A*xx;
+   clear xx;
+elseif strcmpi(rhs_build,'rand_rhs')
+   rhs = rand(size(A,1),1);
+elseif strcmpi(rhs_build,'rhs_in')
+   if ~exist('rhs','var')
+      error('rhs input not found');
+   end
+else
+   error('not expected type of rhs, try unit_rhs/unit_sol/rand_rhs/rhs_in');
+end
+
 % Split the matrix in 4 blocks
 
 nn = size(A,1);
@@ -217,18 +234,6 @@ end
 
 % Compute reverse augmented peconditioner
 AMG_prec = cpt_aspAMG(param,A11_aug,TV0);
-PREC = @(x) AMG_Vcycle(AMG_prec,A11_aug,x);
-
-%-----------------------------------------------------------------------------------------
-%ProdA = @(x) A11_aug*x;
-%rhs11 = ones(size(A11_aug,1),1);
-%[x11,iter11,resvec11,flag11] = PCG_CJ(PREC,ProdA,rhs11,zeros(size(A11_aug,1),1),itmax,tol);
-%res11 = rhs11-A11_aug*x11;
-%D11_scal = D_scal(1:n11,1:n11);
-%fprintf('\n\nRESIDUAL NORMS PCG:\n\n');
-%fprintf('SCALED RES   %15.6e RHS %15.6e\n',norm(res11),norm(rhs11));
-%fprintf('UNSCALED RES %15.6e RHS %15.6e\n',norm(D11_scal\res11),norm(D11_scal\rhs11));
-%-----------------------------------------------------------------------------------------
 
 fprintf('BEGIN: System solution\n');
 switch lower(solv_method)
@@ -263,8 +268,8 @@ fprintf('\n');
 fprintf('# of iterations:   %15d\n',iter);
 
 fprintf('\n\nRESIDUAL NORMS:\n\n');
-fprintf('SCALED RES   %15.6e RHS %15.6e\n',norm(rhs_scaled-A_scaled*sol_scaled),norm(rhs_scaled));
-fprintf('UNSCALED RES %15.6e RHS %15.6e\n',norm(D_scal\(rhs_scaled-A_scaled*sol_scaled)),...
-                                           norm(D_scal\rhs_scaled));
-fprintf('PRECOND. RES %15.6e RHS %15.6e\n',norm(M(rhs_scaled-A_scaled*sol_scaled)),norm(M(rhs_scaled)));
+fprintf('SCALED RES   %15.6e    RHS %15.6e\n',norm(rhs_scaled-A_scaled*sol_scaled),norm(rhs_scaled));
+fprintf('UNSCALED RES %15.6e    RHS %15.6e\n',norm(D_scal\(rhs_scaled-A_scaled*sol_scaled)),...
+                                              norm(D_scal\rhs_scaled));
+fprintf('PRECOND. RES %15.6e    RHS %15.6e\n',norm(M(rhs_scaled-A_scaled*sol_scaled)),norm(M(rhs_scaled)));
 fprintf('\n');

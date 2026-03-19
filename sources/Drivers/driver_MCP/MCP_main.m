@@ -1,8 +1,8 @@
 clear
 clc
 
-simple_flag = false;
 DEBUG = false;
+simple_flag = false;
 
 global DEBINFO;
 % PARTE GENERALE
@@ -65,6 +65,22 @@ fprintf('END INPUT\n\n');
 
 %-----------------------------------------------------------------------------------------
 
+% Check rhs input
+if strcmpi(rhs_build,'unit_rhs')
+   rhs = ones(size(A,1),1);
+elseif strcmpi(rhs_build,'unit_sol')
+   xx = ones(size(A,1),1);
+   rhs = A*xx;
+   clear xx;
+elseif strcmpi(rhs_build,'rand_rhs')
+   rhs = rand(size(A,1),1);
+elseif strcmpi(rhs_build,'rhs_in')
+   if ~exist('rhs','var')
+      error('rhs input not found');
+   end
+else
+   error('not expected type of rhs, try unit_rhs/unit_sol/rand_rhs/rhs_in');
+end
 
 % Split the matrix in 4 blocks
 
@@ -170,28 +186,44 @@ end
 % Compute preconditioner
 MCP_prec = cpt_MCP(param,AA,TV0,BB,CC);
 
-%-----------------------------------------------------------------------------------------
-%fprintf('INIZIO PCG\n');
-%PREC = @(x) AMG_Vcycle(MCP_prec.AMG_prec,AA,x);
-%ProdA = @(x) AA*x;
-%rhs11 = ones(size(AA,1),1);
-%[x11,iter11,resvec11,flag11] = PCG_CJ(PREC,ProdA,rhs11,zeros(size(AA,1),1),itmax,tol);
-%res11 = rhs11-AA*x11;
-%D11_scal = D_scal(1:n11,1:n11);
-%fprintf('\n\nRESIDUAL NORMS PCG:\n\n');
-%fprintf('SCALED RES   %15.6e RHS %15.6e\n',norm(res11),norm(rhs11));
-%fprintf('UNSCALED RES %15.6e RHS %15.6e\n',norm(D11_scal\res11),norm(D11_scal\rhs11));
-%-----------------------------------------------------------------------------------------
 
-nrest = 100;
-M = @(x) apply_MCP(MCP_prec,AA,BB,CC,x);
 A_aug = [AA BB; BB' CC];
 rhs_aug = rhs_scaled;
-[sol_aug,flag,relres,iter,resvec] = gmres_LEFT(A_aug,rhs_aug,nrest,1.e-8,4,M);
+
+fprintf('BEGIN: System solution\n');
+switch lower(solv_method)
+
+    case 'gmres_cj'
+
+        % Solve the system by SQMR
+        fprintf('BEGIN: System solution by GMRES_CJ\n');
+        M = @(x) apply_MCP(MCP_prec,AA,BB,CC,x);
+        [sol_aug,flag,relres,iter,resvec] = gmres_LEFT(A_aug,rhs_aug,restart,tol,itmax/restart,M);
+        fprintf('END: System solution by GMRES_CJ\n\n');
+
+    case 'sqmr'
+
+        % Solve the system by SQMR
+        fprintf('BEGIN: System solution by SQMR\n');
+        Afun = @(x) A_aug*x;
+        M = @(x) apply_MCP(MCP_prec,AA,BB,CC,x);
+        IDfun = @(x) x;
+        [sol_aug,flag,relres,iter,resvec] = SQMR(Afun,rhs_aug,tol,itmax,M,IDfun);
+        fprintf('END: System solution by SQMR\n\n');
+
+end
+fprintf('END: System solution\n');
+
+% Print results
+if flag
+   fprintf('Convergence not achieved\n');
+end
+fprintf('\n');
+fprintf('\n');
+fprintf('# of iterations:   %15d\n',iter);
 
 fprintf('\n\nRESIDUAL NORMS:\n\n');
-fprintf('SCALED RES   %15.6e RHS %15.6e\n',norm(rhs_aug-A_aug*sol_aug),norm(rhs_aug));
-fprintf('UNSCALED RES %15.6e RHS %15.6e\n',norm(D_scal\(rhs_aug-A_aug*sol_aug)),...
-                                           norm(D_scal\rhs_aug));
-fprintf('PRECOND. RES %15.6e RHS %15.6e\n',norm(M(rhs_aug-A_aug*sol_aug)),norm(M(rhs_aug)));
-fprintf('\n');
+fprintf('SCALED RES   %15.6e    RHS %15.6e\n',norm(rhs_aug-A_aug*sol_aug),norm(rhs_aug));
+fprintf('UNSCALED RES %15.6e    RHS %15.6e\n',norm(D_scal\(rhs_aug-A_aug*sol_aug)),...
+                                              norm(D_scal\rhs_aug));
+fprintf('PRECOND. RES %15.6e    RHS %15.6e\n',norm(M(rhs_aug-A_aug*sol_aug)),norm(M(rhs_aug)));
