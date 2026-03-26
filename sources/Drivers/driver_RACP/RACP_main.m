@@ -3,7 +3,7 @@ clc
 
 DEBUG = false;
 simple_flag = false;
-treatBC = false;
+treatBC = true;
 
 global DEBINFO;
 % PARTE GENERALE
@@ -96,20 +96,39 @@ A22 = A(n11+1:end,n11+1:end);
 % Treat BC in A11
 tic;
 if treatBC
+   % Identify target indices
    D = sum(spones(A11));
    ind_dir_dof = find(D==1);
    ind_col_rem = find(sum(spones(A12))==1);
    [ind_dir_lag,~,~] = find(A12(:,ind_col_rem));
    ind_dir = union(ind_dir_dof,ind_dir_lag);
-   A11(:,ind_dir) = 0;
-   A11 = A11';
-   A11(:,ind_dir) = 0;
-   A21(:,ind_dir) = 0;
-   A12 = A21';
+   
+   % Native Column Zeroing 
+   A11(:, ind_dir) = 0;
+   A21(:, ind_dir) = 0;
+   
+   % A11 Row Zeroing
+   A11 = A11.';
+   A11(:, ind_dir) = 0;
+   A11 = A11.';
+   
+   % Coupling Matrix Resolution
+   if sym_flag == 1
+       % Symmetry Exploit: A21 columns are already zeroed. 
+       % Transposing it perfectly zeros the corresponding rows for A12.
+       A12 = A21.';
+   else
+       % Independent execution for non-symmetric systems
+       A12 = A12.';
+       A12(:, ind_dir) = 0;
+       A12 = A12.';
+   end
+   
+   % Diagonal Restoration
    fac = max(D);
-   D = zeros(n11,1);
-   D(ind_dir,1) = fac;
-   A11 = A11 + diag(sparse(D));
+   D_diag = zeros(n11, 1);
+   D_diag(ind_dir, 1) = fac;
+   A11 = A11 + spdiags(D_diag, 0, n11, n11);
 
    % Remove BC columns from A12 (and A21) and A22
    ind_col_retain = setdiff(1:size(A22,1),ind_col_rem)';
