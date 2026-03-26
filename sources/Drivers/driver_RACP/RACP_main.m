@@ -186,7 +186,7 @@ else
    % Compute local augmentation
    
    % Compute augmentation
-   AUG_FILE = fopen('AUG_FACT','w');;
+   AUG_FILE = fopen('AUG_FACT','w');
    AA_list = {};
    BB_list = {};
    aug = zeros(size(A22_scaled,1),1);
@@ -199,7 +199,7 @@ else
       v21 = A21_scaled_T(:,icol);
       [ii_12,~,bb_12] = find(v12);
       [ii_21,~,bb_21] = find(v21);
-      if (numel(ii_12)+numel(ii_21) > 0);
+      if (numel(ii_12)+numel(ii_21) > 0)
          BB = bb_12*bb_21';
          if simple_flag 
             m_a= max(D_11(ii_12));

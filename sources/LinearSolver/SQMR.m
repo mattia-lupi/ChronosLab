@@ -1,13 +1,8 @@
-function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec,x0,verb);
+function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec,x0,verb)
 
 %%%%%%%%%%%%%%%%%%%%%
 %% VETTORI SCRATCH
 nn   = size(rhs,1);
-vscr = zeros(nn,1);
-r    = zeros(nn,1);
-q    = zeros(nn,1);
-u    = zeros(nn,1);
-d    = zeros(nn,1);
 pnew = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
@@ -19,10 +14,8 @@ if nargin < 8
    verb = true;
 end
 
-A = Afun(speye(nn));
-D = max(diag(A));
-
 clear resvec;
+resvec = zeros(1,itmax);
 info=0;
 exit_test = false;
 niter=0;
@@ -39,8 +32,6 @@ q = rprec(vscr);
 tau    = norm(vscr);
 rho0   = r'*q;
 theta0 = 0;
-bnrom = norm(rhs);
-resini = norm(r) / bnorm;
 
 % Main loop
 while ~exit_test && niter < itmax
