@@ -3,6 +3,7 @@ function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec,x
 %%%%%%%%%%%%%%%%%%%%%
 %% VETTORI SCRATCH
 nn   = size(rhs,1);
+d    = zeros(nn,1);
 pnew = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
