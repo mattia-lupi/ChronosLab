@@ -3,6 +3,7 @@ clc
 
 DEBUG = false;
 simple_flag = false;
+treatBC = false;
 
 global DEBINFO;
 % PARTE GENERALE
@@ -94,7 +95,7 @@ A22 = A(n11+1:end,n11+1:end);
 
 % Treat BC in A11
 tic;
-if false
+if treatBC
    D = sum(spones(A11));
    ind_dir_dof = find(D==1);
    ind_col_rem = find(sum(spones(A12))==1);
@@ -243,7 +244,7 @@ switch lower(solv_method)
         % Solve the system by SQMR
         fprintf('BEGIN: System solution by GMRES_CJ\n');
         M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
-        [sol_scaled,flag,relres,iter,resvec] = gmres_LEFT(A_scaled,rhs_scaled,restart,tol,itmax,M);
+        [sol_scaled,flag,relres,iter,resvec] = gmres_RIGHT(A_scaled,rhs_scaled,restart,tol,itmax/restart,M);
         fprintf('END: System solution by GMRES_CJ\n\n');
 
     case 'sqmr'
