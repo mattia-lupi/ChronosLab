@@ -247,7 +247,12 @@ else
    % Compute augmented 11 block
    param.symm = sym_flag;
    inv_D22 = -inv(diag(diag(A22_aug)));
-   ADD = A12_scaled*inv_D22*A21_scaled; ADD = 0.5*(ADD+ADD');
+   ADD = A12_scaled*inv_D22*A21_scaled; 
+
+   % Symmetrise strongly if the matrix is supposed to be symmetric
+   if sym_flag == 1
+      ADD = 0.5*(ADD+ADD');
+   end
    A11_aug = A11_scaled+ADD;
 
 end
