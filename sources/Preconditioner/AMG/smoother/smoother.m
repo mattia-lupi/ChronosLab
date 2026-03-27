@@ -66,7 +66,7 @@ switch lower(method)
         opts.issym = 0;
         opts.disp = verb;
         opts.tol = 5.e-4;
-        lambda = eigs(FAFT,size(A,1),1,'lm',opts);
+        lambda = abs(eigs(FAFT,size(A,1),1,'lm',opts));
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
         end

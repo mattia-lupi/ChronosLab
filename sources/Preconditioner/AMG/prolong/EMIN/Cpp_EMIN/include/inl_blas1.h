@@ -49,7 +49,7 @@ inline rExt inl_ddot(const iReg n, const rExt *const v1, const iReg k1,
 inline rExt inl_dnrm2(const iReg n, const rExt *const v1, const iReg k1){
    rExt dnrm2 = 0.0;
    for (iReg i = 0; i < n; i += k1) dnrm2 += (v1[i])*(v1[i]);
-   return sqrt(dnrm2);
+   return std::sqrt(dnrm2);
 }
 
 /**

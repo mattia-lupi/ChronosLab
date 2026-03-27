@@ -16,6 +16,6 @@ double dnrm2_par(const int np, const int nn, const double* __restrict__ x,
    double dnrm2 = 0.0;
    for ( int ip = 0; ip < np; ip++ ) dnrm2 += reduc[ip];
 
-   return sqrt(dnrm2);
+   return std::sqrt(dnrm2);
 
 }

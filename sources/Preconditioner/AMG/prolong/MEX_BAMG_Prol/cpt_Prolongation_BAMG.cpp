@@ -228,7 +228,7 @@ public:
         // Fill BAMG_params struct
         // -----------------------------------------------------------------------
         BAMG_params params;
-        params.verbosity  = verb + 2;
+        params.verbosity  = verb;
         params.itmax_vol  = itmax_vol;
         params.dist_min   = dist_min;
         params.dist_max   = dist_max;

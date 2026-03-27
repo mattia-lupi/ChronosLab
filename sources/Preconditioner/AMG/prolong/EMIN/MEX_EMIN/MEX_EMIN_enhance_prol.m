@@ -1,4 +1,4 @@
-function [Pout,info] = MEX_EMIN_enhance_prol(level,param,A,Ppatt,Pin,TV,fcnode,verb)
+function [Pout,info] = MEX_EMIN_enhance_prol(level,param,SPDflag,A,Ppatt,Pin,TV,fcnode,verb)
 
 %-----------------------------------------------------------------------------------------
 %
@@ -68,7 +68,6 @@ ja_Pin    = ja_Pin';
 coef_Pin  = coef_Pin';
 iat_patt  = iat_patt';
 ja_patt   = ja_patt';
-verb = double(verb);
 
 % Convert TV in proper 1-D array
 ntv = size(TV,2);
@@ -97,10 +96,14 @@ ja_Pin    = int32(ja_Pin) - 1;
 iat_patt  = int32(iat_patt) - 1;
 ja_patt   = int32(ja_patt) - 1;
 
+% Bool to double
+verb      = double(verb);
+SPDflag   = double(SPDflag);
+
 % Compute Energy Min prolongation --------------------------------------------------------
 [iat_Pout,ja_Pout,coef_Pout,info] = ...
           EMIN_Prolong_compute(level,np,itmax,energ_tol,condmax,prec,sol_type,...
-                               nn,nn_C,ntv,nt_patt,fcnode,iat_A,ja_A,coef_A,...
+                               nn,nn_C,ntv,nt_patt,SPDflag,fcnode,iat_A,ja_A,coef_A,...
                                iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV,verb);
 
 % Create a sparse matrices for Pout

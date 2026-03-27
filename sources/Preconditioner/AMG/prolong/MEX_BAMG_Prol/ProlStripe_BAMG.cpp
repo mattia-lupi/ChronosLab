@@ -424,12 +424,12 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
             }
 
          } // end UPD_WEIGHTS Loop
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-         if (row_rank < ntvecs){
-            #pragma omp atomic update
-            dist_count[dist_max+3]++;
+         if (VERB_FLAG){
+            if (row_rank < ntvecs){
+               #pragma omp atomic update
+               dist_count[dist_max+3]++;
+            }
          }
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
          // Weights are already in coef_S, store column indices in P
          for (iReg i = 0; i < row_rank; i++){

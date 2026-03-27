@@ -255,14 +255,14 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   double max_DR = 0.0;
                   double min_DR = std::numeric_limits<double>::max();
                   for (int kk = 0; kk < l_mm; kk++){
-                     max_DR = std::max(max_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
-                     min_DR = std::min(min_DR,fabs(BB_scr[ind_BB+kk*l_ll+kk]));
+                     max_DR = std::max(max_DR,std::abs(BB_scr[ind_BB+kk*l_ll+kk]));
+                     min_DR = std::min(min_DR,std::abs(BB_scr[ind_BB+kk*l_ll+kk]));
                   }
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
                   if (DEBUG){
                      fprintf(DebEnv.t_logfile[mythid],"DIAG R: ");
                      for (int kk = 0; kk < l_mm; kk++)
-                        fprintf(DebEnv.t_logfile[mythid]," %15.6e",fabs(BB_scr[ind_BB+kk*l_ll+kk]));
+                        fprintf(DebEnv.t_logfile[mythid]," %15.6e",std::abs(BB_scr[ind_BB+kk*l_ll+kk]));
                      fprintf(DebEnv.t_logfile[mythid],"\n");
                      fprintf(DebEnv.t_logfile[mythid],
                              "%6d max_DR %15.6e min_DR %15.6e COND_1 %15.6e\n",icol,
@@ -377,7 +377,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   // Compute the rank of BB using SIGMA
                   int rank_BB = 1;
                   if (nr_BB_loc > 1){
-                     while (SIGMA[0] < condmax *abs(SIGMA[rank_BB])){
+                     while (SIGMA[0] < condmax * std::abs(SIGMA[rank_BB])){
                         rank_BB++;
                         if (rank_BB == std::min(ntv,nr_BB_loc)){
                            break;
@@ -475,11 +475,11 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   // Compute norm of v2
                   double norm_v2 = 0.0;
                   for (int i = 0; i < ntv; i++) norm_v2 += v2[i]*v2[i];
-                  norm_v2 = sqrt(norm_v2);
+                  norm_v2 = std::sqrt(norm_v2);
                   rExt rownorm = 0.0;
                   for (int j = 0; j < nr_BB_loc; j++)
                      rownorm += coef_P0[istart_patt+j]*coef_P0[istart_patt+j];
-                  rownorm = sqrt(rownorm);
+                  rownorm = std::sqrt(rownorm);
                   fprintf(log,"%8d NORM RANDRES %d %20.10e %20.10e\n",icol,TRUERANK,norm_v2,rownorm);
                   fprintf(reslog,"%8d %d %20.10e %20.10e\n",icol,TRUERANK,norm_v2,rownorm);
                   if (norm_v2 > 1.e-8){
@@ -504,7 +504,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   rExt norm = 0.0;
                   for (int j = 0; j < nr_BB_loc; j++)
                      norm += coef_P0[istart_patt+j]*coef_P0[istart_patt+j];
-                  fprintf(DebEnv.t_logfile[mythid],"ICOL %d ROWNORM %e\n",icol,sqrt(norm));
+                  fprintf(DebEnv.t_logfile[mythid],"ICOL %d ROWNORM %e\n",icol,std::sqrt(norm));
                }
                //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 

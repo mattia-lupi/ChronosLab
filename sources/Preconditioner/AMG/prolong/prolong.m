@@ -174,12 +174,12 @@ end
 
 % If the problem is not symmetric force smooth instead of emin
 prol_emin = param.prolong.prol_emin;
-if ~symm_flag && strcmpi(prol_emin,'EMIN')
-   if verb
-      fprintf('Since the problem is not symmetric smoothing is forced instead of EMIN\n');
-   end
-   prol_emin = 'smooth';
-end
+%if ~symm_flag && strcmpi(prol_emin,'EMIN')
+%   if verb
+%      fprintf('Since the problem is not symmetric smoothing is forced instead of EMIN\n');
+%   end
+%   prol_emin = 'smooth';
+%end
 
 % Prolongation smoothing
 if strcmpi(prol_emin,'SMOOTH')
@@ -235,7 +235,7 @@ if strcmpi(prol_emin,'EMIN')
    Ppatt = mk_prolPatt(patt_pow,S_emin,P,fcnode,A,param.prolong.nnzr_max,ntv,verb);
 
    % Apply EMIN algorithm
-   [P,info] = MEX_EMIN_enhance_prol(level,param.prolong,A,Ppatt,P,TV,fcnode,verb);
+   [P,info] = MEX_EMIN_enhance_prol(level,param.prolong,symm_flag,A,Ppatt,P,TV,fcnode,verb);
    if verb
       fprintf('Ener. Min. prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
    end

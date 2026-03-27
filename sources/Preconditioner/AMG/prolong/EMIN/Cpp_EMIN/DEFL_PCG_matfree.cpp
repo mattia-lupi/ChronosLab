@@ -1,5 +1,4 @@
 #include "omp.h"
-#include "mex.h"
 #include <math.h>
 #include <algorithm>
 #include <iostream>
@@ -211,13 +210,19 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       if (iter==1){
          DE0 = DEk;
          if(verb){
-            mexPrintf("%4s %15s %15s\n","iter","Energy","DE");
+            std::cout << std::setw(4)  << "iter"
+                      << std::setw(15) << "Energy"
+                      << std::setw(15) << "DE"
+                      << std::endl;
          }
       }
       double const dDE = DEk/DE0;
       DE -= DEk;
       if(verb){
-         mexPrintf("%4d %15.6e %15.6e\n",iter,init_energy+DE,dDE);
+         std::cout << std::setw(4)  << iter
+                   << std::setw(15) << std::scientific << std::setprecision(6) << init_energy+DE
+                   << std::setw(15) << std::scientific << std::setprecision(6) << dDE
+                   << std::endl;
       }
 
       // Check convergence
