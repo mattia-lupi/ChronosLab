@@ -14,7 +14,7 @@
 typedef int iReg;
 
 // Extended integer
-typedef long int iExt;
+typedef int64_t iExt;
 
 // Regular real
 typedef float rReg;

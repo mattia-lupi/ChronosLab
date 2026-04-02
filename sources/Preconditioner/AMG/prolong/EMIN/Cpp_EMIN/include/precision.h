@@ -27,7 +27,7 @@
  * @brief Regular integer.
  */
 #if IREG_LONG
-   typedef long int iReg;
+   typedef int64_t iReg;
 #else
    typedef int iReg;
 #endif
@@ -36,7 +36,7 @@
  * @brief Extended integer.
  */
 #if IEXT_LONG
-   typedef long int iExt;
+   typedef int64_t iExt;
 #else
    typedef int iExt;
 #endif
@@ -45,7 +45,7 @@
  * @brief Integer for global row/col indexing of a matrix
  */
 #if IGLO_LONG
-   typedef long int iGlo;
+   typedef int64_t iGlo;
 #else
    typedef int iGlo;
 #endif
@@ -68,7 +68,7 @@ typedef int type_MPI_iReg;
 /**
  * @brief MPI extended integer.
  */
-typedef long int type_MPI_iExt;
+typedef int64_t type_MPI_iExt;
 
 /**
  * @brief OMP regular integer.
@@ -83,7 +83,7 @@ typedef int type_BLAS_iReg;
 /**
  * @brief BLAS extended integer.
  */
-typedef long int type_BLAS_iExt;
+typedef int64_t type_BLAS_iExt;
 
 /**
  * @brief LAPACK regular integer.
@@ -93,7 +93,7 @@ typedef int type_LAPACK_iReg;
 /**
  * @brief LAPACK extended integer.
  */
-typedef long int type_LAPACK_iExt;
+typedef int64_t type_LAPACK_iExt;
 
 /**
  * @brief LAPACK extended real.

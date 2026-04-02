@@ -12,19 +12,29 @@ list = {'sources/Preconditioner/AMG/smoother/MEX_SYM_AFSAI/', ...
         'sources/Preconditioner/AMG/filter/MEX_CLev_Filter/', ...
         'sources/Preconditioner/AMG/filter/MEX_Prol_Filter/'};
 
-home = pwd;
+home_dir = pwd;
+sys_arch = computer('arch');
+
 try
-   for folder = list
-       fprintf('Compiling MEX files in %s\n', folder{1});
-       cd(folder{1});
-       if strcmp(computer('arch'),'maca64')
-          compileMac
-       else
-          compile
+   for idx = 1:length(list)
+       folder = list{idx};
+       fprintf('Compiling MEX files in %s\n', folder);
+       cd(folder);
+       
+       switch sys_arch
+           case 'win64'
+               compileWin
+           case 'maca64'
+               compileMac
+           case 'glnxa64'
+               compile
+           otherwise
+               error('Architecture [%s] is explicitly unsupported. Allowed configurations: win64, maca64, glnxa64.', sys_arch);
        end
-       cd(home);
+       
+       cd(home_dir);
    end
 catch ME
-   cd(home);
+   cd(home_dir);
    fprintf(2, 'Compilation failed: %s\n', ME.message);
 end
