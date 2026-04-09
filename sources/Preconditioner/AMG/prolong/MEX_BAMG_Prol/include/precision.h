@@ -17,6 +17,7 @@
 #else
 #include <limits.h>
 #endif
+#include <cstdint>
 
 // Define types for iReg, iExt and iGlo
 #define IREG_LONG 0
