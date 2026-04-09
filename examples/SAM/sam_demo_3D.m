@@ -67,20 +67,10 @@ fprintf('Preprocess: MATLAB = %.4fs | MEX = %.4fs | Speedup = %.2fx\n', t_pre_m,
 fprintf('Compute:    MATLAB = %.4fs | MEX = %.4fs | Speedup = %.2fx\n\n', t_com_m, t_com_x, t_com_m/t_com_x);
 
 %% ---- AMG preconditioner P0 for A0 (computed once, time recorded) ------
-fprintf('Computing AMG preconditioner for A0 ... ');
-generalsolver                           = [];
-generalsolver.simparams                 = [];
-generalsolver.simparams.linSolverParams = [];
-generalsolver.simparams.relTol          = 1e-8;
-generalsolver.domains                   = ones(1,1);
-generalsolver.nInterf                   = 0;
-generalsolver.nDom                      = 1;
 
-t0_amg0   = tic;
-linsolver0 = linearSolver(generalsolver, "pressure");
-linsolver0.Prec.Compute(A0, false);
-t_amg0    = toc(t0_amg0);
-P0_amg    = linsolver0.Prec.Apply_L;
+[AMG_prec,time] = computeAMG(A0,false);
+t_amg0    = time;
+P0_amg    = @(x) AMG_Vcycle(AMG_prec,A0,b_seq{0});
 fprintf('done in %.3f s\n\n', t_amg0);
 
 %% ---- Sparsity pattern preprocessing (once while pattern is fixed) -----
@@ -120,11 +110,9 @@ for k = 1:Nseq
     end
 
     % 1. Recompute AMG
-    t0 = tic;
-    linsolver_k = linearSolver(generalsolver, "pressure");
-    linsolver_k.Prec.Compute(Ak, false);
-    Pk_amg = linsolver_k.Prec.Apply_L;
-    t_prec_new(k) = toc(t0);
+    [AMG_prec,time] = computeAMG(Ak,false);
+    Pk_amg = @(x) AMG_Vcycle(AMG_prec,Ak,bk);
+    t_prec_new(k) = time;
 
     Pfun_new = @(v) sam_apply_left(speye(n), Pk_amg, v);
     t0 = tic;

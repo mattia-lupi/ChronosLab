@@ -4,18 +4,20 @@ n = size(Ak, 1);
 if nargin < 2 || isempty(S)
     S = spones(Ak);
 else
-    % Force conversion to double sparse matrix to interface seamlessly with C++ TypedArray<double>
-    S = spones(S); 
+    S = spones(S);
 end
 
-% Execute C++ MEX 
-[iatk,jak,coefk] = unpack_csr(Ak);
-[s_idx, r_idx, nnz_total] = sam_preprocess_left_mex(iatk,jak,coefk, S);
+[iatk, jak, ~] = unpack_csr(Ak);
+[iats, jas, ~] = unpack_csr(S);
 
-% Pack struct
+[s_ptr, s_data, r_ptr, r_data, nnz_total] = ...
+    sam_preprocess_left_mex(iatk, jak, iats, jas);
+
 preproc.n         = n;
 preproc.S         = logical(S);
-preproc.s_idx     = s_idx;
-preproc.r_idx     = r_idx;
+preproc.s_ptr     = s_ptr;
+preproc.s_data    = s_data;
+preproc.r_ptr     = r_ptr;
+preproc.r_data    = r_data;
 preproc.nnz_total = nnz_total;
 end
