@@ -35,11 +35,13 @@ param.filter = read_filter(file_FILTER);
 param.symm = sym_flag;
 
 %%%%%%%%%%%%%
-% Treat Dir nodes
+% Treat Boundary conditions 
+warning('off', 'MATLAB:eigs:NotAllEigsConvKeep');
 lmax = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',3);
-D = diag(A);
-D(D == 1) = lmax/10;
-A = A - diag(diag(A)) + diag(D);
+d = diag(A);
+idx = (d == 1);
+d(idx) = lmax/10;
+A = spdiags(d, 0, A);
 %%%%%%%%%%%%%
 
 TV0 = ones(size(A,1),1);
@@ -77,7 +79,7 @@ T_setup = 0;
 
 % Compute the AMG hierarchy
 time_start = tic;
-AMG_prec = cpt_aspAMG(param,A,TV0,false);
+AMG_prec = cpt_aspAMG(param,A,TV0,true);
 T_setup = toc(time_start);
 
 end

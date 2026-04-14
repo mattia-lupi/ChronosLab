@@ -29,7 +29,7 @@ fprintf('================================================================\n\n');
 
 %% ---- Parameters -------------------------------------------------------
 m                   = 40;    % grid points per side  (n = m^2 = 1600)
-Nseq                = 12;    % number of systems in the sequence
+Nseq                = 9;    % number of systems in the sequence
 p0                  = 0.0;
 dp                  = 0.15;
 
@@ -53,11 +53,10 @@ generalsolver.domains                   = ones(1,1);
 generalsolver.nInterf                   = 0;
 generalsolver.nDom                      = 1;
 
-t0_amg0   = tic;
-linsolver0 = linearSolver(generalsolver, "pressure");
-linsolver0.Prec.Compute(A0, false);
-t_amg0    = toc(t0_amg0);       % one-off cost of the base preconditioner
-P0_amg    = linsolver0.Prec.Apply_L;
+[AMG_prec,time] = computeAMG(A0,false);
+P0_amg    = @(r) AMG_Vcycle(AMG_prec,A0,r);
+t_amg0    = time; 
+
 fprintf('done in %.3f s\n\n', t_amg0);
 
 %% ---- Sparsity pattern preprocessing (once while pattern is fixed) -----
@@ -109,11 +108,9 @@ for k = 1:Nseq
     end
 
     % ---- 1. Recompute AMG for every Ak ----------------------------------
-    t0 = tic;
-    linsolver_k = linearSolver(generalsolver, "pressure");
-    linsolver_k.Prec.Compute(Ak, false);
-    Pk_amg = linsolver_k.Prec.Apply_L;
-    t_prec_new(k) = toc(t0);
+    [AMG_prec1,time] = computeAMG(Ak,false);
+    Pk_amg = @(r) AMG_Vcycle(AMG_prec1,Ak,r);
+    t_prec_new(k) = time;
 
     Pfun_new = @(v) sam_apply_left(speye(n), Pk_amg, v);
     t0 = tic;

@@ -70,7 +70,7 @@ fprintf('Compute:    MATLAB = %.4fs | MEX = %.4fs | Speedup = %.2fx\n\n', t_com_
 
 [AMG_prec,time] = computeAMG(A0,false);
 t_amg0    = time;
-P0_amg    = @(x) AMG_Vcycle(AMG_prec,A0,b_seq{0});
+P0_amg    = @(x) AMG_Vcycle(AMG_prec,A0,x);
 fprintf('done in %.3f s\n\n', t_amg0);
 
 %% ---- Sparsity pattern preprocessing (once while pattern is fixed) -----
@@ -111,7 +111,7 @@ for k = 1:Nseq
 
     % 1. Recompute AMG
     [AMG_prec,time] = computeAMG(Ak,false);
-    Pk_amg = @(x) AMG_Vcycle(AMG_prec,Ak,bk);
+    Pk_amg = @(x) AMG_Vcycle(AMG_prec,Ak,x);
     t_prec_new(k) = time;
 
     Pfun_new = @(v) sam_apply_left(speye(n), Pk_amg, v);
