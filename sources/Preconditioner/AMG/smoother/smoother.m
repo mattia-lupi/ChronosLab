@@ -17,7 +17,7 @@ smootherOp.left_out = [];
 smootherOp.right_out = [];
 
 % Force use of non-symmetric FSAI if the problem is not symmetric
-if ~symm_flag
+if ~symm_flag && ~strcmpi(method,'jacobi')
    method = 'afsai_nsy';
 end
 
