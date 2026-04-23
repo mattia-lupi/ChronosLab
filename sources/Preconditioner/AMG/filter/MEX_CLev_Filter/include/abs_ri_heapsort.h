@@ -5,4 +5,12 @@
 #include "swapi.h"
 #include "swapr.h"
 
-void abs_ri_heapsort(double* __restrict__ x1, int* __restrict__ x2, const int n);
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+
+void abs_ri_heapsort(double* RESTRICT x1, int* RESTRICT x2, const int n);

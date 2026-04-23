@@ -37,9 +37,12 @@ int gather_K(const int np, const int nn, const int nn_C,
    if (indrow_scr == nullptr || pt_scr == nullptr) return ierr = 1;
 
    int nt_K;
+   
    max_nrows_blk = 0;
    max_nterm_blk = 0;
-   #pragma omp parallel num_threads(np) reduction(max:max_nrows_blk,max_nterm_blk)
+   int local_max_nrows = max_nrows_blk;
+   int local_max_nterm = max_nterm_blk;
+   #pragma omp parallel num_threads(np) reduction(max:local_max_nrows,local_max_nterm)
    {
       int n_entries,n_added;
       int k_scr, ind_scr;
@@ -71,7 +74,7 @@ int gather_K(const int np, const int nn, const int nn_C,
          iend = iat_Pcol[icol+1];
          max_nnzr = std::max(max_nnzr,iend-istart);
       }
-      max_nrows_blk = max_nnzr;
+      local_max_nrows = max_nnzr;
 
       // Allocate buffer
       int nrows_scr = iat_Pcol[lastcol] - iat_Pcol[firstcol];
@@ -126,7 +129,7 @@ int gather_K(const int np, const int nn, const int nn_C,
             iat_scr[k_scr] = ind_scr;
             istart++;
          }
-         max_nterm_blk = std::max(max_nterm_blk,ind_scr-ind_scr_old);
+         local_max_nterm = std::max(local_max_nterm,ind_scr-ind_scr_old);
       }
       exit_loop_icol: ;
 
@@ -179,6 +182,9 @@ int gather_K(const int np, const int nn, const int nn_C,
 
    } // End parallel region
 
+   max_nrows_blk = local_max_nrows;
+   max_nterm_blk = local_max_nterm;
+    
    // Free shared scratches
    free(indrow_scr);
    free(pt_scr);

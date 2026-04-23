@@ -5,8 +5,8 @@
 
 // Computes the global iat_T and update WI pointers.
 void mkiat_Tglo (const int myid, const int nrows, const int nthreads,
-                 const int firstrow, int** __restrict__ WI,
-                 const int* __restrict__  nnz, int* __restrict__ iat_T){
+                 const int firstrow, int** RESTRICT WI,
+                 const int* RESTRICT  nnz, int* RESTRICT iat_T){
 
    // Compute the number of non-zeros belonging to previous threads
    int ntprec = 0;
