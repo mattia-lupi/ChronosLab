@@ -1,9 +1,15 @@
+# Ignore compiled mex files
 *.mexa64
-*.swp
-*.MATLABDriveTag
 *.mexmaca64
-*.a
+*.mexw64
+
+# Ignore matlab and apple trash addings on macOS
+*.MATLABDriveTag
 *.DS_Store
+
+# Ignore useless file types
+*.swp
+*.a
 examples/PorFlowMatrix/MESH/*.txt
 examples/PorFlowMatrix/MESH/*.tetra
 examples/PorFlowMatrix/MESH/*.coord
