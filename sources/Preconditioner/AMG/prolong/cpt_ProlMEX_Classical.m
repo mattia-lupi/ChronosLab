@@ -55,17 +55,12 @@ nn_I = nn_S;
 nc_I = nn_C;
 
 % Convert reals into integers
-level = int32(0);
-np = int32(np);
+level = 0;
 vecstart = int32(vecstart);
-nn_A = int32(nn_A);
-nt_A = int32(nt_A);
 iat_A = int32(iat_A) - 1;
 ja_A = int32(ja_A) - 1;
 fcnodes = int32(fcnodes);
 coef_S = int32(coef_S);
-nn_I = int32(nn_I);
-nc_I = int32(nc_I);
 
 [nt_I,iat_I,ja_I,coef_I] = cpt_Prolongation_Classical(level,np,...
                            vecstart,nn_A,nt_A,iat_A,ja_A,coef_A,coef_S,...

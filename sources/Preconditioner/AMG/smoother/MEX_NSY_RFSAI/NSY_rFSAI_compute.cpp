@@ -10,32 +10,6 @@
 // Build command (compile.m):
 //   See compile.m — ensure -R2018a is on its OWN line (see compile.m fix notes)
 //
-// FIXES APPLIED (vs previous version — all found by Clang on R2025b/macOS)
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() is NOT declared when using the pure C++ MEX API
-//         (mex.hpp does not pull in mex.h).  Replaced with a helper
-//         mprint() that routes through getEngine()->feval(u"fprintf").
-//
-// [FIX-B] TypedArray<T>::operator[] returns a PROXY object
-//         (ArrayElementTypedRef<T>), NOT a real reference.  Taking its
-//         address (&arr[0]) is ill-formed.  Fixed by copying input arrays
-//         into std::vector<T> and passing vec.data() to the kernel.
-//         This is the only correct way to get a raw pointer from a
-//         TypedArray in the C++ MEX API.
-//
-// [FIX-C] ArgumentList (MexIORange) has size() and operator[] defined as
-//         NON-const member functions, so validateArguments() cannot take
-//         its arguments as  const ArgumentList&.  Changed to non-const
-//         references  (ArgumentList&).
-//
-// [FIX-D] compile.m had '-R2018a' placed AFTER '...' on the same line:
-//              '-lmwlapack', ... '-R2018a',...
-//         In MATLAB, everything after '...' on the same physical line is
-//         silently ignored — so -R2018a was never passed to mex, meaning
-//         the interleaved complex ABI was never enabled.  Fixed in
-//         compile.m (see companion file).
-// -----------------------------------------------------------------------
-//----------------------------------------------------------------------------------------
 
 #if defined PRINT
     static constexpr bool dump = true;

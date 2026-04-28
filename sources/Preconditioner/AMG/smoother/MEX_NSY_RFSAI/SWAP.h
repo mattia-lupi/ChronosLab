@@ -16,7 +16,7 @@
  * @brief Swaps 2 TYPE variables.
  */
 template <typename TYPE>
-inline void SWAP(TYPE & __restrict__ i1, TYPE & __restrict__ i2){TYPE tmp = i1; i1 = i2; i2 = tmp;}
+inline void SWAP(TYPE &i1, TYPE &i2){TYPE tmp = i1; i1 = i2; i2 = tmp;}
 
 // Instantiate template
-template void SWAP<int>(int & __restrict__ , int & __restrict__ );
+template void SWAP<int>(int &, int &);

@@ -12,6 +12,13 @@
  */
 
 #pragma once
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
 
 /**
  * @brief Counts the number of non-zeroes assigned to a thread in each row.
@@ -20,5 +27,5 @@
  * @param [in] ja column indexes.
  * @param [out] WI number of non-zeros for each row.
  */
-void count_rowterms( const int nequ, const int nterm, const int* __restrict__ ja,
-                     int* __restrict__ WI );
+void count_rowterms( const int nequ, const int nterm, const int* RESTRICT ja,
+                     int* RESTRICT WI );

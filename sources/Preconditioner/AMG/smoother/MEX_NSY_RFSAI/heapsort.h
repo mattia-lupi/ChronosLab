@@ -20,4 +20,4 @@
  * @param [in] n number of components of x1.
  */
 template <typename Tx, typename Tn>
-void heapsort(Tx* __restrict__ x1, const Tn n);
+void heapsort(Tx* x1, const Tn n);
