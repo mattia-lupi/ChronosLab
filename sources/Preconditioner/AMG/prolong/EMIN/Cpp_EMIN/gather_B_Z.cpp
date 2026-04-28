@@ -46,7 +46,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
 
    // Compute the number of entries in Z and max block size
    int nrmax_blk = 0;
-   #pragma omp parallel num_threads(np) //reduction(max:nrmax_blk)
+   #pragma omp parallel num_threads(np)
    {
       // Get thread ID and column partition
       int mythid = omp_get_thread_num();

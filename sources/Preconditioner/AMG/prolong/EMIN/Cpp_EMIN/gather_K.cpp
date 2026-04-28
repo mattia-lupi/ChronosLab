@@ -41,7 +41,7 @@ int gather_K(const int np, const int nn, const int nn_C,
    max_nrows_blk = 0;
    max_nterm_blk = 0;
   
-   #pragma omp parallel num_threads(np) //reduction(max:local_max_nrows,local_max_nterm)
+   #pragma omp parallel num_threads(np) 
    {
        int local_max_nrows = 0;
        int local_max_nterm = 0;
