@@ -1,4 +1,4 @@
-function [AMG_prec,T_setup] = computeAMG(A,sym_flag)
+function [M,T_setup] = computeAMG(A,TV0,sym_flag,verb)
 fileIN = fopen('aspAMG.fnames','r');
 C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
 C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
@@ -44,8 +44,6 @@ d(idx) = lmax/10;
 A = spdiags(d, 0, A);
 %%%%%%%%%%%%%
 
-TV0 = ones(size(A,1),1);
-
 global DEBINFO;
 % PARTE GENERALE
 DEBINFO.flag = true;
@@ -81,5 +79,7 @@ T_setup = 0;
 time_start = tic;
 AMG_prec = cpt_aspAMG(param,A,TV0,true);
 T_setup = toc(time_start);
+
+M = @(x) AMG_Vcycle(AMG_prec,A,x);
 
 end

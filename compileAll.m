@@ -1,6 +1,4 @@
 clc;
-clear;
-close all;
 
 list = {'sources/Preconditioner/AMG/smoother/MEX_SYM_AFSAI/', ...
         'sources/Preconditioner/AMG/smoother/MEX_NSY_RFSAI/', ...

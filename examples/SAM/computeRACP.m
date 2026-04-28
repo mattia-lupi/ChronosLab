@@ -1,10 +1,10 @@
-function [M,T_setup] = computeRACP(A,TV0,sym_flag)
+function [M,T_setup] = computeRACP(A,TV0,sym_flag,verb)
 
 DEBUG = false;
 simple_flag = false;
 treatBC = true;
 itmax_ruiz = 0;
-tol_ruiz = 1;
+tol_ruiz = 1e-5;
 
 global DEBINFO;
 % PARTE GENERALE
@@ -115,7 +115,7 @@ A_orig = [A11 A12; A21 A22];
 nn = size(A_orig,1);
 n22 = size(A22,1);
 time = toc;
-fprintf('Tempo BC %f\n',time);
+% fprintf('Tempo BC %f\n',time);
 
 % Apply Ruiz to the entire matriz
 tic;
@@ -129,7 +129,7 @@ D_22 = full(diag(D_scal(n11+1:end,n11+1:end)));
 TV0 = diag(sparse(D_11))\TV0;
 D_scal = diag(sparse([D_11; D_22]));
 time = toc;
-fprintf('Tempo scal %f\n',time);
+% fprintf('Tempo scal %f\n',time);
 
 A_scaled = [A11_scaled A12_scaled; A21_scaled A22_scaled];
 
@@ -229,7 +229,7 @@ end
 
 % Compute reverse augmented peconditioner
 time_start = tic;
-AMG_prec = cpt_aspAMG(param,A11_aug,TV0,true);
+AMG_prec = cpt_aspAMG(param,A11_aug,TV0,verb);
 T_setup = toc(time_start);
 
 M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
