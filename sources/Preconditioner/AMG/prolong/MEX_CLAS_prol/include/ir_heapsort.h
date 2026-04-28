@@ -24,5 +24,13 @@ typedef double rExt;
  * @param [inout] x2 array of reals to be sorted.
  * @param [in] n number of components of x1.
  */
-void ir_heapsort(iReg* __restrict__ x1, rExt* __restrict__ x2, const iReg n);
+
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+void ir_heapsort(iReg* RESTRICT x1, rExt* RESTRICT x2, const iReg n);
 

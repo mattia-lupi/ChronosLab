@@ -1,6 +1,7 @@
+#include "mvjcol.h"
 // Transpose pattern indices.
-void mvjcol( const int firstrow, const int nrows, const int* __restrict__ iat,
-             const int* __restrict__ ja, int* __restrict__ ja_T, int* __restrict__ punt,
+void mvjcol( const int firstrow, const int nrows, const int* RESTRICT iat,
+             const int* RESTRICT ja, int* RESTRICT ja_T, int* RESTRICT punt,
              int* __restrict perm){
 
    // Transpose local stripe

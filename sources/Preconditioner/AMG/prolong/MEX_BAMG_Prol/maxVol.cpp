@@ -1,5 +1,6 @@
 
 #include "maxVol.h"
+#include <vector>
 
 //----------------------------------------------------------------------------------------
 
@@ -10,7 +11,8 @@ void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt de
 
    iReg maxrank = std::min(n,m);
    maxrank = std::min(maxrank,mmax);
-   rExt wrot[m];
+   std::vector<rExt> wrot_vec(m);
+   rExt *wrot = wrot_vec.data();
 
    // Set the initial guess for the rank
    rank = 1;

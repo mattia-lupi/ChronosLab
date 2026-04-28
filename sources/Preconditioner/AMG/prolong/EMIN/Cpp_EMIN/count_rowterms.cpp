@@ -4,8 +4,8 @@
 //----------------------------------------------------------------------------------------
 
 // Counts the number of non-zeroes assigned to a thread in each row
-void count_rowterms( const int nequ, const int nterm, const int* __restrict__ ja,
-                     int* __restrict__ WI ){
+void count_rowterms( const int nequ, const int nterm, const int* RESTRICT ja,
+                     int* RESTRICT WI ){
 
    // Initialize WI
    for ( int i = 0; i < nequ; i++ ) {

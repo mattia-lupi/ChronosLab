@@ -5,15 +5,16 @@
 #include "mkiat_Tloc.h"
 #include "mkiat_Tglo.h"
 #include "mvjcol.h"
+#include "Transp_Patt.h"
 
 //----------------------------------------------------------------------------------------
 
 // Transpose the pattern of a csr matrix and creates permutation (perm) and inverse
 // permutation (iperm) to map entries from original to transposed pattern and viceversa.
 int Transp_Patt(const int nthreads, const int nrows, const int ncols, const int nterm,
-                const int* __restrict__ iat, const int* __restrict__ ja,
-                int* __restrict__ iat_T, int* __restrict__ ja_T, int* __restrict__ perm,
-                int* __restrict__ iperm){
+                const int* RESTRICT iat, const int* RESTRICT ja,
+                int* RESTRICT iat_T, int* RESTRICT ja_T, int* RESTRICT perm,
+                int* RESTRICT iperm){
 
    // Init error code
    int ierr = 0;

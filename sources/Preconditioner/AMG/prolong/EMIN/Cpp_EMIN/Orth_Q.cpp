@@ -1,10 +1,11 @@
 #include "omp.h"
 #include "emin_blas.h"
+#include "Orth_Q.h"
 
 // Performs the orthogonalization v_out = v_in - Q*QT*v_in
-void Orth_Q(const int np, const int nn, const int ntv, const int* __restrict__ iat_patt,
-            const double* __restrict__ mat_Q, const double* __restrict__ v_in,
-            double* __restrict__ v_ntv, double* __restrict__ v_out){
+void Orth_Q(const int np, const int nn, const int ntv, const int* RESTRICT iat_patt,
+            const double* RESTRICT mat_Q, const double* RESTRICT v_in,
+            double* RESTRICT v_ntv, double* RESTRICT v_out){
 
    /* form of op(A) & op(B) to use in matrix vector multiplication */
    char const *chn = "N", *cht = "T";
