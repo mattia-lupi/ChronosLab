@@ -1,11 +1,14 @@
 # Ignore compiled mex files
 *.mexa64
 *.mexmaca64
-*.mexw64
+*.mexw64*
 
 # Ignore matlab and apple trash addings on macOS
 *.MATLABDriveTag
 *.DS_Store
+
+# Ignore matlab and windows trash addings on macOS
+*.vs*
 
 # Ignore useless file types
 *.swp
