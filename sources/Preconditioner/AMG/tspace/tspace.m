@@ -132,12 +132,12 @@ switch lower(method)
       [V0,~] = qr(V0,0);
       % Call Arnoldi
       [iter, lambda, V, res_norm_X, res_norm_D, ~] = ...
-         block_arnoldi(ProdMat, ntv, [], V0, 'smallest', itmax, tol, verb);
+         block_arnoldi(A, ntv, {smootherOp.left,smootherOp.right}, V0, 'smallest', itmax, tol, verb);
       % [V, lambda] = eigs(ProdMat, size(A,1), ntv,'smallestreal','Tolerance',1e-15, ...
       %    'MaxIterations',itmax, 'Display',1);
       res = [res_norm_D,res_norm_X];%zeros(ntv,2);%
       % lambda = diag(lambda);
-      % V = real(V);
+      V = real(V);
    otherwise
       error('Not existing method');
 end
