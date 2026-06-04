@@ -123,6 +123,21 @@ switch lower(method)
       [V, lambda, iter, res] = Arnoldi(V0, ProdMat, itmax, ntv, dual_orth, verb);
       % Orthonormalize
       [V,~] = qr(V,0);
+
+   case 'block_arnoldi'
+      ProdMat = @(x) smootherOp.right*(smootherOp.left*(A*x));
+      % Apply 1 step of smoother to remove Dirichlet nodes
+      V0 = V0 - ProdMat(V0);
+      % Orthonormalize
+      [V0,~] = qr(V0,0);
+      % Call Arnoldi
+      [iter, lambda, V, res_norm_X, res_norm_D, ~] = ...
+         block_arnoldi(A, ntv, {smootherOp.left,smootherOp.right}, V0, 'smallest', itmax, tol, verb);
+      % [V, lambda] = eigs(ProdMat, size(A,1), ntv,'smallestreal','Tolerance',1e-15, ...
+      %    'MaxIterations',itmax, 'Display',1);
+      res = [res_norm_D,res_norm_X];%zeros(ntv,2);%
+      % lambda = diag(lambda);
+      V = real(V);
    otherwise
       error('Not existing method');
 end

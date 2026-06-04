@@ -147,20 +147,21 @@ else
    if verb
       fprintf('BEGIN: Computing the test space\n');
    end
-   if param.symm
-      [TV, lambda, res] = tspace(TV0, A, smootherOp, param.tspace, verb);
-      nl = numel(lambda);
-      if verb && ~strcmpi(param.tspace.method,'NONE')
-         fprintf('   i          lambda     res_lam     res_vec\n');
-         fprintf('%4d %15.6e %11.2e %11.2e\n',[(1:nl)' lambda(end:-1:1) res(end:-1:1,:)]');
-      end
-   else
+   if ~param.symm && ~strcmpi(param.tspace.method,'none')
       if verb
-         fprintf('Unsymmetric eigensolver not available yet\n');
-         fprintf('The initial test space will be used\n');
+         fprintf('\n\nBlock Arnoldi was made using Gemini and has not been checked by a human,\n');
+         fprintf('results may be incorrect\n\n');
       end
-      TV = TV0;
+      param.tspace.method = 'block_arnoldi';
    end
+
+   [TV, lambda, res] = tspace(TV0, A, smootherOp, param.tspace, verb);
+   nl = numel(lambda);
+   if verb && ~strcmpi(param.tspace.method,'NONE')
+      fprintf('   i          lambda     res_lam     res_vec\n');
+      fprintf('%4d %15.6e %11.2e %11.2e\n',[(1:nl)' lambda(end:-1:1) res(end:-1:1,:)]');
+   end
+
    if verb
       fprintf('END: Computing the test space\n\n');
    end
@@ -282,18 +283,9 @@ else
    AMG_hrc.TV = TV; clear TV;
    AMG_hrc.fcnode = fcnode;
    AMG_hrc.omega =smootherOp.omega;
-   if strcmpi(param.smoother.method,'blk_j')
-      AMG_hrc.Snnz = 0;
-   elseif strcmpi(param.smoother.method,'bafsai')
-      AMG_hrc.Snnz = 0;
-   elseif strcmpi(param.smoother.method,'ddsw')
-      AMG_hrc.Snnz = smootherOp.nnz;
-   else
-      AMG_hrc.Snnz = nnz(smootherOp.right) + nnz(smootherOp.left);
-   end
+   AMG_hrc.Snnz = nnz(smootherOp.right) + nnz(smootherOp.left);
    AMG_hrc.nupre = param.smoother.nupre;
    AMG_hrc.nupost = param.smoother.nupost;
-   % Simple smoother
    AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
    AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
 

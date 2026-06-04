@@ -1,4 +1,4 @@
-function [V, iter, res] = simple_smoothing(V0,smooth,itmax,tol)
+function [V, iter, res] = simple_smoothing(V0,smooth,itmax,tol,verb)
 
 iter = 0;
 res = 2*tol;
