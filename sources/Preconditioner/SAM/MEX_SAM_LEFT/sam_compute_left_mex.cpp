@@ -1,41 +1,4 @@
-// sam_compute_left_mex.cpp  —  LEFT Sparse Approximate Map (MEX, C++17, OpenMP)
-//
-// Interface (unchanged — MEX_sam_compute_left.m works as-is):
-//
-//   [row_N, col_N, val_N] = sam_compute_left_mex(iatk, jak, coefk,
-//                                                 iat0, ja0, coef0,
-//                                                 preproc)
-//
-// All index arrays (iatk, jak, iat0, ja0, preproc.s_idx, preproc.r_idx)
-// are 1-based MATLAB convention; conversion to 0-based is done once,
-// up-front, into plain C++ memory before any parallel work begins.
-//
-// Performance improvements over the original version
-// ---------------------------------------------------
-// 1. ALL preproc CellArray / StructArray data is extracted into flat
-//    C++ CSR-style vectors BEFORE the parallel region.  The MATLAB API
-//    is NOT called inside any hot or parallel loop.
-//
-// 2. LAPACK dgels_ workspace is queried ONCE with worst-case dimensions
-//    before the parallel region.  Each thread pre-allocates a single
-//    work buffer of that fixed size and reuses it for every row it owns.
-//
-// 3. Ak and A0 stay in CSR — no CSC conversion.  Left-SAM row problems
-//    access Ak by row, which is exactly what CSR provides O(1).
-//
-// 4. Element lookups inside the LS assembly use std::lower_bound on the
-//    sorted column arrays instead of linear scans over pair-vectors.
-//
-// 5. Thread-local Atmp / f / work vectors are declared once per thread
-//    inside the omp parallel region and only grow, never shrink — one
-//    heap allocation per thread across the entire sequence of rows.
-//
-// 6. Output is indexed by pre-computed row offsets (== pp.s_ptr) so
-//    each thread writes to a non-overlapping slice with no locks.
-//
-// 7. Row/col structural indices are filled in one sequential pass before
-//    the parallel loop so threads write only the value array.
-
+// sam_compute_left_mex.cpp
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "MatlabDataArray.hpp"
@@ -48,47 +11,39 @@
 using namespace matlab::data;
 using namespace matlab::mex;
 
-// =========================================================================
-// LAPACK: dgels_ — overdetermined/underdetermined least squares via QR.
-// ptrdiff_t is what MATLAB's mwlapack expects on both ILP64 and LP64.
-// =========================================================================
 extern "C" {
-void dgels_(const char*      trans,
-            const ptrdiff_t* m,
-            const ptrdiff_t* n,
-            const ptrdiff_t* nrhs,
-            double* a,       const ptrdiff_t* lda,
-            double* b,       const ptrdiff_t* ldb,
-            double* work,    const ptrdiff_t* lwork,
-            ptrdiff_t* info);
+void dgels_(const char* trans, const ptrdiff_t* m, const ptrdiff_t* n, const ptrdiff_t* nrhs,
+            double* a, const ptrdiff_t* lda, double* b, const ptrdiff_t* ldb,
+            double* work, const ptrdiff_t* lwork, ptrdiff_t* info);
+
+void dposv_(const char* uplo, const ptrdiff_t* n, const ptrdiff_t* nrhs,
+            double* a, const ptrdiff_t* lda, double* b, const ptrdiff_t* ldb, ptrdiff_t* info);
+
+void dsyrk_(const char* uplo, const char* trans, const ptrdiff_t* n, const ptrdiff_t* k,
+            const double* alpha, const double* a, const ptrdiff_t* lda,
+            const double* beta, double* c, const ptrdiff_t* ldc);
+
+void dgemv_(const char* trans, const ptrdiff_t* m, const ptrdiff_t* n,
+            const double* alpha, const double* a, const ptrdiff_t* lda,
+            const double* x, const ptrdiff_t* incx,
+            const double* beta, double* y, const ptrdiff_t* incy);
 }
 
-// =========================================================================
-// Minimal CSR container, all 0-based.
-// =========================================================================
 struct CSR {
-    int n;                   // number of rows
-    std::vector<int>    ptr; // size n+1, row pointers
-    std::vector<int>    col; // column indices, sorted within each row
+    int n;
+    std::vector<int>    ptr;
+    std::vector<int>    col;
     std::vector<double> val;
 };
 
-// Build from 1-based MATLAB arrays iat (size n+1), ja (nnz), coef (nnz).
-static CSR buildCSR(const TypedArray<double>& iat,
-                    const TypedArray<double>& ja,
-                    const TypedArray<double>& coef)
-{
+static CSR buildCSR(const TypedArray<double>& iat, const TypedArray<double>& ja, const TypedArray<double>& coef) {
     CSR csr;
     csr.n   = static_cast<int>(iat.getNumberOfElements()) - 1;
     int nnz = static_cast<int>(ja.getNumberOfElements());
-
     csr.ptr.resize(csr.n + 1);
     csr.col.resize(nnz);
     csr.val.resize(nnz);
-
-    for (int i = 0; i <= csr.n; ++i)
-        csr.ptr[i] = static_cast<int>(iat[i]) - 1;   // 1-based → 0-based
-
+    for (int i = 0; i <= csr.n; ++i) csr.ptr[i] = static_cast<int>(iat[i]) - 1;
     for (int p = 0; p < nnz; ++p) {
         csr.col[p] = static_cast<int>(ja[p]) - 1;
         csr.val[p] = coef[p];
@@ -96,281 +51,220 @@ static CSR buildCSR(const TypedArray<double>& iat,
     return csr;
 }
 
-// =========================================================================
-// Flat (cache-friendly) representation of the SAM preproc struct.
-//
-//   s_data[ s_ptr[i] .. s_ptr[i+1]-1 ]  =  s_i  (0-based column indices)
-//   r_data[ r_ptr[i] .. r_ptr[i+1]-1 ]  =  r_i  (0-based, sorted)
-// =========================================================================
-struct PreprocFlat {
-    int n, total_nnz;
-    std::vector<int> s_ptr, s_data;
-    std::vector<int> r_ptr, r_data;
-};
-
-// -------------------------------------------------------------------------
-// Read preproc struct produced by MEX_sam_preprocess_left.
-//
-// NEW (fast) path — fields s_ptr / s_data / r_ptr / r_data are flat double
-// vectors written by the updated sam_preprocess_left_mex.cpp.
-// Extraction cost: 4 linear casts (memcpy-equivalent), O(nnz) total,
-// with zero MATLAB CellArray API calls.
-//
-// LEGACY path — fields s_idx / r_idx are CellArrays (old MATLAB or old MEX).
-// Kept for backward compatibility; costs O(n) MATLAB API calls.
-// -------------------------------------------------------------------------
-static PreprocFlat extractPreproc(const StructArray& preproc)
-{
-    PreprocFlat pp;
-
-    TypedArray<double> n_arr   = preproc[0]["n"];
-    TypedArray<double> nnz_arr = preproc[0]["nnz_total"];
-    pp.n         = static_cast<int>(n_arr[0]);
-    pp.total_nnz = static_cast<int>(nnz_arr[0]);
-
-    // Detect which format the struct carries by checking for "s_ptr" field
-    bool has_flat = false;
-    for (const auto& f : preproc.getFieldNames())
-       if (std::string(f) == "s_ptr") { has_flat = true; break; }
-
-    if (has_flat) {
-        // ---- NEW path: flat 0-based double arrays ----------------------
-        TypedArray<double> sp = preproc[0]["s_ptr"];
-        TypedArray<double> sd = preproc[0]["s_data"];
-        TypedArray<double> rp = preproc[0]["r_ptr"];
-        TypedArray<double> rd = preproc[0]["r_data"];
-
-        int np1  = static_cast<int>(sp.getNumberOfElements());  // n+1
-        int sns  = static_cast<int>(sd.getNumberOfElements());
-        int rns  = static_cast<int>(rd.getNumberOfElements());
-
-        pp.s_ptr.resize(np1);
-        pp.s_data.resize(sns);
-        pp.r_ptr.resize(np1);
-        pp.r_data.resize(rns);
-
-        // Arrays are already 0-based; one cast loop per array
-        for (int i = 0; i < np1; ++i) pp.s_ptr[i]  = static_cast<int>(sp[i]);
-        for (int i = 0; i < sns; ++i) pp.s_data[i] = static_cast<int>(sd[i]);
-        for (int i = 0; i < np1; ++i) pp.r_ptr[i]  = static_cast<int>(rp[i]);
-        for (int i = 0; i < rns; ++i) pp.r_data[i] = static_cast<int>(rd[i]);
-
-    } else {
-        // ---- LEGACY path: CellArray s_idx / r_idx (1-based) -----------
-        CellArray s_cell = preproc[0]["s_idx"];
-        CellArray r_cell = preproc[0]["r_idx"];
-
-        pp.s_ptr.resize(pp.n + 1, 0);
-        pp.r_ptr.resize(pp.n + 1, 0);
-        pp.s_data.reserve(pp.total_nnz);
-        pp.r_data.reserve(pp.total_nnz * 3);
-
-        for (int i = 0; i < pp.n; ++i) {
-            TypedArray<double> si = s_cell[i];
-            TypedArray<double> ri = r_cell[i];
-            int nsi = static_cast<int>(si.getNumberOfElements());
-            int nri = static_cast<int>(ri.getNumberOfElements());
-
-            pp.s_ptr[i + 1] = pp.s_ptr[i] + nsi;
-            pp.r_ptr[i + 1] = pp.r_ptr[i] + nri;
-
-            for (int k = 0; k < nsi; ++k)
-                pp.s_data.push_back(static_cast<int>(si[k]) - 1);  // 1→0
-            for (int k = 0; k < nri; ++k)
-                pp.r_data.push_back(static_cast<int>(ri[k]) - 1);  // 1→0
-        }
-    }
-    return pp;
-}
-
-// =========================================================================
-// Query optimal dgels_ LWORK with worst-case dimensions.
-// Called once, single-threaded, before entering the parallel region.
-// =========================================================================
-static int queryLwork(int max_m, int max_n)
-{
+static int queryLwork(int max_m, int max_n) {
     if (max_m <= 0 || max_n <= 0) return 128;
-
-    // Build a small diagonal matrix so the query is non-degenerate
-    int mn = std::min(max_m, max_n);
     std::vector<double> Atmp(max_m * max_n, 0.0);
+    int mn = std::min(max_m, max_n);
     for (int k = 0; k < mn; ++k) Atmp[k * max_m + k] = 1.0;
 
-    char      trans  = 'N';
+    char trans = 'N';
     ptrdiff_t pm = max_m, pn = max_n, pnrhs = 1;
-    ptrdiff_t plda = pm, pldb = std::max(pm, pn);
-    ptrdiff_t plw  = -1;
-    ptrdiff_t info = 0;
+    ptrdiff_t plda = pm, pldb = std::max(pm, pn), plw = -1, info = 0;
     double wq = 0.0;
     std::vector<double> ftmp(std::max(max_m, max_n), 0.0);
 
-    dgels_(&trans, &pm, &pn, &pnrhs,
-           Atmp.data(), &plda,
-           ftmp.data(), &pldb,
-           &wq, &plw, &info);
-
+    dgels_(&trans, &pm, &pn, &pnrhs, Atmp.data(), &plda, ftmp.data(), &pldb, &wq, &plw, &info);
     return std::max(128, static_cast<int>(wq));
 }
 
-// =========================================================================
-// MexFunction
-// =========================================================================
+inline bool solve_micro_kernel(int n, const double* B, const double* g, double* z) {
+    if (n == 1) {
+        if (B[0] <= 0.0) return false;
+        z[0] = g[0] / B[0];
+        return true;
+    } else if (n == 2) {
+        double det = B[0]*B[3] - B[1]*B[2];
+        if (det <= 0.0) return false;
+        z[0] = (B[3]*g[0] - B[2]*g[1]) / det;
+        z[1] = (B[0]*g[1] - B[1]*g[0]) / det;
+        return true;
+    } else if (n == 3) {
+        double det = B[0]*(B[4]*B[8] - B[5]*B[7]) - B[3]*(B[1]*B[8] - B[2]*B[7]) + B[6]*(B[1]*B[5] - B[2]*B[4]);
+        if (det <= 0.0) return false;
+        double invDet = 1.0 / det;
+        z[0] = ((B[4]*B[8] - B[5]*B[7])*g[0] + (B[6]*B[5] - B[3]*B[8])*g[1] + (B[3]*B[7] - B[6]*B[4])*g[2]) * invDet;
+        z[1] = ((B[7]*B[2] - B[1]*B[8])*g[0] + (B[0]*B[8] - B[6]*B[2])*g[1] + (B[1]*B[6] - B[0]*B[7])*g[2]) * invDet;
+        z[2] = ((B[1]*B[5] - B[4]*B[2])*g[0] + (B[3]*B[2] - B[0]*B[5])*g[1] + (B[0]*B[4] - B[3]*B[1])*g[2]) * invDet;
+        return true;
+    }
+    return false;
+}
+
 class MexFunction : public Function {
 public:
-    void operator()(ArgumentList outputs, ArgumentList inputs) override
-    {
+    void operator()(ArgumentList outputs, ArgumentList inputs) override {
         ArrayFactory factory;
 
-        if (inputs.size() != 7) {
-            getEngine()->feval(u"error", 0,
-                std::vector<Array>({factory.createScalar(
-                    "sam_compute_left_mex: requires "
-                    "iatk, jak, coefk, iat0, ja0, coef0, preproc.")}));
+        if (inputs.size() != 11) {
+            getEngine()->feval(u"error", 0, std::vector<Array>({factory.createScalar("sam_compute_left_mex: requires iatk, jak, coefk, iat0, ja0, coef0, s_ptr, s_data, r_ptr, r_data, nnz_total.")}));
             return;
         }
 
-        // ---- Phase 1: extract all data from MATLAB into C++ memory -----
-        // This entire phase is single-threaded and touches the MATLAB API.
-        // Nothing after this point calls the MATLAB API inside a hot loop.
+        TypedArray<double> iatk  = std::move(inputs[0]); TypedArray<double> jak   = std::move(inputs[1]); TypedArray<double> coefk = std::move(inputs[2]);
+        TypedArray<double> iat0  = std::move(inputs[3]); TypedArray<double> ja0   = std::move(inputs[4]); TypedArray<double> coef0 = std::move(inputs[5]);
+        
+        TypedArray<int32_t> s_ptr_arr = std::move(inputs[6]);
+        TypedArray<int32_t> s_dat_arr = std::move(inputs[7]);
+        TypedArray<int32_t> r_ptr_arr = std::move(inputs[8]);
+        TypedArray<int32_t> r_dat_arr = std::move(inputs[9]);
+        
+        int total_nnz;
+        if (inputs[10].getType() == ArrayType::INT32) {
+            total_nnz = static_cast<TypedArray<int32_t>>(inputs[10])[0];
+        } else {
+            total_nnz = static_cast<int>(static_cast<TypedArray<double>>(inputs[10])[0]);
+        }
 
-        TypedArray<double> iatk  = std::move(inputs[0]);
-        TypedArray<double> jak   = std::move(inputs[1]);
-        TypedArray<double> coefk = std::move(inputs[2]);
-        TypedArray<double> iat0  = std::move(inputs[3]);
-        TypedArray<double> ja0   = std::move(inputs[4]);
-        TypedArray<double> coef0 = std::move(inputs[5]);
-        StructArray preproc      = std::move(inputs[6]);
+        const CSR Ak = buildCSR(iatk, jak, coefk);
+        const CSR A0 = buildCSR(iat0, ja0, coef0);
+        const int n = Ak.n;
 
-        const CSR        Ak = buildCSR(iatk, jak, coefk);
-        const CSR        A0 = buildCSR(iat0, ja0, coef0);
-        const PreprocFlat pp = extractPreproc(preproc);
+        // Zero-copy pointers to MATLAB memory
+        const int32_t* s_ptr = &(*s_ptr_arr.begin());
+        const int32_t* s_data = &(*s_dat_arr.begin());
+        const int32_t* r_ptr = &(*r_ptr_arr.begin());
+        const int32_t* r_data = &(*r_dat_arr.begin());
 
-        const int n         = pp.n;
-        const int total_nnz = pp.total_nnz;
-
-        // ---- Phase 2: compute worst-case LS dimensions, query LWORK ----
         int max_si = 0, max_ri = 0;
         for (int i = 0; i < n; ++i) {
-            max_si = std::max(max_si, pp.s_ptr[i+1] - pp.s_ptr[i]);
-            max_ri = std::max(max_ri, pp.r_ptr[i+1] - pp.r_ptr[i]);
+            max_si = std::max(max_si, s_ptr[i+1] - s_ptr[i]);
+            max_ri = std::max(max_ri, r_ptr[i+1] - r_ptr[i]);
         }
         const int LWORK = queryLwork(max_ri, max_si);
+        const int max_ldb = std::max(max_ri, max_si);
 
-        // ---- Phase 3: allocate output COO arrays (plain C++ vectors) ---
-        std::vector<double> row_N(total_nnz), col_N(total_nnz), val_N(total_nnz);
-
-        // Fill structural indices sequentially (cheap, no data dependency)
-        for (int i = 0; i < n; ++i) {
-            for (int p = pp.s_ptr[i]; p < pp.s_ptr[i+1]; ++p) {
-                row_N[p] = static_cast<double>(i + 1);              // 1-based
-                col_N[p] = static_cast<double>(pp.s_data[p] + 1);  // 1-based
-            }
-        }
-
-        // ---- Phase 4: parallel row loop --------------------------------
-        // Dynamic scheduling with a chunk of 16 rows balances the variable
-        // subproblem sizes without excessive scheduling overhead.
-        #pragma omp parallel
-        {
-            // Thread-local persistent buffers.
-            // Declared here so they survive across omp for iterations
-            // and are only reallocated when a larger size is needed.
-            std::vector<double> Atmp, f, work(LWORK);
-
-            #pragma omp for schedule(dynamic, 16) nowait
-            for (int i = 0; i < n; ++i)
-            {
-                const int s0   = pp.s_ptr[i];
-                const int s1   = pp.s_ptr[i + 1];
-                const int nnzi = s1 - s0;
-                if (nnzi == 0) continue;
-
-                const int r0  = pp.r_ptr[i];
-                const int r1  = pp.r_ptr[i + 1];
-                const int nri = r1 - r0;
-
-                const int* si = pp.s_data.data() + s0;  // 0-based col indices
-                const int* ri = pp.r_data.data() + r0;  // 0-based, sorted
-
-                // Zero out the output values for this row up front
-                for (int p = s0; p < s1; ++p) val_N[p] = 0.0;
-                if (nri == 0) continue;
-
-                // ---- Assemble Atmp = Ak(s_i, r_i)^T  -------------------
-                // Size: nri (rows) × nnzi (cols), column-major for LAPACK.
-                // Column ji of Atmp corresponds to row si[ji] of Ak.
-                // We need Atmp[ji * nri + ri_idx] = Ak[ si[ji], ri[ri_idx] ].
-                //
-                // Ak is CSR → row si[ji] is a sorted list of (col, val) pairs.
-                // For each entry in that row, binary-search its column in ri.
-                const int m_ls = nri, n_ls = nnzi;
-                Atmp.assign(m_ls * n_ls, 0.0);
-
-                for (int ji = 0; ji < nnzi; ++ji) {
-                    const int row_k = si[ji];
-                    const int ks    = Ak.ptr[row_k];
-                    const int ke    = Ak.ptr[row_k + 1];
-                    for (int p = ks; p < ke; ++p) {
-                        const int c = Ak.col[p];
-                        // Binary search: ri is sorted, typically short
-                        const int* pos = std::lower_bound(ri, ri + nri, c);
-                        if (pos != ri + nri && *pos == c) {
-                            Atmp[ji * m_ls + static_cast<int>(pos - ri)] = Ak.val[p];
-                        }
-                    }
-                }
-
-                // ---- Assemble f = A0(i, r_i) ----------------------------
-                // Row i of A0 in CSR; binary-search each needed column.
-                const int ldb = std::max(m_ls, n_ls);
-                f.assign(ldb, 0.0);
-                {
-                    const int as = A0.ptr[i];
-                    const int ae = A0.ptr[i + 1];
-                    for (int p = as; p < ae; ++p) {
-                        const int c = A0.col[p];
-                        const int* pos = std::lower_bound(ri, ri + nri, c);
-                        if (pos != ri + nri && *pos == c) {
-                            f[static_cast<int>(pos - ri)] = A0.val[p];
-                        }
-                    }
-                }
-
-                // ---- Solve min_z || Atmp z - f ||_2 via dgels_ ----------
-                char      trans  = 'N';
-                ptrdiff_t pm = m_ls, pn = n_ls, pnrhs = 1;
-                ptrdiff_t plda = pm, pldb = ldb;
-                ptrdiff_t plw  = static_cast<ptrdiff_t>(work.size());
-                ptrdiff_t info = 0;
-
-                dgels_(&trans, &pm, &pn, &pnrhs,
-                       Atmp.data(), &plda,
-                       f.data(),    &pldb,
-                       work.data(), &plw, &info);
-
-                // Solution is in f[0 .. nnzi-1]; write to val_N
-                for (int ji = 0; ji < nnzi; ++ji) {
-                    double v  = f[ji];
-                    val_N[s0 + ji] = (info == 0 && std::isfinite(v)) ? v : 0.0;
-                }
-            }
-        } // end omp parallel
-
-        // ---- Phase 5: copy C++ COO into MATLAB output arrays -----------
-        // One linear copy; MATLAB array creation cannot be parallelised.
         const size_t sz = static_cast<size_t>(total_nnz);
         TypedArray<double> out_row = factory.createArray<double>({sz, 1});
         TypedArray<double> out_col = factory.createArray<double>({sz, 1});
         TypedArray<double> out_val = factory.createArray<double>({sz, 1});
 
-        for (int p = 0; p < total_nnz; ++p) {
-            out_row[p] = row_N[p];
-            out_col[p] = col_N[p];
-            out_val[p] = val_N[p];
+        double* p_row = &(*out_row.begin()); double* p_col = &(*out_col.begin()); double* p_val = &(*out_val.begin());
+
+        for (int i = 0; i < n; ++i) {
+            for (int p = s_ptr[i]; p < s_ptr[i+1]; ++p) {
+                p_row[p] = static_cast<double>(i + 1);
+                p_col[p] = static_cast<double>(s_data[p] + 1);
+            }
         }
 
-        outputs[0] = std::move(out_row);
-        outputs[1] = std::move(out_col);
-        outputs[2] = std::move(out_val);
+        #pragma omp parallel
+        {
+            std::vector<double> Atmp(max_ri * max_si);
+            std::vector<double> f(max_ldb);
+            std::vector<double> work(LWORK);
+            std::vector<double> B(64 * 64);
+            std::vector<double> g(64);
+
+            #pragma omp for schedule(guided) nowait
+            for (int i = 0; i < n; ++i) {
+                const int s0 = s_ptr[i], s1 = s_ptr[i + 1], nnzi = s1 - s0;
+                if (nnzi == 0) continue;
+
+                const int r0 = r_ptr[i], r1 = r_ptr[i + 1], nri = r1 - r0;
+                const int32_t* si = s_data + s0;
+                const int32_t* ri = r_data + r0;
+
+                for (int p = s0; p < s1; ++p) p_val[p] = 0.0;
+                if (nri == 0) continue;
+
+                const int m_ls = nri, n_ls = nnzi;
+                const int ldb = std::max(m_ls, n_ls);
+                bool solved = false;
+
+                if (n_ls <= 16 && m_ls >= n_ls) {
+                    for (int c1 = 0; c1 < n_ls; ++c1) {
+                        int row1 = si[c1];
+                        double sum_g = 0.0;
+                        int pa = Ak.ptr[row1], ea = Ak.ptr[row1+1];
+                        int p0 = A0.ptr[i], e0 = A0.ptr[i+1];
+                        while(pa < ea && p0 < e0) {
+                            if (Ak.col[pa] == A0.col[p0]) { sum_g += Ak.val[pa]*A0.val[p0]; pa++; p0++; }
+                            else if (Ak.col[pa] < A0.col[p0]) pa++;
+                            else p0++;
+                        }
+                        g[c1] = sum_g;
+
+                        for (int c2 = 0; c2 <= c1; ++c2) {
+                            int row2 = si[c2];
+                            double sum_B = 0.0;
+                            int p1 = Ak.ptr[row1], e1 = Ak.ptr[row1+1];
+                            int p2 = Ak.ptr[row2], e2 = Ak.ptr[row2+1];
+                            while(p1 < e1 && p2 < e2) {
+                                if (Ak.col[p1] == Ak.col[p2]) { sum_B += Ak.val[p1]*Ak.val[p2]; p1++; p2++; }
+                                else if (Ak.col[p1] < Ak.col[p2]) p1++;
+                                else p2++;
+                            }
+                            B[c1 * n_ls + c2] = sum_B;
+                            B[c2 * n_ls + c1] = sum_B;
+                        }
+                    }
+
+                    if (n_ls <= 3) {
+                        solved = solve_micro_kernel(n_ls, B.data(), g.data(), &p_val[s0]);
+                    }
+
+                    if (!solved) {
+                        char uplo = 'U'; ptrdiff_t pn_chol = n_ls, pnrhs_chol = 1, plda_chol = n_ls, pldb_chol = n_ls, info_chol = 0;
+                        dposv_(&uplo, &pn_chol, &pnrhs_chol, B.data(), &plda_chol, g.data(), &pldb_chol, &info_chol);
+                        if (info_chol == 0) {
+                            for (int ji = 0; ji < n_ls; ++ji) p_val[s0 + ji] = std::isfinite(g[ji]) ? g[ji] : 0.0;
+                            solved = true;
+                        }
+                    }
+                }
+
+                if (!solved) {
+                    std::fill(Atmp.begin(), Atmp.begin() + (m_ls * n_ls), 0.0);
+                    std::fill(f.begin(), f.begin() + ldb, 0.0);
+
+                    for (int ji = 0; ji < nnzi; ++ji) {
+                        const int row_k = si[ji], ks = Ak.ptr[row_k], ke = Ak.ptr[row_k + 1];
+                        int p_ak = ks, p_ri = 0;
+                        while (p_ak < ke && p_ri < nri) {
+                            if (Ak.col[p_ak] == ri[p_ri]) { Atmp[ji * m_ls + p_ri] = Ak.val[p_ak]; p_ak++; p_ri++; }
+                            else if (Ak.col[p_ak] < ri[p_ri]) p_ak++;
+                            else p_ri++;
+                        }
+                    }
+
+                    {
+                        const int as = A0.ptr[i], ae = A0.ptr[i + 1];
+                        int p_a0 = as, p_ri = 0;
+                        while (p_a0 < ae && p_ri < nri) {
+                            if (A0.col[p_a0] == ri[p_ri]) { f[p_ri] = A0.val[p_a0]; p_a0++; p_ri++; }
+                            else if (A0.col[p_a0] < ri[p_ri]) p_a0++;
+                            else p_ri++;
+                        }
+                    }
+
+                    if (n_ls <= 64 && m_ls >= n_ls) {
+                        char uplo = 'U', trans = 'T';
+                        ptrdiff_t pn_blas = n_ls, pk_blas = m_ls;
+                        double alpha = 1.0, beta = 0.0;
+                        ptrdiff_t plda_blas = m_ls, pldc_blas = n_ls;
+                        dsyrk_(&uplo, &trans, &pn_blas, &pk_blas, &alpha, Atmp.data(), &plda_blas, &beta, B.data(), &pldc_blas);
+
+                        char trans_v = 'T'; ptrdiff_t incx = 1, incy = 1;
+                        dgemv_(&trans_v, &pk_blas, &pn_blas, &alpha, Atmp.data(), &plda_blas, f.data(), &incx, &beta, g.data(), &incy);
+
+                        char uplo_chol = 'U'; ptrdiff_t pnrhs_chol = 1, info_chol = 0;
+                        dposv_(&uplo_chol, &pn_blas, &pnrhs_chol, B.data(), &pldc_blas, g.data(), &pldc_blas, &info_chol);
+
+                        if (info_chol == 0) {
+                            for (int ji = 0; ji < n_ls; ++ji) p_val[s0 + ji] = std::isfinite(g[ji]) ? g[ji] : 0.0;
+                            solved = true;
+                        }
+                    }
+
+                    if (!solved) {
+                        char trans = 'N'; ptrdiff_t pm = m_ls, pn = n_ls, pnrhs = 1, plda = m_ls, pldb = ldb, plw = static_cast<ptrdiff_t>(work.size()), info = 0;
+                        dgels_(&trans, &pm, &pn, &pnrhs, Atmp.data(), &plda, f.data(), &pldb, work.data(), &plw, &info);
+                        for (int ji = 0; ji < n_ls; ++ji) p_val[s0 + ji] = (info == 0 && std::isfinite(f[ji])) ? f[ji] : 0.0;
+                    }
+                }
+            }
+        }
+
+        outputs[0] = std::move(out_row); outputs[1] = std::move(out_col); outputs[2] = std::move(out_val);
     }
 };

@@ -1,3 +1,4 @@
+// sam_preprocess_left_mex.cpp
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "MatlabDataArray.hpp"
@@ -46,29 +47,14 @@ public:
         buildCSR(iatk, jak, n, a_ptr, a_col);
         buildCSR(iats, jas, n, s_ptr, s_data);
 
-        int max_threads = omp_get_max_threads();
-        std::vector<std::vector<int>> thread_r_data(max_threads);
-        std::vector<std::vector<int>> thread_r_ptr(max_threads);
+        std::vector<int> r_ptr(n + 1, 0);
 
         #pragma omp parallel
         {
-            int tid = omp_get_thread_num();
-            int nthreads = omp_get_num_threads();
-
-            int chunk = (n + nthreads - 1) / nthreads;
-            int start = std::min(tid * chunk, n);
-            int end   = std::min(start + chunk, n);
-            int local_n = end - start;
-
-            thread_r_ptr[tid].resize(local_n + 1, 0);
-            thread_r_data[tid].reserve(local_n * 32); 
-
             std::vector<int> marker(n, -1);
-            std::vector<int> local_r;
-            local_r.reserve(512);
-
-            for (int i = start; i < end; ++i) {
-                local_r.clear();
+            #pragma omp for schedule(guided)
+            for (int i = 0; i < n; ++i) {
+                int count = 0;
                 int s0 = s_ptr[i], s1 = s_ptr[i + 1];
 
                 for (int ji = s0; ji < s1; ++ji) {
@@ -77,43 +63,44 @@ public:
                     for (int p = a0; p < a1; ++p) {
                         int c = a_col[p];
                         if (marker[c] != i) {
-                            marker[c] = i; 
-                            local_r.push_back(c);
+                            marker[c] = i;
+                            count++;
                         }
                     }
                 }
-                
-                std::sort(local_r.begin(), local_r.end());
-                thread_r_data[tid].insert(thread_r_data[tid].end(), local_r.begin(), local_r.end());
-                thread_r_ptr[tid][i - start + 1] = static_cast<int>(thread_r_data[tid].size());
+                r_ptr[i + 1] = count;
             }
         }
 
-        std::vector<int> global_r_ptr(n + 1, 0);
-        int total_r_nnz = 0;
-        int active_threads = omp_get_max_threads();
-
-        for (int t = 0; t < active_threads; ++t) {
-            int chunk = (n + active_threads - 1) / active_threads;
-            int start = std::min(t * chunk, n);
-            int end   = std::min(start + chunk, n);
-            int local_n = end - start;
-
-            for (int i = 0; i < local_n; ++i) {
-                global_r_ptr[start + i + 1] = total_r_nnz + thread_r_ptr[t][i + 1];
-            }
-            total_r_nnz += static_cast<int>(thread_r_data[t].size());
+        for (int i = 0; i < n; ++i) {
+            r_ptr[i + 1] += r_ptr[i];
         }
+        
+        int total_r_nnz = r_ptr[n];
+        std::vector<int> r_data(total_r_nnz);
 
-        std::vector<int> global_r_data(total_r_nnz);
+        #pragma omp parallel
+        {
+            std::vector<int> marker(n, -1);
+            #pragma omp for schedule(guided)
+            for (int i = 0; i < n; ++i) {
+                int s0 = s_ptr[i], s1 = s_ptr[i + 1];
+                int offset = r_ptr[i];
+                int count = 0;
 
-        #pragma omp parallel for schedule(static, 1)
-        for (int t = 0; t < active_threads; ++t) {
-            int chunk = (n + active_threads - 1) / active_threads;
-            int start = std::min(t * chunk, n);
-            if (start < n) {
-                std::copy(thread_r_data[t].begin(), thread_r_data[t].end(), 
-                          global_r_data.begin() + global_r_ptr[start]);
+                for (int ji = s0; ji < s1; ++ji) {
+                    int j = s_data[ji];
+                    int a0 = a_ptr[j], a1 = a_ptr[j + 1];
+                    for (int p = a0; p < a1; ++p) {
+                        int c = a_col[p];
+                        if (marker[c] != i) {
+                            marker[c] = i;
+                            r_data[offset + count] = c;
+                            count++;
+                        }
+                    }
+                }
+                std::sort(r_data.begin() + offset, r_data.begin() + offset + count);
             }
         }
 
@@ -122,20 +109,21 @@ public:
         const size_t sz_rp = static_cast<size_t>(n + 1);
         const size_t sz_rd = static_cast<size_t>(total_r_nnz);
 
-        TypedArray<double> out_sptr = factory.createArray<double>({sz_sp, 1});
-        TypedArray<double> out_sdat = factory.createArray<double>({sz_sd, 1});
-        TypedArray<double> out_rptr = factory.createArray<double>({sz_rp, 1});
-        TypedArray<double> out_rdat = factory.createArray<double>({sz_rd, 1});
+        // Type downcasting to int32_t to halve memory bandwidth
+        TypedArray<int32_t> out_sptr = factory.createArray<int32_t>({sz_sp, 1});
+        TypedArray<int32_t> out_sdat = factory.createArray<int32_t>({sz_sd, 1});
+        TypedArray<int32_t> out_rptr = factory.createArray<int32_t>({sz_rp, 1});
+        TypedArray<int32_t> out_rdat = factory.createArray<int32_t>({sz_rd, 1});
 
-        for (int i = 0; i <= n; ++i) out_sptr[i] = static_cast<double>(s_ptr[i]);
-        for (size_t i = 0; i < sz_sd; ++i) out_sdat[i] = static_cast<double>(s_data[i]);
-        for (int i = 0; i <= n; ++i) out_rptr[i] = static_cast<double>(global_r_ptr[i]);
-        for (size_t i = 0; i < sz_rd; ++i) out_rdat[i] = static_cast<double>(global_r_data[i]);
+        for (int i = 0; i <= n; ++i) out_sptr[i] = static_cast<int32_t>(s_ptr[i]);
+        for (size_t i = 0; i < sz_sd; ++i) out_sdat[i] = static_cast<int32_t>(s_data[i]);
+        for (int i = 0; i <= n; ++i) out_rptr[i] = static_cast<int32_t>(r_ptr[i]);
+        for (size_t i = 0; i < sz_rd; ++i) out_rdat[i] = static_cast<int32_t>(r_data[i]);
 
         outputs[0] = std::move(out_sptr);
         outputs[1] = std::move(out_sdat);
         outputs[2] = std::move(out_rptr);
         outputs[3] = std::move(out_rdat);
-        outputs[4] = factory.createScalar(static_cast<double>(sz_sd));
+        outputs[4] = factory.createScalar(static_cast<int32_t>(sz_sd));
     }
 };
