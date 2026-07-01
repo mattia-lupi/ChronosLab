@@ -4,6 +4,7 @@
 #include <iostream>
 #include "lapack.h"
 #include "cblas.h"
+#include "qr_functions.h"
 
 // LAPACK Fortran routines declarations
 // extern "C" {
@@ -17,13 +18,13 @@ void findNonZeroInColJ(int *J, int *iatk, int *jak, int n2, int *I, int &sizeI);
 void getA0k(double *a0k,  int *I, int sizeI, int oldSizeI, int *iat0,  int *ja0, double *coef0,  int k);
 void getAhat( int *I,  int sizeI,  int *J,  int Jstart,  int Jend,
              int *iatk,  int *jak, double *coefk, double *Ahat,  int &Astart);
-void computeFirstQR(double *Ahat, int sizeI, int sizeJ, double *R, double *tau, double *work, int lwork, int &info);
-void computeUpdateQR();
-void applyFirstQt(double *Ahat, int sizeI, int sizeJ, double *tau, double *a0k, double *work, int lwork, int &info);
-void applyR(int sizeJ, double *R, double *a0k, int &info);
 void getAJ(int *J, int Jsize, int nn_A, int *iatk, int *jak, double *coefk, double *AJ);
-void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double &resRelNorm);
-void fillL(double *L, double *res, int nn_A, int &usedL);
+void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double &resRelNorm, double &resNorm);
+void fillL(int *L, double *res, int nn_A, int &usedL);
+void findJtilde(int *Jtilde, int &JtildeSize, int *L, int sizeL, int *iatk, int *jak, int *J, int sizeJ);
+void fullAJtilde(int nn_A, int *iatk, int *jak, double *coefk, int *Jtilde, int JtildeSize, double *AJtilde);
+void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, double *res, double normRes);
+int minIdx(double *rhoJ2, int JtildeSize);
 
 
 void print_matrix(const char* desc, int m, int n, double* mat, int lda) {
@@ -50,9 +51,9 @@ void print_vector(const char* desc, int n,  int* vec) {
 }
 
 void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
-                     int *iat0, int *ja0,double *coef0,
-                     int nthread,int n_step,int step_size,double eps, int nn_A,
-                     int *iatN, int *jaN,double *coefN){
+                           int *iat0, int *ja0,double *coef0,
+                           int nthread,int n_step,int step_size,double eps, int nn_A,
+                           int *iatN, int *jaN,double *coefN){
 
    // Suppose the pattern is symmetric
    // Count the maximum number of entries per row
@@ -71,8 +72,8 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
       // reduced to 1 per object instead of being nn_A while also reducing the actual max size
       // allocated
 
-      double resRelNorm = 1.0;
-      int usedL;
+      double resRelNorm = 1.0, resNorm;
+      int usedL, JtildeSize;
 
       // Allocate J
       std::vector< int> Jvec(maxJsize);
@@ -92,17 +93,25 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
       std::vector<double> aJvec(maxJsize);
       double *aJ = aJvec.data();
 
+      // Allocate space for A(:,J)
+      std::vector<double> normvec(maxJsize);
+      double *normColJ = normvec.data();
+
       // Allocate space for A0(I,k)
       std::vector<double> a0kvec(max_nnz_r);
       double *a0k = a0kvec.data();
+
+      // Allocate space for mHat(I,k)
+      std::vector<double> mHatvec(max_nnz_r);
+      double *mHat = mHatvec.data();
 
       // Allocate space for A0(:,k)
       std::vector<double> A0kvec(nn_A);
       double *A0k = A0kvec.data();
 
       // Allocate space for the residuals
-      std::vector<double> Lvec(nn_A);
-      double *L = Lvec.data();
+      std::vector<int> Lvec(nn_A);
+      int *L = Lvec.data();
 
       // Fill the current column of the "old" matrix 
       // Do it once per column
@@ -111,7 +120,6 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
       double normA0k = cblas_dnrm2(nn_A,A0k,1);
 
       // Allocate Ahat buffer for the max possible size
-      // Contains the householder vectors for all the updates
       std::vector<double> AhatBuffer(max_nnz_r*maxJsize);
       double *Ahat = AhatBuffer.data();
 
@@ -120,14 +128,21 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
       std::vector<double> AJBuffer(nn_A*maxJsize);
       double *AJ = AJBuffer.data();
 
+      // Allocate AJtilde buffer for the max possible size
+      std::vector<double> AJtildeBuffer(nn_A*maxJsize);
+      double *AJtilde = AJtildeBuffer.data();
+
       // Allocate tau for the max possible size
       std::vector<double> tauVec(maxJsize);
       double *tau = tauVec.data();
 
       // Allocate R for the max possible size
-      std::vector<double> RVec((maxJsize)*(maxJsize+1)/2);
+      std::vector<double> RVec(maxJsize*maxJsize);
       double *R = RVec.data();
-      int indexR = 0;
+
+      // Allocate R for the max possible size (only triangular values)
+      std::vector<double> RtriangVec((maxJsize)*(maxJsize+1)/2);
+      double *Rtriang = RtriangVec.data();
 
       // DGEQRF Workspace Query
       int lwork = -1;
@@ -153,38 +168,60 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
 
          oldSizeI = sizeI;
 
+         print_vector("Vector J", n2, J);
+         // print_vector("Vector iatk", nn_A+1, iatk);
+         // print_vector("Vector jak", 6, jak);
+
          // Get the row entries of the matrix in columns J
          findNonZeroInColJ(J, iatk, jak, n2, I, sizeI);
+         printf("%d -> %d\n", oldSizeI,sizeI);
 
          // check what happens if I does not change
          print_vector("Vector I", sizeI, I);
 
-         // Get the new piece of A0k
+         // Get the new piece of A0k and add it to ak0
          getA0k(a0k, I, sizeI, oldSizeI, iat0, ja0, coef0, k);
 
+         // Copy onto mHat which can be modified
+         std::memcpy(mHat,a0k,sizeI*sizeof(double));
          print_vector("Vector A0k", sizeI, a0k);
+         // print_vector("Vector mhat", sizeI, mHat);
 
          // Add to Ahat the new part of the matrix on which to work
+         // printf("Astart %d, Jstart %d, Jend %d\n", Astart,n2old,n2);
          getAhat(I, sizeI, J, n2old, n2, iatk, jak, coefk, Ahat, Astart);
-         printf("Astart %d\n", Astart);
 
-         print_matrix("Matrix Ahat", sizeI, n2, Ahat, sizeI);
+         print_vector("init Matrix Ahat QR", max_nnz_r*maxJsize, Ahat);
 
          if (t == 0){
             // Compute the QR factorization of the first matrix
-            computeFirstQR(Ahat, sizeI, n2, R, tau, work, lwork, info);
-            print_matrix("Matrix Ahat QR", sizeI, n2, Ahat, sizeI);
+            computeFirstQR(Ahat, sizeI, n2, R, Rtriang, tau, work, lwork, info);
+            print_vector("cpt 1 Matrix Ahat QR", max_nnz_r*maxJsize, Ahat);
+            print_vector("tau", maxJsize, tau);
 
             // Apply Qt for the first matrix
-            applyFirstQt(Ahat, sizeI, n2, tau, a0k, work, lwork, info);
-            print_vector("Vector chat", sizeI, a0k);
+            applyFirstQt(Ahat, sizeI, n2, tau, mHat, work, lwork, info);
+            print_vector("Vector chat", sizeI, mHat);
          } else{
-            computeUpdateQR();
+            // Apply the previously computed Q to the new Ahat part
+            applyOldQ(t, n2old, n2, oldSizeI, sizeI, Ahat, tau, a0k, work, lwork, info);
+            print_vector("apply Matrix Ahat QR", max_nnz_r*maxJsize, Ahat);
+
+            printf("rowSizeB2 %d, colSizeB2 %d, startB2 %d, rowSizeB %d, oldSizeTau %d\n", 
+                   oldSizeI-n2old, n2-n2old, oldSizeI*n2old + n2-n2old, sizeI, n2old);
+            
+            computeNewQR(oldSizeI-n2old, n2-n2old, oldSizeI*n2old + n2-n2old, sizeI, n2old, Ahat,
+                         tau, R, n2old, Rtriang, work, lwork, info);
+            print_vector("cpt n Matrix Ahat QR", max_nnz_r*maxJsize, Ahat);
+            print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
+            // print_matrix("Matrix R", n2, n2, R, n2);
+            // computeUpdateQR();
          }
 
          // Solve the triangolar system
-         applyR(n2, R, a0k, info);
-         print_vector("Vector mhat", sizeI, a0k);
+         applyR(n2, R, mHat, info);
+         print_matrix("Matrix R", n2, n2, R, n2);
+         print_vector("Vector mhat", n2, mHat);
 
          // Get the matrix A(:,J)
          getAJ(J, n2, nn_A, iatk, jak, coefk, AJ);
@@ -192,16 +229,61 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
 
          // Assign the norm of A0(:,k) to resRelNorm
          resRelNorm = normA0k;
-         cptRes(nn_A, n2, A0k, AJ, a0k, resRelNorm);
+         // Compute res = AJ*mHat-A0k and save it in AJ
+         cptRes(nn_A, n2, A0k, AJ, mHat, resRelNorm, resNorm);
          print_matrix("Matrix Aj", nn_A, n2, AJ, nn_A);
 
          if (resRelNorm < eps){
             break;
          }
 
-         if (t < n_step){
+         if (t < n_step - 1){
+            // Find the values for L
             fillL(L, AJ, nn_A, usedL);
             print_vector("L", usedL, L);
+
+            // Find the values for Jtilde
+            findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);
+            print_vector("Vector Jtilde", JtildeSize, Jtilde);
+
+            // Nothing new to add
+            if (JtildeSize == 0){
+               break;
+            }
+
+            // If there is more than one need to decide which to add
+            if (JtildeSize != 1){
+               // Find A(:,Jtilde)
+               fullAJtilde(nn_A, iatk, jak, coefk, Jtilde, JtildeSize, AJtilde);
+               print_matrix("Matrix Ajtilde", nn_A, JtildeSize, AJtilde, nn_A);
+   
+               // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
+               cptRhoJ2(JtildeSize, normColJ, AJtilde, nn_A, AJ, resNorm);
+               print_vector("Vector rhoJ2", JtildeSize, normColJ);
+               // print_matrix("Matrix Ajtilde", JtildeSize, JtildeSize, AJtilde, nn_A);
+
+               // Add a single one
+               if (step_size == 1){
+                  // Get the new J
+                  J[n2] = Jtilde[minIdx(normColJ, JtildeSize)];
+
+                  // Update the size of J
+                  n2old = n2;
+                  n2++;
+               }
+               else{
+                  printf("Error, not implemented yet\n");
+                  return;
+               }
+            }
+            else{
+               // Add the index to J
+               J[n2] = Jtilde[0];
+
+               // Update the size of J
+               n2old = n2;
+               n2++;
+            }
          }
       }
       return;
@@ -309,7 +391,7 @@ void getAhat(int *I, int sizeI, int *J, int Jstart, int Jend,
                break;
             }
 
-            if(j == iatk[I[i] + 1] - 1){
+            if(k == iatk[I[i] + 1] - 1){
                // If entered here there is no column entry equal to k 
                // set to zero
                // printf("0\n");
@@ -326,49 +408,6 @@ void getAhat(int *I, int sizeI, int *J, int Jstart, int Jend,
    return;
 }
 
-void computeFirstQR(double *Ahat, int sizeI, int sizeJ, double *R, double *tau, double *work, int lwork, int &info){
-   // Compute QR Factorization
-   dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
-   if (info != 0){
-      printf("Exit at first QR due to error %d\n", info);
-      return;
-   }
-
-   // Copy R into a separate vector to store and use also the updated R later
-   R[0] = Ahat[0];
-
-   return;
-}
-
-void applyFirstQt(double *Ahat, int sizeI, int sizeJ, double *tau, double *a0k, double *work, int lwork, int &info){
-   char side = 'L';
-   char trans = 'T';
-
-   // Check why I needed to add the fortran string length sizes
-   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ, Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info,3,3);
-   if (info != 0){
-      printf("Exit at first Qt apply due to error %d\n", info);
-      return;
-   }
-
-   return;
-}
-
-void applyR(int sizeJ, double *R, double *a0k, int &info){
-   char uplo = 'U';
-   char trans = 'N';
-   char diag = 'N';
-   int nrhs = 1;
-
-   // Check why I needed to add the fortran string length sizes
-   dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, R, &sizeJ, a0k, &sizeJ, &info,3,3,3);
-   if (info != 0){
-      printf("Exit at R apply due to error %d\n", info);
-      return;
-   }
-
-   return;
-}
 
 
 // AJ is saved rowwise then used as transposed in the blas gemm to have better memory access in creating it
@@ -421,7 +460,7 @@ void getAJ(int *J, int Jsize, int nn_A, int *iatk, int *jak, double *coefk, doub
    return;
 }
 
-void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double &resRelNorm){
+void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double &resRelNorm, double &resNorm){
    // Compute the product AJ*mHat and save it in AJ
    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nn_A, 1, sizeJ, 1.0, AJ, sizeJ, mHat, 1, 0.0, AJ, sizeJ);
 
@@ -432,13 +471,16 @@ void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double &
    cblas_daxpy(nn_A, -1.0, A0k, 1, AJ, 1);
 
    // Compute the residual norm
-   resRelNorm = 2*cblas_dnrm2(nn_A,AJ,1)/(normAjMh+resRelNorm);
+   resNorm = cblas_dnrm2(nn_A,AJ,1);
+
+   // Compute the relative version of the norm
+   resRelNorm = 2*resNorm/(normAjMh+resRelNorm);
    // printf("resNorm %f\n", resRelNorm);
 
    return;
 }
 
-void fillL(double *L, double *res, int nn_A, int &usedL){
+void fillL(int *L, double *res, int nn_A, int &usedL){
    usedL = 0;
    // Loop over all residual entries
    for (int i = 0; i < nn_A; ++i){
@@ -452,49 +494,138 @@ void fillL(double *L, double *res, int nn_A, int &usedL){
    return;
 }
 
-void findJtilde(){
-   // Assume the pattern is symmetric
-   // the nonzero row entries in column J correspond to 
-   // the nonzero column entries in row J
+void findJtilde(int *Jtilde, int &JtildeSize, int *L, int sizeL, int *iatk, int *jak, int *J, int sizeJ){
 
-   int initial_count = sizeI;
+   // Sanity check for sizeL == 0
+   if (sizeL == 0){
+      printf("sizeL == 0, check\n");
+      return;
+   }
+
+   // Initialize counter to 0
+   JtildeSize = 0;
 
    // Flag for fast exit in case of repeated index
-   bool exitt = false;
-   // Cycle over J to select the rows to get, need to check for no repeated indices
-   for (int i = 0; i < n2; ++i){
-      for (int j = iatk[J[i]]; j < iatk[J[i] + 1]; ++j){
-         // If the sizeI is 0 then avoid checks and just copy all the first row
-         if(initial_count != 0){
-            // Check for duplicate value
-            for (int q = 0; q < sizeI; ++q){
-               if(jak[j] == I[q]){
-                  exitt = true;
+   bool skip = false;
+   int maxJsize;
+   for (int i = 0; i < sizeL; ++i){
+      for (int j = iatk[L[i]]; j < iatk[L[i] + 1]; ++j){
+         // Get the max size to search for duplicates
+         maxJsize = std::max(sizeJ,JtildeSize);
+         // std::cout << "maxJsize = " << maxJsize << std::endl;
+         // std::cout << "ja["<< j << "] = " << jak[j] << std::endl;
+         // Check for duplicate value
+         for (int q = 0; q < maxJsize; ++q){
+            // Check if it is already in Jtilde
+            if(q < JtildeSize){
+               if(jak[j] == Jtilde[q]){
+                  skip = true;
                   break;
                }
             }
-   
-            // This index is repeated, fast exit
-            if (exitt){
-               // Reset flag to false
-               exitt = false;
-               break;
+
+            // Check if it is already in J
+            if (q < sizeJ){
+               if(jak[j] == J[q]){
+                  skip = true;
+                  break;
+               }
             }
          }
-
-         // This index is new
-         // Copy this nonzero column entry inside I
-         I[sizeI] = jak[j];
-         sizeI++;
+   
+         // This index is repeated, fast exit
+         if (skip){
+            // Reset flag to false
+            skip = false;
+         }
+         else{
+            // Index is not repeated, add it
+            Jtilde[JtildeSize] = jak[j];
+            JtildeSize++;
+         }
       }
    }
    return;
 }
 
-void computeUpdateQR(){
+// Compute A(:,Jtilde) in colmajor
+// check again if Jtilde size >= 2
+void fullAJtilde(int nn_A, int *iatk, int *jak, double *coefk, int *Jtilde, int JtildeSize, double *AJtilde){
+   
+   // Loop over possible columns for Jtilde
+   for (int j = 0; j < JtildeSize; ++j){
+      // Loop over the rows
+      for (int row = 0; row < nn_A; ++row){
+         // Loop over the single row entries
+         for (int i = iatk[row]; i < iatk[row+1]; ++i){
+         
+            // If the column is the same of the current column k
+            // Get the nonzero index
+            if (jak[i] == Jtilde[j]){
+               AJtilde[row + j*nn_A] = coefk[i];
+               break;
+            }
+   
+            // No entry was found, set to zero
+            if (i == iatk[i+1] - 1){
+               AJtilde[row + j*nn_A] = 0;
+            }
+         }
+      }
+   }
+   return;
+}
+
+// Check when JtildeSize >= 2
+void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, double *res, double normRes){
+   // Compute the norm for each column. 
+   // The matrix is saved in column major so doing the norm is easy
+   for (int i = 0; i < JtildeSize; ++i){
+      normColJ[i] = cblas_dnrm2(nn_A,&(AJtilde[i*nn_A]),1);
+      normColJ[i] *= normColJ[i];
+
+      // If the norm is zero then discard this column
+      if (normColJ[i] < 1e-15){
+         normColJ[i] = 1e15;
+      }
+   }
+
+   print_vector("Vector res", JtildeSize, res);
+
+   // Compute the product AJtilde^T*res and save it in AJtilde
+   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, JtildeSize, 1, nn_A, 1.0, AJtilde, nn_A, res, nn_A, 0.0, AJtilde, nn_A);
+
+   print_vector("Vector rat", JtildeSize, AJtilde);
+   double temp;
+   // Compute the rhoJ2 and save it in normColJ
+   for (int i = 0; i < JtildeSize; ++i){
+      temp = AJtilde[i];
+      normColJ[i] = normRes*normRes - temp*temp/normColJ[i];
+      // Avoid having possibly negative rhos 
+      normColJ[i] = std::max(normColJ[i],0.);
+   }
 
    return;
 }
+
+// Compute the index in which rhoJ2 is minimum
+int minIdx(double *rhoJ2, int JtildeSize){
+   int idx = 0;
+   // Initialize the minimum
+   double minimum = rhoJ2[0];
+
+   // Loop over the rhoJ2 to get the minimum
+   for (int i = 1; i < JtildeSize; ++i){
+      if (rhoJ2[i] < minimum){
+         idx = i;
+         minimum = rhoJ2[i];
+      }
+   }
+
+   return idx;
+}
+
+
 
 
 
