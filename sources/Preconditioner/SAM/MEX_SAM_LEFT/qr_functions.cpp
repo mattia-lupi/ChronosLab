@@ -34,18 +34,40 @@ void applyR(int sizeJ, double *R, double *a0k, int &info){
    return;
 }
 
-void applyOldQ(int t, int oldSizeJ, int sizeJ, int oldSizeI, int sizeI, 
-               double *Ahat, double *tau, double *a0k, double *work, int lwork, int &info){
+void print_vector1(const char* desc, int n, double* vec) {
+    printf("\n--- %s ---\n", desc);
+    for (int i = 0; i < n; i++) {
+        printf("%10.4f\n", vec[i]);
+    }
+}
+void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat, 
+             double *tau, double *a0k, int nrowsA0k, int ncolsA0k, double *work, int lwork, int &info){
 
-   if(t == 1){
-      // If it's the first step then it's easy to reapply the Q'
-      applyFirstQt(Ahat, oldSizeI, sizeJ-oldSizeJ, tau, Ahat + oldSizeJ*oldSizeI, work, lwork, info);
+   // Apply iteratively the Qs in the correct way
+   char side = 'L';
+   char trans = 'T';
+
+   // Loop over all the matrices Q I have computed and apply them to the correct point
+   int nrows, ncols, nrefl, LDA, LDC, ofA0k = 0, ofTau = 0; 
+   for (int i = 0; i < t; ++i){
+      // Get the values for the new iteration matrix
+      nrows = sizeI[i+1] - sizeJ[i];
+      ncols = ncolsA0k;
+      nrefl = sizeJ[i+1] - sizeJ[i];
+      LDA   = nrows;
+      LDC   = nrowsA0k;
+      ofA0k += sizeJ[i];
+      ofTau += sizeJ[i];
+      // printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
+
+      // Check why I needed to add the fortran string length sizes
+      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] +i, &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,3,3);
+      // print_vector1("chat vec iter",nrowsA0k,a0k);// check why +i above
+      if (info != 0){
+         printf("Exit at first Qt apply due to error %d\n", info);
+         return;
+      }
    }
-   else{
-      // Apply iteratively the Qs in the correct way
-
-   }
-
    return;
 }
 
@@ -68,25 +90,38 @@ void computeFirstQR(double *Ahat, int sizeI, int sizeJ, double *R, double *Rtria
 // rowSizeB2 = J_add + I_add size
 // startB2   = oldSizeI*n2old + n2-n2old
 // rowSizeB  = sizeI
-void computeNewQR(int rowSizeB2, int colSizeB2, int startB2, int rowSizeB, int oldSizeTau, double *Ahat,
-                  double *tau, double *R, int sqrtStartR, double *Rtriang, double *work, int lwork, int &info){
+void computeNewQR(int t, int *sizeI, int *sizeJ, int *qStart, double *Ahat, double *tau, double *R, 
+                  double *Rtriang, double *work, int lwork, int &info){
    // Compute QR Factorization on the new part of the matrix
-   dgeqrf_(&rowSizeB2, &colSizeB2, Ahat+startB2, &rowSizeB, tau+oldSizeTau, work, &lwork, &info);
-   if (info != 0){
-      printf("Exit at first QR due to error %d\n", info);
-      return;
-   }
+   int colSizeB2  = sizeJ[t+1] - sizeJ[t];
+   int rowSizeB   = sizeI[t+1];
+   int oldSizeTau = sizeJ[t];
+   int rowSizeB2  = sizeI[t]-oldSizeTau;
+   int sqrtStartR = oldSizeTau;
+
+   // Set the starting point for the new QR factorization
+   qStart[t+1]    = qStart[t] + rowSizeB*colSizeB2;
+   int startB2    = qStart[t] + oldSizeTau;
+
    // Get the filled size of Rtriang
    int startRtri = 0.5*sqrtStartR*(sqrtStartR+1);
 
    // Copy the data into the triangular R first (colmajor)
    int sizeAddR = colSizeB2*rowSizeB;
-   int startB = startB2 - rowSizeB + rowSizeB2;
+   int startB = qStart[t];
+   // printf("startB2 %d startB %d at t %d\n", startB2,startB, t);
+   
+   // Compute the new QR factorization
+   dgeqrf_(&rowSizeB2, &colSizeB2, Ahat+startB2, &rowSizeB, tau+oldSizeTau, work, &lwork, &info);
+   if (info != 0){
+      printf("Exit at first QR due to error %d\n", info);
+      return;
+   }
    
    // Loop over the columns
    for (int j = 0; j < colSizeB2; ++j){
       // Loop over rows
-      for (int i = 0; i < rowSizeB2; ++i){
+      for (int i = 0; i < rowSizeB; ++i){
          // Save the new values carefully adjusting for the leading dimension
          Rtriang[startRtri] = Ahat[startB + i + j*rowSizeB];
          // Update the starting point

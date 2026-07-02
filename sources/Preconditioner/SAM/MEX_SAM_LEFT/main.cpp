@@ -10,22 +10,30 @@ int main() {
     // Row 2: 0.775713, 0.000000, 1.435859, 0.000000 (2 nnz)
     // Row 3: 0.000000, 0.000000, 0.000000, 1.000000 (1 nnz)
     
-    std::vector<double> mat_vals = {1.625618560729690,0.081125768865785,1.929385970968730,
-                                    0.775712678608402,1.435858588580919,1.000000000000000};
+    std::vector<double> mat_vals = {1.6256,0.0811,0.1568,1.9294,0.7757,1.435,-0.4525,1.0000,1.0000};
 
-    std::vector<int> mat_cols = {0,2,1,0,2,3};
+    std::vector<int> mat_cols = {0,2,3,1,0,2,0,3,4};
 
-    std::vector<int> mat_row_ptr = {0,2,3,5,6};
+    std::vector<int> mat_row_ptr = {0,3,4,6,8,9};
 
     // 2. Identity Matrix (4x4, 4 Non-zero elements)
     std::vector<double> eye_vals = {1.0, 1.0, 1.0, 1.0};
     std::vector<int> eye_cols = {0, 1, 2, 3};
     std::vector<int> eye_row_ptr = {0, 1, 2, 3, 4};
 
+    int nthread = 1;
+    int n_step = 5;
+    int step_size = 1;
+    double eps = 1e-5;
+    int nn_A = mat_row_ptr.size() - 1;
+    int *iat_N = nullptr;
+    int *ja_N = nullptr;
+    double *coef_N = nullptr;
+
     cpt_sam_adaptive_left(mat_row_ptr.data(),mat_cols.data(),mat_vals.data(),
                      eye_row_ptr.data(),eye_cols.data(),eye_vals.data(),
-                     1,1,1,1e-5,4,
-                     nullptr,nullptr,nullptr);
+                     nthread,n_step,step_size,eps,nn_A,
+                     iat_N,ja_N,coef_N);
 
     return 0;
 }
