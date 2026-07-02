@@ -22,7 +22,7 @@ void fullA0k(int nn_A, int *iat0, int *ja0, double *coef0, int k, double *A0k){
    }
    return;
 }
-void findNonZeroInColJ( int *J, int *iatk,  int *jak, int n2,  int *I, int &sizeI){
+void findNonZeroInColJ(int *J, int *iatk, int *jak, int n2, int *I, int &sizeI){
 
    // Assume the pattern is symmetric
    // the nonzero row entries in column J correspond to 
@@ -31,32 +31,41 @@ void findNonZeroInColJ( int *J, int *iatk,  int *jak, int n2,  int *I, int &size
    int initial_count = sizeI;
 
    // Flag for fast exit in case of repeated index
-   bool exitt = false;
+   bool skip = false;
    // Cycle over J to select the rows to get, need to check for no repeated indices
    for (int i = 0; i < n2; ++i){
+   	// printf("J[%d] %d\n", i,J[i]);
       for (int j = iatk[J[i]]; j < iatk[J[i] + 1]; ++j){
+      	// printf("from %d to %d\n",iatk[J[i]],iatk[J[i] + 1]);
          // If the sizeI is 0 then avoid checks and just copy all the first row
          if(initial_count != 0){
             // Check for duplicate value
             for (int q = 0; q < sizeI; ++q){
+            	// printf("\t\tjak %d, Iq %d, sizeI %d\n", jak[j],I[q],sizeI);
                if(jak[j] == I[q]){
-                  exitt = true;
+                  skip = true;
                   break;
                }
             }
    
             // This index is repeated, fast exit
-            if (exitt){
+            if (skip){
                // Reset flag to false
-               exitt = false;
-               break;
+               skip = false;
+            }
+            else{
+            	// This index is new
+         		// Copy this nonzero column entry inside I
+         		I[sizeI] = jak[j];
+         		sizeI++;
             }
          }
-
-         // This index is new
-         // Copy this nonzero column entry inside I
-         I[sizeI] = jak[j];
-         sizeI++;
+         else{
+         	// This index is new
+         	// Copy this nonzero column entry inside I
+         	I[sizeI] = jak[j];
+         	sizeI++;
+         }
       }
    }
    return;
@@ -123,58 +132,77 @@ void getAhat(int *I, int sizeI, int *J, int Jstart, int Jend,
 // AJ is saved rowwise then used as transposed in the blas gemm to have better memory access in creating it
 void getAJ(int *J, int Jsize, int nn_A, int *iatk, int *jak, double *coefk, double *AJ){
    int Astart = 0;
-   int currJ = 0;
+   // int currJ = 0;
 
    // printf("%d\n",Jsize);
 
    // Cycle over the rows in I
    for (int i = 0; i < nn_A; ++i){
-      currJ = 0;
+      // currJ = 0;
 
-      // Cycle over the chosen row
-      for(int k = iatk[i]; k < iatk[i+1]; ++k){
+      // Loop over all possible J
+      for (int currJ = 0; currJ < Jsize; ++currJ){
+      	// Cycle over the chosen row
+      	for(int k = iatk[i]; k < iatk[i+1]; ++k){
+      		// If column index is equal to the chosen J column then add it
+      		if(jak[k] == J[currJ]){
+      			// printf("A[%d] = %f\n", Astart,coefk[k]);
+      			AJ[Astart] = coefk[k];
+         		Astart++;
+         		break;
+      		}
+
+      		if(k == iatk[i+1] - 1){
+				   // If entered here there is no column entry equal to this J
+				   // set to zero
+				   // printf("A[%d] = %f\n", Astart,0);
+				   AJ[Astart] = 0;
+				   Astart++;
+				   break;
+				}
+      	}
          // printf("k %d, jak %d, Jcurr %d\n",k,jak[k],J[currJ]);
-         if(jak[k] > J[currJ]){
-            // If entered here there is no column entry equal to k 
-            // set to zero
-            // printf("0\n");
-            // printf("entered when k %d, jak %d, Jcurr %d\n",k,jak[k],J[currJ]);
-            AJ[Astart] = 0;
-            // printf("A[%d] = %f\n", Astart,0);
-            Astart++;
-            currJ++;
-         }
+         // if(jak[k] > J[currJ]){
+         //    // If entered here there is no column entry equal to k 
+         //    // set to zero
+         //    // printf("0\n");
+         //    // printf("entered when k %d, jak %d, Jcurr %d\n",k,jak[k],J[currJ]);
+         //    AJ[Astart] = 0;
+         //    printf("A[%d] = %f\n", Astart,0);
+         //    Astart++;
+         //    currJ++;
+         // }
 
-         // Check if reached the max size for J
-         if(currJ >= Jsize){
-            // printf("entered break at k = %d\n",k);
-            break;
-         }
+         // // Check if reached the max size for J
+         // if(currJ >= Jsize){
+         //    printf("entered break at k = %d\n",k);
+         //    break;
+         // }
 
-         // If the column in the row coincides with the column needed then add
-         if(jak[k] == J[currJ]){
-            AJ[Astart] = coefk[k];
-            // printf("A[%d] = %f\n", Astart,coefk[k]);
-            Astart++;
-            currJ++;
+         // // If the column in the row coincides with the column needed then add
+         // if(jak[k] == J[currJ]){
+         //    AJ[Astart] = coefk[k];
+         //    printf("A[%d] = %f\n", Astart,coefk[k]);
+         //    Astart++;
+         //    currJ++;
 
-         }
+         // }
 
-         // Check if reached the max size for J
-         if(currJ >= Jsize){
-            // printf("entered break at k = %d\n",k);
-            break;
-         }
+         // // Check if reached the max size for J
+         // if(currJ >= Jsize){
+         //    printf("entered break at k = %d\n",k);
+         //    break;
+         // }
 
-         if(k == iatk[i + 1] - 1){
-            // If entered here there is no column entry equal to k 
-            // set to zero
-            // printf("0\n");
-            for (int j = currJ; j < Jsize; ++j){
-            	AJ[Astart] = 0;
-            	Astart++;
-            }
-         }
+         // if(k == iatk[i + 1] - 1){
+         //    // If entered here there is no column entry equal to k 
+         //    // set to zero
+         //    printf("0\n");
+         //    for (int j = currJ; j < Jsize; ++j){
+         //    	AJ[Astart] = 0;
+         //    	Astart++;
+         //    }
+         // }
       }
    }
    return;

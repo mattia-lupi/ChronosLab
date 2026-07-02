@@ -2,7 +2,12 @@
 #include "cblas.h"
 #include "qr_functions.h"
 
-
+void print_vector1(const char* desc, int n, double* vec) {
+    printf("\n--- %s ---\n", desc);
+    for (int i = 0; i < n; i++) {
+        printf("%10.4f\n", vec[i]);
+    }
+}
 
 void applyFirstQt(double *Ahat, int sizeI, int sizeJ, double *tau, double *a0k, double *work, int lwork, int &info){
    char side = 'L';
@@ -34,12 +39,6 @@ void applyR(int sizeJ, double *R, double *a0k, int &info){
    return;
 }
 
-void print_vector1(const char* desc, int n, double* vec) {
-    printf("\n--- %s ---\n", desc);
-    for (int i = 0; i < n; i++) {
-        printf("%10.4f\n", vec[i]);
-    }
-}
 void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat, 
              double *tau, double *a0k, int nrowsA0k, int ncolsA0k, double *work, int lwork, int &info){
 
@@ -96,7 +95,8 @@ void computeNewQR(int t, int *sizeI, int *sizeJ, int *qStart, double *Ahat, doub
    int colSizeB2  = sizeJ[t+1] - sizeJ[t];
    int rowSizeB   = sizeI[t+1];
    int oldSizeTau = sizeJ[t];
-   int rowSizeB2  = sizeI[t]-oldSizeTau;
+   // printf("sizeIt %d, sizeJt %d\n", sizeI[t+1],oldSizeTau);
+   int rowSizeB2  = sizeI[t+1]-oldSizeTau;
    int sqrtStartR = oldSizeTau;
 
    // Set the starting point for the new QR factorization

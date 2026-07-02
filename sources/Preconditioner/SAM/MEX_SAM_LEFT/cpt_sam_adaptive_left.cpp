@@ -2,13 +2,16 @@
 #include "cpt_sam_adaptive_left.h"
 #include <vector>
 #include <iostream>
+#include <numeric>
 #include "lapack.h"
 #include "cblas.h"
 #include "qr_functions.h"
 #include "find_stuff.h"
 #include "cpt_resRho.h"
+#include "omp.h"
 
-int checkCol = 1;
+int checkCol = 4;
+int checkLevel = 4;
 
 // LAPACK Fortran routines declarations
 // extern "C" {
@@ -54,7 +57,7 @@ void print_vector(const char* desc, int n,  int* vec) {
 void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
                            int *iat0, int *ja0,double *coef0,
                            int nthread,int n_step,int step_size,double eps, int nn_A,
-                           int *&iatN, int *&jaN,double *&coefN){
+                           int *&iatN, int *&jaN,double *&coefN, double &avg_resRelNorm){
 
 
    // Suppose the pattern is symmetric
@@ -75,6 +78,7 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
    int maxJsize = n_step*step_size;
 
    // Cycle over the columns
+   #pragma omp parallel for num_threads(nthread)
    for (int k = 0; k < nn_A; ++k){
       // All allocation could be done outside the cycle multiplying the size of the memory
       // needed by the size of the parallel thread pool. Then each thread can read and write
@@ -251,7 +255,7 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
             if (k == checkCol) print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
             if (k == checkCol) print_vector("Vector a0k", n2+1, mHat);
             applyQt(t+1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeI[t], sizeJ[t+1]-sizeJ[t], work, lwork, info);
-            if (k == checkCol) print_vector("Vector chat", n2, mHat);
+            if (k == checkCol) print_vector("Vector chat", sizeI[t+1], mHat);
             // print_matrix("Matrix R", n2, n2, R, n2);
          }
          // print_vector("qStart", t+2, qStart);
@@ -324,6 +328,9 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
                sizeJ[t+2] = n2;
             }
          }
+         if (checkLevel == t && k == checkCol){
+            return;
+         }
       }
       memcpy(&(storageJ[k*nn_A]),J,n2*sizeof(int));
       memcpy(&(storageN[k*nn_A]),mHat,n2*sizeof(double));
@@ -333,8 +340,43 @@ void cpt_sam_adaptive_left(int *iatk, int *jak,double *coefk,
       }
    }
 
+   int total_nnz = std::accumulate(storageJsizevec.begin(), storageJsizevec.end(), 0.0);
+   // printf("%d\n", total_nnz);
+
+   // Allocate the space for the SAM matrix
+   iatN = new int[nn_A+1];
+   jaN = new int[total_nnz];
+   coefN = new double[total_nnz];
+
+   // print_vector("storageJsize",nn_A,storageJsize);
    print_matrix("storageJ",n_step, nn_A, storageJ, n_step);
    print_matrix("storageN",n_step, nn_A, storageN, n_step);
+
+   // Set values
+   iatN[0] = 0;
+   int nEnt, count = 0, entryPos;
+
+   // Loop over all columns
+   for (int i = 0; i < nn_A; ++i){
+      nEnt = storageJsize[i];
+      iatN[i+1] = iatN[i] + nEnt;
+      // Loop over the max number of entries for each column
+      for (int j = 0; j < nEnt; ++j){
+         // Get where to save the column index or the value
+         entryPos = i*n_step + j;
+
+         // Save column indices
+         jaN[count] = storageJ[entryPos];
+
+         // Save column values
+         coefN[count] = storageN[entryPos];
+         count++;
+      }
+   }
+
+   print_vector("iatN",nn_A+1,iatN);
+   print_vector("jaN",total_nnz,jaN);
+   print_vector("iatN",total_nnz,coefN);
 
    return;
 }
