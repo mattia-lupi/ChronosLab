@@ -1,31 +1,61 @@
 #include <iostream>
 #include <vector>
 #include <iomanip>
+#include <fstream>
+#include <string>
+
 #include "cpt_sam_adaptive_left.h"
 
+// Helper function to load data from a file into a vector
+template <typename T>
+std::vector<T> load_vector_from_file(const std::string& filename) {
+    std::vector<T> data;
+    std::ifstream file(filename);
+    
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return data;
+    }
+
+    T value;
+    while (file >> value) {
+        data.push_back(value);
+    }
+    
+    return data;
+}
+
 int main() {
-   // 1. Target Matrix (4x4, 6 Non-zero elements)
-   // Row 0: 1.625619, 0.000000, 0.081126, 0.000000 (2 nnz)
-   // Row 1: 0.000000, 1.929386, 0.000000, 0.000000 (1 nnz)
-   // Row 2: 0.775713, 0.000000, 1.435859, 0.000000 (2 nnz)
-   // Row 3: 0.000000, 0.000000, 0.000000, 1.000000 (1 nnz)
-   
-   std::vector<double> mat_vals = {1.625619,0.081126,0.156789,
-                                   1.929386,0.14568, 
-                                   0.775713,1.435859,
-                                   -0.45245,1.0000,
-                                   0.145680,1.0000};
+    // 1. Load the matrix from .dat files
+    std::vector<double> mat_vals    = load_vector_from_file<double>("coef.dat");
+    std::vector<int> mat_cols       = load_vector_from_file<int>("ja.dat");
+    std::vector<int> mat_row_ptr    = load_vector_from_file<int>("iat.dat");
 
-   std::vector<int> mat_cols = {0, 2, 3, 1, 4, 0, 2, 0, 3, 1, 4};
+    // Check if loading was successful
+    if (mat_row_ptr.empty()) {
+        std::cerr << "Failed to load matrix data properly." << std::endl;
+        return 1;
+    }
 
-   std::vector<int> mat_row_ptr = {0, 3, 5, 7, 9, 11};
+    // 2. Dynamically create the CSR Identity Matrix
+    // The number of rows is determined by (row_ptr.size() - 1)
+    size_t num_rows = mat_row_ptr.size() - 1;
 
-   // 2. Identity Matrix (4x4, 4 Non-zero elements)
-   std::vector<double> eye_vals = {1.0, 1.0, 1.0, 1.0,1,0};
-   std::vector<int> eye_cols = {0, 1, 2, 3, 4};
-   std::vector<int> eye_row_ptr = {0, 1, 2, 3, 4, 5};
+    std::vector<double> eye_vals(num_rows, 1.0);
+    std::vector<int> eye_cols(num_rows);
+    std::vector<int> eye_row_ptr(num_rows + 1);
 
-   int nthread = 5;
+    for (size_t i = 0; i < num_rows; ++i) {
+        eye_cols[i] = i;         // Diagonal element column index matches row index
+        eye_row_ptr[i] = i;      // Each row has exactly 1 non-zero element before it
+    }
+    eye_row_ptr[num_rows] = num_rows; // Final element is total NNZ
+
+    // --- Verification Output ---
+    // std::cout << "Loaded Matrix Rows: " << num_rows << "\n";
+    // std::cout << "Identity Matrix row_ptr sizes match: " << eye_row_ptr.size() << std::endl;
+
+   int nthread = 1;
    int n_step = 5;
    int step_size = 1;
    double eps = 1e-5;

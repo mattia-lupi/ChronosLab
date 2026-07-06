@@ -3,20 +3,21 @@
 #include <iostream>
 
 void fullA0k(int nn_A, int *iat0, int *ja0, double *coef0, int k, double *A0k){
+   // Zero all the vector then focus on finding the nonzeros
+   std::fill_n(A0k, nn_A, 0.0);
+
    // Loop over the rows
-   for (int row = 0; row < nn_A; ++row){
+   for (int row = 0; row < nn_A; ++row) {
+      int row_start = iat0[row];
+      int row_end = iat0[row+1];
+
       // Loop over the single row entries
-      for (int i = iat0[row]; i < iat0[row+1]; ++i){
-         // If the column is the same of the current column k
+      for (int i = row_start; i < row_end; ++i) {
+      	// If the column is the same of the current column k
          // Get the nonzero index
-         if (ja0[i] == k){
+         if (ja0[i] == k) {
             A0k[row] = coef0[i];
             break;
-         }
-
-         // No entry was found, set to zero
-         if (i == iat0[i+1] - 1){
-            A0k[row] = 0;
          }
       }
    }
@@ -73,20 +74,25 @@ void findNonZeroInColJ(int *J, int *iatk, int *jak, int n2, int *I, int &sizeI){
 
 
 void getA0k(double *a0k,  int *I, int sizeI, int oldSizeI, int *iat0,  int *ja0, double *coef0,  int k){
+   int row, row_start, row_end;
+
    // Cycle over I to get which columns to seach for
    // Cycle over only the new entries of I
-   for (int i = oldSizeI; i < sizeI; ++i){
-      for (int j = iat0[I[i]]; j < iat0[I[i] + 1]; ++j){
-         if (ja0[j] == k){
-            // Get the entry of column k
-            a0k[i] = coef0[j];
-            break;
-         }
+   for (int i = oldSizeI; i < sizeI; ++i) {
+      row = I[i];
+      row_start = iat0[row];
+      row_end = iat0[row + 1];
 
-         if(j == iat0[I[i] + 1] - 1){
-            // If entered here there is no column entry equal to k 
-            // set to zero
-            a0k[i] = 0;
+      // Set default value to 0.0
+      a0k[i] = 0.0;
+
+      // Loop over the single row entries
+      for (int j = row_start; j < row_end; ++j) {
+      	// If entered here there is no column entry equal to k 
+      	// set to zero
+         if (ja0[j] == k) {
+            a0k[i] = coef0[j];
+            break; 
          }
       }
    }
@@ -132,9 +138,6 @@ void getAhat(int *I, int sizeI, int *J, int Jstart, int Jend,
 // AJ is saved rowwise then used as transposed in the blas gemm to have better memory access in creating it
 void getAJ(int *J, int Jsize, int nn_A, int *iatk, int *jak, double *coefk, double *AJ){
    int Astart = 0;
-   // int currJ = 0;
-
-   // printf("%d\n",Jsize);
 
    // Cycle over the rows in I
    for (int i = 0; i < nn_A; ++i){
@@ -161,48 +164,6 @@ void getAJ(int *J, int Jsize, int nn_A, int *iatk, int *jak, double *coefk, doub
 				   break;
 				}
       	}
-         // printf("k %d, jak %d, Jcurr %d\n",k,jak[k],J[currJ]);
-         // if(jak[k] > J[currJ]){
-         //    // If entered here there is no column entry equal to k 
-         //    // set to zero
-         //    // printf("0\n");
-         //    // printf("entered when k %d, jak %d, Jcurr %d\n",k,jak[k],J[currJ]);
-         //    AJ[Astart] = 0;
-         //    printf("A[%d] = %f\n", Astart,0);
-         //    Astart++;
-         //    currJ++;
-         // }
-
-         // // Check if reached the max size for J
-         // if(currJ >= Jsize){
-         //    printf("entered break at k = %d\n",k);
-         //    break;
-         // }
-
-         // // If the column in the row coincides with the column needed then add
-         // if(jak[k] == J[currJ]){
-         //    AJ[Astart] = coefk[k];
-         //    printf("A[%d] = %f\n", Astart,coefk[k]);
-         //    Astart++;
-         //    currJ++;
-
-         // }
-
-         // // Check if reached the max size for J
-         // if(currJ >= Jsize){
-         //    printf("entered break at k = %d\n",k);
-         //    break;
-         // }
-
-         // if(k == iatk[i + 1] - 1){
-         //    // If entered here there is no column entry equal to k 
-         //    // set to zero
-         //    printf("0\n");
-         //    for (int j = currJ; j < Jsize; ++j){
-         //    	AJ[Astart] = 0;
-         //    	Astart++;
-         //    }
-         // }
       }
    }
    return;
@@ -278,29 +239,59 @@ void findJtilde(int *Jtilde, int &JtildeSize, int *L, int sizeL, int *iatk, int 
 }
 
 // Compute A(:,Jtilde) in colmajor
-// check again if Jtilde size >= 2
 void fullAJtilde(int nn_A, int *iatk, int *jak, double *coefk, int *Jtilde, int JtildeSize, double *AJtilde){
    
-   // Loop over possible columns for Jtilde
-   for (int j = 0; j < JtildeSize; ++j){
-      // Loop over the rows
-      for (int row = 0; row < nn_A; ++row){
-         // Loop over the single row entries
-         for (int i = iatk[row]; i < iatk[row+1]; ++i){
-         
-            // If the column is the same of the current column k
-            // Get the nonzero index
-            if (jak[i] == Jtilde[j]){
-               AJtilde[row + j*nn_A] = coefk[i];
-               break;
-            }
-   
-            // No entry was found, set to zero
-            if (i == iatk[i+1] - 1){
-               AJtilde[row + j*nn_A] = 0;
-            }
-         }
-      }
+   std::fill_n(AJtilde, nn_A * JtildeSize, 0.0);
+
+   // Find both the minimum and maximum column indices in Jtilde
+   auto minmax = std::minmax_element(Jtilde, Jtilde + JtildeSize);
+   int min_col = *minmax.first;
+   int max_col = *minmax.second;
+   int range = max_col - min_col + 1;
+
+   // Fill the lookup array based purely on the range span
+   std::vector<int> lookup(range, -1);
+   for (int c = 0; c < JtildeSize; ++c) {
+       lookup[Jtilde[c] - min_col] = c; // Apply the negative offset
    }
+
+   // 4. Iterate through the CSR matrix
+   for (int r = 0; r < nn_A; ++r) {
+       int row_end = iatk[r + 1];
+       for (int k = iatk[r]; k < row_end; ++k) {
+           int col = jak[k];
+           
+           // 5. Quick bounds check using the min/max cluster boundaries
+           if (col >= min_col && col <= max_col) {
+               int c = lookup[col - min_col]; // Apply same offset to query
+               
+               if (c != -1) {
+                   // Compute column-major index: row + (col_index * total_rows)
+                   AJtilde[r + c * nn_A] = coefk[k];
+               }
+           }
+       }
+   }
+   // // Loop over possible columns for Jtilde
+   // for (int j = 0; j < JtildeSize; ++j){
+   //    // Loop over the rows
+   //    for (int row = 0; row < nn_A; ++row){
+   //       // Loop over the single row entries
+   //       for (int i = iatk[row]; i < iatk[row+1]; ++i){
+         
+   //          // If the column is the same of the current column k
+   //          // Get the nonzero index
+   //          if (jak[i] == Jtilde[j]){
+   //             AJtilde[row + j*nn_A] = coefk[i];
+   //             break;
+   //          }
+   
+   //          // No entry was found, set to zero
+   //          if (i == iatk[i+1] - 1){
+   //             AJtilde[row + j*nn_A] = 0;
+   //          }
+   //       }
+   //    }
+   // }
    return;
 }

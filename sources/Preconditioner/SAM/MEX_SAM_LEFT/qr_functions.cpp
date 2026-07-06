@@ -5,8 +5,23 @@
 void print_vector1(const char* desc, int n, double* vec) {
     printf("\n--- %s ---\n", desc);
     for (int i = 0; i < n; i++) {
-        printf("%10.4f\n", vec[i]);
+        printf("%10.4g\n", vec[i]);
     }
+}
+
+void computeFirstQR(double *Ahat, int sizeI, int sizeJ, double *R, double *Rtriang, double *tau, double *work, int lwork, int &info){
+   // Compute QR Factorization
+   dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
+   if (info != 0){
+      printf("Exit at first QR due to error %d\n", info);
+      return;
+   }
+
+   // Copy R into a separate vector to store and use also the updated R later
+   R[0] = Ahat[0];
+   Rtriang[0] = Ahat[0];
+
+   return;
 }
 
 void applyFirstQt(double *Ahat, int sizeI, int sizeJ, double *tau, double *a0k, double *work, int lwork, int &info){
@@ -40,7 +55,7 @@ void applyR(int sizeJ, double *R, double *a0k, int &info){
 }
 
 void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat, 
-             double *tau, double *a0k, int nrowsA0k, int ncolsA0k, double *work, int lwork, int &info){
+             double *tau, double *a0k, int nRowsRHS, int ncolsRHS, double *work, int lwork, int &info){
 
    // Apply iteratively the Qs in the correct way
    char side = 'L';
@@ -51,39 +66,27 @@ void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat,
    for (int i = 0; i < t; ++i){
       // Get the values for the new iteration matrix
       nrows = sizeI[i+1] - sizeJ[i];
-      ncols = ncolsA0k;
+      ncols = ncolsRHS;
       nrefl = sizeJ[i+1] - sizeJ[i];
       LDA   = nrows;
-      LDC   = nrowsA0k;
-      ofA0k += sizeJ[i];
-      ofTau += sizeJ[i];
-      // printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
+      LDC   = nRowsRHS;
+      ofA0k = sizeJ[i];
+      ofTau = sizeJ[i];
+      printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
+      printf("it %d, ahat(1) %f, tau(1) %f, rhs(1) %f\n",i,Ahat[qStart[i] + sizeJ[i]],tau[ofTau],a0k[ofA0k]);
 
       // Check why I needed to add the fortran string length sizes
-      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] +i, &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,3,3);
+      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,3,3);
       // print_vector1("chat vec iter",nrowsA0k,a0k);// check why +i above
       if (info != 0){
-         printf("Exit at first Qt apply due to error %d\n", info);
+         printf("Exit at Qt apply due to error %d\n", info);
+         printf("nrows(3) %d, ncols(4) %d, nrefl(5) %d, lda(7) %d, ldc(10) %d\n", nrows, ncols, nrefl, LDA, LDC);
          return;
       }
    }
    return;
 }
 
-void computeFirstQR(double *Ahat, int sizeI, int sizeJ, double *R, double *Rtriang, double *tau, double *work, int lwork, int &info){
-   // Compute QR Factorization
-   dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
-   if (info != 0){
-      printf("Exit at first QR due to error %d\n", info);
-      return;
-   }
-
-   // Copy R into a separate vector to store and use also the updated R later
-   R[0] = Ahat[0];
-   Rtriang[0] = Ahat[0];
-
-   return;
-}
 
 // colSizeB2 = J_add size
 // rowSizeB2 = J_add + I_add size
@@ -95,13 +98,12 @@ void computeNewQR(int t, int *sizeI, int *sizeJ, int *qStart, double *Ahat, doub
    int colSizeB2  = sizeJ[t+1] - sizeJ[t];
    int rowSizeB   = sizeI[t+1];
    int oldSizeTau = sizeJ[t];
+   int rowSizeB2  = sizeI[t+1]- sizeJ[t];
+   int sqrtStartR = sizeJ[t];
    // printf("sizeIt %d, sizeJt %d\n", sizeI[t+1],oldSizeTau);
-   int rowSizeB2  = sizeI[t+1]-oldSizeTau;
-   int sqrtStartR = oldSizeTau;
-
    // Set the starting point for the new QR factorization
    qStart[t+1]    = qStart[t] + rowSizeB*colSizeB2;
-   int startB2    = qStart[t] + oldSizeTau;
+   int startB2    = qStart[t] + sizeJ[t];
 
    // Get the filled size of Rtriang
    int startRtri = 0.5*sqrtStartR*(sqrtStartR+1);
