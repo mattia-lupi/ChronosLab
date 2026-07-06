@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <fstream>
 #include <string>
+#include <chrono>
 
 #include "cpt_sam_adaptive_left.h"
 
@@ -55,7 +56,7 @@ int main() {
     // std::cout << "Loaded Matrix Rows: " << num_rows << "\n";
     // std::cout << "Identity Matrix row_ptr sizes match: " << eye_row_ptr.size() << std::endl;
 
-   int nthread = 20;
+   int nthread = 8;
    int n_step = 25;
    int step_size = 1;
    double eps = 1e-5;
@@ -65,10 +66,20 @@ int main() {
    double *coef_N = nullptr;
    double resNorm = 0;
 
+
+   auto start = std::chrono::steady_clock::now();
    cpt_sam_adaptive_left(mat_row_ptr.data(),mat_cols.data(),mat_vals.data(),
                     eye_row_ptr.data(),eye_cols.data(),eye_vals.data(),
                     nthread,n_step,step_size,eps,nn_A,
                     iat_N,ja_N,coef_N,resNorm);
+
+   auto end = std::chrono::steady_clock::now();
+
+   // 4. Calculate the duration
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "Time taken: " << duration.count() << " microseconds" << std::endl;
+    std::cout << "Time taken: " << duration.count() / 1000.0 << " milliseconds" << std::endl;
 
    return 0;
 }
