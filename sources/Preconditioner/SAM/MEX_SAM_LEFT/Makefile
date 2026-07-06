@@ -20,8 +20,8 @@ endif
 
 ifeq ($(UNAME_S), Linux)
     # Linux Configuration
-    INCLUDES := $(shell pkg-config --cflags openblas lapack 2>/dev/null || echo "")
-    LIBS     := $(shell pkg-config --libs openblas lapack 2>/dev/null || echo "-llapack -lblas")
+    INCLUDES := -I/usr/include/
+    LIBS     := -llapack -lblas
     
     CXXFLAGS += -fopenmp
 endif

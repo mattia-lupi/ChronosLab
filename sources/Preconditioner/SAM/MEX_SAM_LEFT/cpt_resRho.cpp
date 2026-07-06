@@ -1,18 +1,19 @@
 #include "cpt_resRho.h"
 #include <vector>
+#include <cstring>
 #include <iostream>
 #include "lapack.h"
 #include "cblas.h"
 
 void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double *res, double &resRelNorm, double &resNorm){
-   // Compute the product AJ*mHat and save it in AJ
+   // Compute the product AJ*mHat and save it in res
    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nn_A, 1, sizeJ, 1.0, AJ, sizeJ, mHat, 1, 0.0, res, 1);
 
    // print_vector("Matrix Aj", nn_A, res);
    // Compute the norm of Aj*mHat
    double normAjMh = cblas_dnrm2(nn_A,res,1);
 
-   // Compute res = Aj*mHat - A0k and save it in AJ
+   // Compute res = Aj*mHat - A0k and save it in res
    cblas_daxpy(nn_A, -1.0, A0k, 1, res, 1);
 
    // Compute the residual norm
@@ -26,8 +27,7 @@ void cptRes(int nn_A, int sizeJ, double *A0k, double *AJ, double *mHat, double *
 }
 
 
-// Check when JtildeSize >= 2
-void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, double *res, double normRes){
+void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, double *res, double *tmpRes, double normRes){
    // Compute the norm for each column. 
    // The matrix is saved in column major so doing the norm is easy
    for (int i = 0; i < JtildeSize; ++i){
@@ -42,14 +42,17 @@ void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, doubl
 
    // print_vector("Vector res", JtildeSize, res);
 
-   // Compute the product AJtilde^T*res and save it in AJtilde
-   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, JtildeSize, 1, nn_A, 1.0, AJtilde, nn_A, res, nn_A, 0.0, AJtilde, nn_A);
+   // Copy the residual inside the temporary vector
+   std::memcpy(tmpRes, res, nn_A*sizeof(double));
+
+   // Compute the product AJtilde^T*res and save it in res
+   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, JtildeSize, 1, nn_A, 1.0, AJtilde, nn_A, tmpRes, nn_A, 0.0, res, nn_A);
 
    // print_vector("Vector rat", JtildeSize, AJtilde);
    double temp;
    // Compute the rhoJ2 and save it in normColJ
    for (int i = 0; i < JtildeSize; ++i){
-      temp = AJtilde[i];
+      temp = res[i];
       normColJ[i] = normRes*normRes - temp*temp/normColJ[i];
       // Avoid having possibly negative rhos 
       normColJ[i] = std::max(normColJ[i],0.);

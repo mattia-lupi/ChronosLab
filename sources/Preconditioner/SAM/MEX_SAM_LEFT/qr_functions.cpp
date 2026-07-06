@@ -29,7 +29,7 @@ void applyFirstQt(double *Ahat, int sizeI, int sizeJ, double *tau, double *a0k, 
    char trans = 'T';
 
    // Check why I needed to add the fortran string length sizes
-   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ, Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info,3,3);
+   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ, Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);//,3,3
    if (info != 0){
       printf("Exit at first Qt apply due to error %d\n", info);
       return;
@@ -45,7 +45,7 @@ void applyR(int sizeJ, double *R, double *a0k, int &info){
    int nrhs = 1;
 
    // Check why I needed to add the fortran string length sizes
-   dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, R, &sizeJ, a0k, &sizeJ, &info,3,3,3);
+   dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, R, &sizeJ, a0k, &sizeJ, &info);// ,3,3,3
    if (info != 0){
       printf("Exit at R apply due to error %d\n", info);
       return;
@@ -72,11 +72,11 @@ void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat,
       LDC   = nRowsRHS;
       ofA0k = sizeJ[i];
       ofTau = sizeJ[i];
-      printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
-      printf("it %d, ahat(1) %f, tau(1) %f, rhs(1) %f\n",i,Ahat[qStart[i] + sizeJ[i]],tau[ofTau],a0k[ofA0k]);
+//       printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
+//       printf("it %d, ahat(1) %f, tau(1) %f, rhs(1) %f\n",i,Ahat[qStart[i] + sizeJ[i]],tau[ofTau],a0k[ofA0k]);
 
       // Check why I needed to add the fortran string length sizes
-      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,3,3);
+      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);// ,3,3
       // print_vector1("chat vec iter",nrowsA0k,a0k);// check why +i above
       if (info != 0){
          printf("Exit at Qt apply due to error %d\n", info);
@@ -95,15 +95,15 @@ void applyQt(int t, int *sizeJ, int *sizeI, int *qStart, double *Ahat,
 void computeNewQR(int t, int *sizeI, int *sizeJ, int *qStart, double *Ahat, double *tau, double *R, 
                   double *Rtriang, double *work, int lwork, int &info){
    // Compute QR Factorization on the new part of the matrix
-   int colSizeB2  = sizeJ[t+1] - sizeJ[t];
-   int rowSizeB   = sizeI[t+1];
    int oldSizeTau = sizeJ[t];
-   int rowSizeB2  = sizeI[t+1]- sizeJ[t];
-   int sqrtStartR = sizeJ[t];
+   int colSizeB2  = sizeJ[t+1] - oldSizeTau;
+   int rowSizeB   = sizeI[t+1];
+   int rowSizeB2  = sizeI[t+1] - oldSizeTau;
+   int sqrtStartR = oldSizeTau;
    // printf("sizeIt %d, sizeJt %d\n", sizeI[t+1],oldSizeTau);
    // Set the starting point for the new QR factorization
    qStart[t+1]    = qStart[t] + rowSizeB*colSizeB2;
-   int startB2    = qStart[t] + sizeJ[t];
+   int startB2    = qStart[t] + oldSizeTau;
 
    // Get the filled size of Rtriang
    int startRtri = 0.5*sqrtStartR*(sqrtStartR+1);

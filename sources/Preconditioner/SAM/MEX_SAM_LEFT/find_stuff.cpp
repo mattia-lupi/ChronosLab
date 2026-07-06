@@ -1,7 +1,9 @@
 #include "find_stuff.h"
+#include <algorithm>
 #include <vector>
 #include <iostream>
 
+bool mattia = false;
 void fullA0k(int nn_A, int *iat0, int *ja0, double *coef0, int k, double *A0k){
    // Zero all the vector then focus on finding the nonzeros
    std::fill_n(A0k, nn_A, 0.0);
@@ -23,55 +25,56 @@ void fullA0k(int nn_A, int *iat0, int *ja0, double *coef0, int k, double *A0k){
    }
    return;
 }
-void findNonZeroInColJ(int *J, int *iatk, int *jak, int n2, int *I, int &sizeI){
 
+void findNonZeroInColJ(int *J, int *iatk, int *jak, int n2, int *I, int &sizeI){
    // Assume the pattern is symmetric
-   // the nonzero row entries in column J correspond to 
+   // the nonzero row entries in column J correspond to
    // the nonzero column entries in row J
 
-   int initial_count = sizeI;
+   const int initial_count = sizeI;
+   int start, end;
 
-   // Flag for fast exit in case of repeated index
-   bool skip = false;
-   // Cycle over J to select the rows to get, need to check for no repeated indices
-   for (int i = 0; i < n2; ++i){
-   	// printf("J[%d] %d\n", i,J[i]);
-      for (int j = iatk[J[i]]; j < iatk[J[i] + 1]; ++j){
-      	// printf("from %d to %d\n",iatk[J[i]],iatk[J[i] + 1]);
-         // If the sizeI is 0 then avoid checks and just copy all the first row
-         if(initial_count != 0){
-            // Check for duplicate value
-            for (int q = 0; q < sizeI; ++q){
-            	// printf("\t\tjak %d, Iq %d, sizeI %d\n", jak[j],I[q],sizeI);
-               if(jak[j] == I[q]){
-                  skip = true;
-                  break;
-               }
-            }
-   
-            // This index is repeated, fast exit
-            if (skip){
-               // Reset flag to false
-               skip = false;
-            }
-            else{
-            	// This index is new
-         		// Copy this nonzero column entry inside I
-         		I[sizeI] = jak[j];
-         		sizeI++;
-            }
-         }
-         else{
-         	// This index is new
-         	// Copy this nonzero column entry inside I
-         	I[sizeI] = jak[j];
-         	sizeI++;
+   // First time entering, copy all
+   if (initial_count == 0) {
+      // Direct copy without any duplicate checks
+      for (int i = 0; i < n2; ++i) {
+         start = iatk[J[i]];
+         end = iatk[J[i] + 1];
+         for (int j = start; j < end; ++j) {
+            I[sizeI] = jak[j];
+            sizeI++;
          }
       }
    }
-   return;
-}
+   else {
+      bool duplicate;
+      int val;
 
+      // Cycle over J to select the rows to get, need to check for no repeated indices
+      for (int i = 0; i < n2; ++i) {
+         start = iatk[J[i]];
+         end = iatk[J[i] + 1];
+         for (int j = start; j < end; ++j) {
+            // Initialize the values for this jak
+            val = jak[j];
+            duplicate = false;
+
+            // Check for duplicate value
+            for (int q = 0; q < sizeI; ++q) {
+               if (I[q] == val) {
+                  duplicate = true;
+                  break;
+               }
+            }
+
+            // This index is not repeated, copy it
+            if (!duplicate) {
+               I[sizeI++] = val;
+            }
+         }
+      }
+   }
+}
 
 void getA0k(double *a0k,  int *I, int sizeI, int oldSizeI, int *iat0,  int *ja0, double *coef0,  int k){
    int row, row_start, row_end;
@@ -99,40 +102,80 @@ void getA0k(double *a0k,  int *I, int sizeI, int oldSizeI, int *iat0,  int *ja0,
    return;
 }
 
+
 void getAhat(int *I, int sizeI, int *J, int Jstart, int Jend,
-             int *iatk, int *jak, double *coefk, double *Ahat, int &Astart){
-   // Cycle over the columns in J that have been added
-   for (int j = Jstart; j < Jend; ++j){
-      // Cycle over the rows in I
-      for (int i = 0; i < sizeI; ++i){
-         // Cycle over the chosen row
-         for(int k = iatk[I[i]]; k < iatk[I[i]+1]; ++k){
-            // If the column in the row coincides with the column added then get the nonzero value
-            // printf("%d %d %d ", k, jak[k], J[j]);
-            if(jak[k] == J[j]){
-               Ahat[Astart] = coefk[k];
-               // printf("%f\n", coefk[k]);
-               Astart++;
-               break;
-            }
+             int *iatk, int *jak, double *coefk, double *Ahat, int &Astart) {
 
-            if(k == iatk[I[i] + 1] - 1){
-               // If entered here there is no column entry equal to k 
-               // set to zero
-               // printf("0\n");
-               Ahat[Astart] = 0;
-               Astart++;
-            }
-            // else{
-            //    // printf("\n");
-            // }
+   if(mattia == true){
+      // Cycle over the columns in J that have been added
+      for (int j = Jstart; j < Jend; ++j){
+         // Cycle over the rows in I
+         for (int i = 0; i < sizeI; ++i){
+            // Cycle over the chosen row
+            for(int k = iatk[I[i]]; k < iatk[I[i]+1]; ++k){
+               // If the column in the row coincides with the column added then get the nonzero value
+               // printf("%d %d %d ", k, jak[k], J[j]);
+               if(jak[k] == J[j]){
+                  Ahat[Astart] = coefk[k];
+                  // printf("%f\n", coefk[k]);
+                  Astart++;
+                  break;
+               }
 
+               if(k == iatk[I[i] + 1] - 1){
+                  // If entered here there is no column entry equal to k
+                  // set to zero
+                  // printf("0\n");
+                  Ahat[Astart] = 0;
+                  Astart++;
+               }
+               // else{
+               //    // printf("\n");
+               // }
+
+            }
          }
       }
-   }
-   return;
-}
+      return;
+   }else{
+      int num_cols = Jend - Jstart;
+      int row, row_start, row_end, row_len;
+      int target_col, dest_idx, k;
+      int *row_cols, *it;
 
+      // Loop over rows
+      for (int i = 0; i < sizeI; ++i) {
+         row = I[i];
+         row_start = iatk[row];
+         row_end = iatk[row + 1];
+         row_len = row_end - row_start;
+
+         // Loop over the added columns
+         for (int j = Jstart; j < Jend; ++j) {
+            target_col = J[j];
+
+            // Calculate the exact 1D destination index in Ahat
+            dest_idx = Astart + (j - Jstart) * sizeI + i;
+
+            // Binary search assuming 'jak' is sorted per row
+            row_cols = &jak[row_start];
+            it = std::lower_bound(row_cols, row_cols + row_len, target_col);
+
+            // Assign value if found, otherwise explicitly assign 0 (fixes the empty row bug)
+            if (it != row_cols + row_len && *it == target_col) {
+               k = row_start + (it - row_cols);
+               Ahat[dest_idx] = coefk[k];
+            } else {
+               Ahat[dest_idx] = 0.0;
+            }
+         }
+      }
+
+      // Update Astart once at the very end
+      Astart += num_cols * sizeI;
+      return;
+   }
+}
 
 
 // AJ is saved rowwise then used as transposed in the blas gemm to have better memory access in creating it
@@ -255,13 +298,13 @@ void fullAJtilde(int nn_A, int *iatk, int *jak, double *coefk, int *Jtilde, int 
        lookup[Jtilde[c] - min_col] = c; // Apply the negative offset
    }
 
-   // 4. Iterate through the CSR matrix
+   // Iterate through the CSR matrix
    for (int r = 0; r < nn_A; ++r) {
        int row_end = iatk[r + 1];
        for (int k = iatk[r]; k < row_end; ++k) {
            int col = jak[k];
            
-           // 5. Quick bounds check using the min/max cluster boundaries
+           // Quick bounds check using the min/max cluster boundaries
            if (col >= min_col && col <= max_col) {
                int c = lookup[col - min_col]; // Apply same offset to query
                
