@@ -35,12 +35,10 @@ void cptRhoJ2(int JtildeSize, double *normColJ, double *AJtilde, int nn_A, doubl
       normColJ[i] *= normColJ[i];
 
       // If the norm is zero then discard this column
-      if (normColJ[i] < 1e-15){
-         normColJ[i] = 1e15;
+      if (normColJ[i] == 0.){
+         normColJ[i] = 1e25;
       }
    }
-
-   // print_vector("Vector res", JtildeSize, res);
 
    // Copy the residual inside the temporary vector
    std::memcpy(tmpRes, res, nn_A*sizeof(double));

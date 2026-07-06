@@ -55,8 +55,8 @@ int main() {
     // std::cout << "Loaded Matrix Rows: " << num_rows << "\n";
     // std::cout << "Identity Matrix row_ptr sizes match: " << eye_row_ptr.size() << std::endl;
 
-   int nthread = 1;
-   int n_step = 10;
+   int nthread = 20;
+   int n_step = 25;
    int step_size = 1;
    double eps = 1e-5;
    int nn_A = mat_row_ptr.size() - 1;
