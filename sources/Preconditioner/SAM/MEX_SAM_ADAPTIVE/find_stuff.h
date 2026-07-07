@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef I
+#undef I
+#endif
+
 #include "precision.h"
 
 void fullA0k(iExt nn_A, iExt *iat0, iReg *ja0, double *coef0, iExt k, double *A0k);

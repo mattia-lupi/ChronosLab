@@ -3,8 +3,7 @@
 #include <cstring>
 #include <iostream>
 #include <numeric>
-#include "lapacke.h"
-// #include "blas.h"
+#include "lapack.h"
 #include "cpt_sam_adaptive_left.h"
 #include "qr_functions.h"
 #include "find_stuff.h"
@@ -17,11 +16,11 @@ iReg checkLevel = 0;
 
 // blas Fortran routines declarations
 extern "C" {
-    void dgemm_(const char* transa, const char* transb, const iReg* m, const iReg* n, const iReg* k,
-                const double* alpha, const double* a, const iReg* lda, const double* b, const iReg* ldb,
-                const double* beta, double* c, const iReg* ldc);
-    double dnrm2_(const iReg* n, const double* x, const iReg* incx);
-    void daxpy_(const iReg* n, const double* alpha, const double* x, const iReg* incx, double* y, const iReg* incy);
+    void dgemm_(const char* transa, const char* transb, const lapack_int* m, const lapack_int* n, const lapack_int* k,
+                const double* alpha, const double* a, const lapack_int* lda, const double* b, const lapack_int* ldb,
+                const double* beta, double* c, const lapack_int* ldc);
+    double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
+    void daxpy_(const lapack_int* n, const double* alpha, const double* x, const lapack_int* incx, double* y, const lapack_int* incy);
 }
 
 
@@ -75,7 +74,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    iReg maxJsize = n_step*step_size;
 
    // Cycle over the columns
-   #pragma omp parallel for num_threads(nthread)
    for (iReg k = 0; k < nn_A; ++k){
       // All allocation could be done outside the cycle multiplying the size of the memory
       // needed by the size of the parallel thread pool. Then each thread can read and write
@@ -144,8 +142,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       // Do it once per column
       fullA0k(nn_A, iat0, ja0, coef0, k, A0k);
       // Compute the norm only once
-      iReg one = 1;
-      double normA0k = dnrm2_(&nn_A,A0k,&one);
+      lapack_int N = static_cast<lapack_int>(nn_A);
+      lapack_int one = 1;
+      double normA0k = dnrm2_(&N,A0k,&one);
 
       // Allocate Ahat buffer for the max possible size
       std::vector<double> AhatBuffer(nn_A*maxJsize);
@@ -173,17 +172,27 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *Rtriang = RtriangVec.data();
 
       // Manual workspace allocation
+      char side = 'L';
+      char trans = 'T';
       lapack_int lwork = -1;
-      double work_query;
+      lapack_int mxJ = static_cast<lapack_int>(maxJsize);
+      double work_query, work_query1;
       lapack_int info;
       
       // Query workspace size
-      info = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR, nn_A, maxJsize, Ahat, nn_A, tau, &work_query, lwork);
+      dormqr_(&side, &trans, &N, &one, &mxJ, Ahat, &N, tau, a0k, &N, &work_query1, &lwork, &info);
       if (info != 0){
-         printf("Error in allocating workspace, error %d\n",info);
+         printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
       }
 
-      lwork = static_cast<iReg>(work_query);
+      // Query workspace size
+      dgeqrf_(&N, &mxJ, Ahat, &N, tau, &work_query, &lwork, &info);
+      if (info != 0){
+         printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
+      }
+
+      lwork = static_cast<lapack_int>(work_query);
+      lwork = std::max(static_cast<lapack_int>(work_query1),lwork);
       // Allocate workspace for the max possible size
       std::vector<double> workVec(lwork);
       double *work = workVec.data();
@@ -216,7 +225,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
          // Copy into mHat to be modified later
          std::memcpy(mHat,a0k,sizeIcurr*sizeof(double));
-         // if (k == checkCol && debug) print_vector("Vector A0k", sizeIcurr, a0k);
+         if (k == checkCol && debug) print_vector("Vector A0k", sizeIcurr, a0k);
 
          // Add to Ahat the new part of the matrix on which to work
          // printf("Astart %d, Jstart %d, Jend %d\n", Astart,n2old,n2);
@@ -264,7 +273,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          resRelNorm = normA0k;
          // Compute res = AJ*mHat-A0k and save it in AJ
          cptRes(nn_A, n2, A0k, AJ, mHat, res, resRelNorm, resNorm);
-         if (k == checkCol && debug) print_vector("vector res", nn_A, res);
+         // if (k == checkCol && debug) print_vector("vector res", std::min(nn_A,20), res);
 
          if (resRelNorm < eps){
             break;
@@ -273,11 +282,11 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          if (t < n_step - 1){
             // Find the values for L
             fillL(L, res, nn_A, usedL);
-            if (k == checkCol && debug) print_vector("L", usedL, L);
+            // if (k == checkCol && debug) print_vector("L", usedL, L);
 
             // Find the values for Jtilde
             findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);
-            if (k == checkCol && debug) print_vector("Vector Jtilde", JtildeSize, Jtilde);
+            /// if (k == checkCol && debug) print_vector("Vector Jtilde", JtildeSize, Jtilde);
 
             // Nothing new to add
             if (JtildeSize == 0){
@@ -291,7 +300,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                // if (k == checkCol) print_vector("Matrix Ajtilde", nn_A*JtildeSize, AJtilde);//print_matrix("Matrix Ajtilde", nn_A, JtildeSize, AJtilde, nn_A);
    
                // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
-               cptRhoJ2(JtildeSize, normColJ, AJtilde, nn_A, res, mHat, resNorm);
+               // cptRhoJ2(JtildeSize, normColJ, AJtilde, nn_A, res, mHat, resNorm);
                if (k == checkCol && debug) print_vector("Vector rhoJ2", JtildeSize, normColJ);
                // print_matrix("Matrix Ajtilde", JtildeSize, JtildeSize, AJtilde, nn_A);
 
@@ -320,11 +329,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                sizeJ[t+2] = n2;
             }
          }
-#if debug
          if (checkLevel == t && k == checkCol && debug){
             return;
          }
-#endif
       }
 
       // Compute the average relative residual norm
@@ -338,11 +345,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::memcpy(&(storageN[k*n_step]),mHat,n2*sizeof(double));
       storageJsize[k] = n2;
 
-#if debug
       if (k == checkCol && debug){
          break;
       }
-#endif
    }
 
    // Take the average dividing by the number of rows once
@@ -357,7 +362,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    jaN = new iReg[total_nnz];
    coefN = new double[total_nnz];
 
-   print_vector("storageJsize",nn_A,storageJsize);
+   // print_vector("storageJsize",nn_A,storageJsize);
    // print_matrix("storageJ",n_step, nn_A, storageJ, n_step);
    // print_matrix("storageN",n_step, nn_A, storageN, n_step);
 

@@ -1,6 +1,6 @@
 # Variables
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17
+CXXFLAGS = -Wall -Wextra -std=c++17 -ffast-math -flto
 TARGET = main
 SRCS = main.cpp cpt_sam_adaptive_left.cpp qr_functions.cpp find_stuff.cpp cpt_resRho.cpp
 OBJS = $(SRCS:.cpp=.o)
@@ -19,7 +19,7 @@ ifeq ($(UNAME_S), Darwin)
     # Append the library path and the explicit OpenMP library flag
     LIBS = -llapack -lblas $(LIBOMP_LIB) -lomp
 
-	 M1_FLAGS = -mcpu=apple-m1 -ffast-math -flto
+	 M1_FLAGS = -mcpu=apple-m1
     
     CXXFLAGS += -Xpreprocessor -fopenmp -fPIC -mmacosx-version-min=15.0 $(M1_FLAGS)
     LDFLAGS  += -mmacosx-version-min=15.0 -flto
@@ -30,7 +30,7 @@ ifeq ($(UNAME_S), Linux)
     INCLUDES := -I/usr/include/
     LIBS     := -llapack -lblas
 
-    CXXFLAGS += -fopenmp
+    CXXFLAGS += -fopenmp -march=native
 endif
 
 # --- Build Rules ---

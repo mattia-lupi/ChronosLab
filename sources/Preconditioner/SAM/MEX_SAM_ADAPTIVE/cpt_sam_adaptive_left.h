@@ -1,3 +1,4 @@
+#pragma once
 #include "precision.h"
 #include <cstring>
 #include <iostream>

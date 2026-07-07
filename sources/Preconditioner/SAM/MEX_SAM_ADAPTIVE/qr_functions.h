@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lapacke.h"
+#include "lapack.h"
 #include "precision.h"
 
 void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 

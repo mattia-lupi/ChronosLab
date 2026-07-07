@@ -18,6 +18,7 @@
 #include <limits.h>
 #endif
 #include <cstdint>
+#include <cstddef>
 
 // Define types for iReg, iExt and iGlo
 #define IREG_LONG 0
@@ -40,6 +41,17 @@
    typedef int64_t iExt;
 #else
    typedef int iExt;
+#endif
+
+#ifdef MATLAB_MEX_FILE 
+   // MATLAB MEX needs a specific size
+   typedef ptrdiff_t lapack_int;
+#else
+   // If lapack.h is already included, it provided lapack_int. 
+   // We only define it if the common LAPACK macro guards are completely missing.
+   #if !defined(LAPACK_INT) && !defined(LAPACK_H) && !defined(LAPACKE_H)
+      typedef int lapack_int;
+   #endif
 #endif
 
 /**
