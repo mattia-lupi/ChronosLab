@@ -1,15 +1,17 @@
 #pragma once
 
 #include "precision.h"
+#include <iostream>
+#include <cstring>
 
-void computeFirstQR(double *Ahat, iReg sizeI, iReg sizeJ, double *R, double *Rtriang, double *tau, double *work, iExt lwork, iReg &info);
+void computeFirstQR(double *Ahat, ptrdiff_t sizeI, ptrdiff_t sizeJ, double *R, double *Rtriang, double *tau, double *work, ptrdiff_t lwork, ptrdiff_t &info);
 
-void applyFirstQt(double *Ahat, iReg sizeI, iReg sizeJ, double *tau, double *a0k, double *work, iExt lwork, iReg &info);
+void applyFirstQt(double *Ahat, ptrdiff_t sizeI, ptrdiff_t sizeJ, double *tau, double *a0k, double *work, ptrdiff_t lwork, ptrdiff_t &info);
 
-void applyR(iReg sizeJ, double *R, double *a0k, iReg &info);
+void applyR(ptrdiff_t sizeJ, double *R, double *a0k, ptrdiff_t &info);
 
-void applyQt(iReg t, iReg *sizeJ, iReg *sizeI, iExt *qStart, double *Ahat, 
-             double *tau, double *a0k, iReg nrowsA0k, iReg ncolsA0k, double *work, iExt lwork, iReg &info);
+void applyQt(ptrdiff_t t, ptrdiff_t *sizeJ, ptrdiff_t *sizeI, ptrdiff_t *qStart, double *Ahat, 
+             double *tau, double *a0k, ptrdiff_t nrowsA0k, ptrdiff_t ncolsA0k, double *work, ptrdiff_t lwork, ptrdiff_t &info);
 
-void computeNewQR(iReg t, iReg *sizeI, iReg *sizeJ, iExt *qStart, double *Ahat, double *tau, double *R, 
-                  double *Rtriang, double *work, iExt lwork, iReg &info);
+void computeNewQR(ptrdiff_t t, ptrdiff_t *sizeI, ptrdiff_t *sizeJ, ptrdiff_t *qStart, double *Ahat, double *tau, double *R, 
+                  double *Rtriang, double *work, ptrdiff_t lwork, ptrdiff_t &info);

@@ -1,10 +1,14 @@
-function [M,T_setup] = computeRACP(A,TV0,sym_flag,verb)
+function [M,T_setup,A11_aug] = computeRACP(A,TV0,sym_flag,verb)
 
 DEBUG = false;
 simple_flag = false;
 treatBC = true;
 itmax_ruiz = 0;
 tol_ruiz = 1e-5;
+
+if nargin < 4
+   verb = 1;
+end
 
 global DEBINFO;
 % PARTE GENERALE
@@ -232,6 +236,6 @@ time_start = tic;
 AMG_prec = cpt_aspAMG(param,A11_aug,TV0,verb);
 T_setup = toc(time_start);
 
-M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
+M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,A21_scaled,inv_D22,x);
 
 end

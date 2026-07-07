@@ -1,3 +1,4 @@
+clc
 % Get Homebrew Paths
 [status, cmdout] = system('/opt/homebrew/bin/brew --prefix libomp');
 if status ~= 0

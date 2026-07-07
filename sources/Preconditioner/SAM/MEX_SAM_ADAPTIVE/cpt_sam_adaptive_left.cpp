@@ -1,7 +1,5 @@
 
 #include <vector>
-#include <cstring>
-#include <iostream>
 #include <numeric>
 #include "lapack.h"
 #include "blas.h"
@@ -12,69 +10,69 @@
 #include "omp.h"
 
 bool debug = false;
-iReg checkCol = 0;
-iReg checkLevel = 0;
+ptrdiff_t checkCol = 0;
+ptrdiff_t checkLevel = 0;
 
 // LAPACK Fortran routines declarations
 // extern "C" {
-//    void dgeqrf_(iReg* m, iReg* n, double* a, iReg* lda, double* tau, double* work, iReg* lwork, iReg* info);
-//    void dormqr_(char* side, char* trans, iReg* m, iReg* n, iReg* k, double* a, iReg* lda, double* tau, double* c, iReg* ldc, double* work, iReg* lwork, iReg* info);
-//    void dtrtrs_(char* uplo, char* trans, char* diag, iReg* n, iReg* nrhs, double* a, iReg* lda, double* b, iReg* ldb, iReg* info);
+//    void dgeqrf_(ptrdiff_t* m, ptrdiff_t* n, double* a, ptrdiff_t* lda, double* tau, double* work, ptrdiff_t* lwork, ptrdiff_t* info);
+//    void dormqr_(char* side, char* trans, ptrdiff_t* m, ptrdiff_t* n, ptrdiff_t* k, double* a, ptrdiff_t* lda, double* tau, double* c, ptrdiff_t* ldc, double* work, ptrdiff_t* lwork, ptrdiff_t* info);
+//    void dtrtrs_(char* uplo, char* trans, char* diag, ptrdiff_t* n, ptrdiff_t* nrhs, double* a, ptrdiff_t* lda, double* b, ptrdiff_t* ldb, ptrdiff_t* info);
 // }
 
 
 
-void print_matrix(const char* desc, iReg m, iReg n, double* mat, iReg lda) {
+void print_matrix(const char* desc, ptrdiff_t m, ptrdiff_t n, double* mat, ptrdiff_t lda) {
     printf("\n--- %s (%dx%d) ---\n", desc, m, n);
-    for (iReg i = 0; i < m; i++) {
-        for (iReg j = 0; j < n; j++) {
+    for (ptrdiff_t i = 0; i < m; i++) {
+        for (ptrdiff_t j = 0; j < n; j++) {
             printf("%10.4g ", mat[i + j * lda]);
         }
         printf("\n");
     }
 }
-void print_matrix(const char* desc, iReg m, iReg n, iReg* mat, iReg lda) {
+void print_matrix(const char* desc, ptrdiff_t m, ptrdiff_t n, ptrdiff_t* mat, ptrdiff_t lda) {
     printf("\n--- %s (%dx%d) ---\n", desc, m, n);
-    for (iReg i = 0; i < m; i++) {
-        for (iReg j = 0; j < n; j++) {
+    for (ptrdiff_t i = 0; i < m; i++) {
+        for (ptrdiff_t j = 0; j < n; j++) {
             printf("%d ", mat[i + j * lda]);
         }
         printf("\n");
     }
 }
 
-void print_vector(const char* desc, iReg n, double* vec) {
+void print_vector(const char* desc, ptrdiff_t n, double* vec) {
     printf("\n--- %s ---\n", desc);
-    for (iReg i = 0; i < n; i++) {
+    for (ptrdiff_t i = 0; i < n; i++) {
         printf("%10.4g\n", vec[i]);
     }
 }
-void print_vector(const char* desc, iReg n,  iReg* vec) {
+void print_vector(const char* desc, ptrdiff_t n,  ptrdiff_t* vec) {
     printf("\n--- %s ---\n", desc);
-    for (iReg i = 0; i < n; i++) {
+    for (ptrdiff_t i = 0; i < n; i++) {
         printf("%d\n", vec[i]);
     }
 }
 
-void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
-                           iExt *iat0, iReg *ja0, double *coef0,
-                           iReg nthread, iReg n_step, iReg step_size, double eps, iExt nn_A,
-                           iExt *&iatN, iReg *&jaN, double *&coefN, double &avg_resRelNorm){
+void cpt_sam_adaptive_left(ptrdiff_t *iatk, ptrdiff_t *jak, double *coefk,
+                           ptrdiff_t *iat0, ptrdiff_t *ja0, double *coef0,
+                           ptrdiff_t nthread, ptrdiff_t n_step, ptrdiff_t step_size, double eps, ptrdiff_t nn_A,
+                           ptrdiff_t *&iatN, ptrdiff_t *&jaN, double *&coefN, double &avg_resRelNorm){
 
    // Allocate the space for storing the outputs of the loop over the columns
-   std::vector<iReg> storageJsizevec(nn_A);
-   iReg *storageJsize = storageJsizevec.data();
-   std::vector<iReg> storageJvec(n_step*nn_A);
-   iReg *storageJ = storageJvec.data();
+   std::vector<ptrdiff_t> storageJsizevec(nn_A);
+   ptrdiff_t *storageJsize = storageJsizevec.data();
+   std::vector<ptrdiff_t> storageJvec(n_step*nn_A);
+   ptrdiff_t *storageJ = storageJvec.data();
    std::vector<double> storageNvec(n_step*nn_A);
    double *storageN = storageNvec.data();
    avg_resRelNorm = 0;
 
-   int64_t maxJsize = n_step*step_size;
+   ptrdiff_t maxJsize = n_step*step_size;
 
    // Cycle over the columns
    #pragma omp parallel for num_threads(nthread)
-   for (iReg k = 0; k < nn_A; ++k){
+   for (ptrdiff_t k = 0; k < nn_A; ++k){
       // All allocation could be done outside the cycle multiplying the size of the memory
       // needed by the size of the parallel thread pool. Then each thread can read and write
       // only on its part of the allocated memory. in this way the number of allocations is 
@@ -82,37 +80,37 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       // allocated
 
       double resRelNorm = 1.0, resNorm;
-      iReg usedL, JtildeSize;
+      ptrdiff_t usedL, JtildeSize;
 
       // Allocate pointers to where the new factorization starts
-      std::vector<iExt> qStartvec(n_step+1);
-      iExt *qStart = qStartvec.data();
+      std::vector<ptrdiff_t> qStartvec(n_step+1);
+      ptrdiff_t *qStart = qStartvec.data();
       qStart[0] = 0;
 
       // Allocate pointers to how big was I at each step
-      std::vector<iReg> sizeIvec(n_step+1);
-      iReg *sizeI = sizeIvec.data();
+      std::vector<ptrdiff_t> sizeIvec(n_step+1);
+      ptrdiff_t *sizeI = sizeIvec.data();
       sizeI[0] = 0;
 
       // Allocate pointers to how big was J at each step
-      std::vector<iReg> sizeJvec(n_step+2);
-      iReg *sizeJ = sizeJvec.data();
+      std::vector<ptrdiff_t> sizeJvec(n_step+2);
+      ptrdiff_t *sizeJ = sizeJvec.data();
       sizeJ[0] = 0;
       sizeJ[1] = 1;
 
       // Allocate J
-      std::vector<iReg> Jvec(maxJsize);
-      iReg *J = Jvec.data();
+      std::vector<ptrdiff_t> Jvec(maxJsize);
+      ptrdiff_t *J = Jvec.data();
       // Set first sparsity pattern to be diagonal
       J[0] = k;
 
       // Allocate Jtilde
-      std::vector<iReg> Jtildevec(nn_A);
-      iReg *Jtilde = Jtildevec.data();
+      std::vector<ptrdiff_t> Jtildevec(nn_A);
+      ptrdiff_t *Jtilde = Jtildevec.data();
 
       // Allocate I
-      std::vector<iReg> Ivec(nn_A);
-      iReg *I = Ivec.data();
+      std::vector<ptrdiff_t> Ivec(nn_A);
+      ptrdiff_t *I = Ivec.data();
 
       // Allocate space for the vector norms
       std::vector<double> normvec(nn_A);
@@ -135,15 +133,16 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *res = resvec.data();
 
       // Allocate space for L
-      std::vector<iReg> Lvec(nn_A);
-      iReg *L = Lvec.data();
+      std::vector<ptrdiff_t> Lvec(nn_A);
+      ptrdiff_t *L = Lvec.data();
 
       // Fill the current column of the "old" matrix 
       // Do it once per column
       fullA0k(nn_A, iat0, ja0, coef0, k, A0k);
       // Compute the norm only once
-      int64_t one = 1;
-      double normA0k = dnrm2_(&nn_A,A0k,&one);
+      ptrdiff_t blas_nn_A = static_cast<ptrdiff_t>(nn_A);
+      ptrdiff_t blas_one = 1;
+      double normA0k = dnrm2_(&blas_nn_A,A0k,&blas_one);
 
       // Allocate Ahat buffer for the max possible size
       std::vector<double> AhatBuffer(nn_A*maxJsize);
@@ -171,26 +170,26 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *Rtriang = RtriangVec.data();
 
       // DGEQRF Workspace Query
-      iReg lwork = -1;
+      ptrdiff_t lwork = -1;
       double work_query;
-      iReg info;
+      ptrdiff_t info;
       
-      dgeqrf_(&nn_A, &maxJsize, Ahat, &nn_A, tau, &work_query, &lwork, &info);
+      dgeqrf_(&blas_nn_A, &maxJsize, Ahat, &blas_nn_A, tau, &work_query, &lwork, &info);
       if (info != 0){
-         printf("Error in allocating workspace, error %d\n",info);
+         printf("Error in allocating workspace, error %td\n",info);
       }
 
-      lwork = static_cast<iReg>(work_query);
+      lwork = static_cast<ptrdiff_t>(work_query);
       // Allocate workspace for the max possible size
       std::vector<double> workVec(lwork);
       double *work = workVec.data();
 
       // Initialize the size of J to 1 as the number of entries
-      iReg n2 = 1, n2old = 0;
-      iReg oldSizeI, sizeIcurr = 0;
-      iReg Astart = 0;
+      ptrdiff_t n2 = 1, n2old = 0;
+      ptrdiff_t oldSizeI, sizeIcurr = 0;
+      ptrdiff_t Astart = 0;
 
-      for (iReg t = 0; t < n_step; ++t){
+      for (ptrdiff_t t = 0; t < n_step; ++t){
          if (k == checkCol) printf("-------------------------------------------------------\n");
          if (k == checkCol) printf("----------------------- %d -----------------------------\n",t);
          if (k == checkCol) printf("-------------------------------------------------------\n");
@@ -331,7 +330,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       // printf("col %d, avgRes %.2g, t %d\n",k,resRelNorm,n2);
 
       // Copy the results in the storage
-      std::memcpy(&(storageJ[k*n_step]),J,n2*sizeof(iReg));
+      std::memcpy(&(storageJ[k*n_step]),J,n2*sizeof(ptrdiff_t));
       std::memcpy(&(storageN[k*n_step]),mHat,n2*sizeof(double));
       storageJsize[k] = n2;
 
@@ -346,12 +345,12 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    avg_resRelNorm /= nn_A;
 
    // Compute total nnz of the SAM matrix
-   iReg total_nnz = std::accumulate(storageJsizevec.begin(), storageJsizevec.end(), 0.0);
+   ptrdiff_t total_nnz = std::accumulate(storageJsizevec.begin(), storageJsizevec.end(), 0.0);
    // printf("%d\n", total_nnz);
 
    // Allocate the space for the SAM matrix
-   iatN = new iReg[nn_A+1];
-   jaN = new iReg[total_nnz];
+   iatN = new ptrdiff_t[nn_A+1];
+   jaN = new ptrdiff_t[total_nnz];
    coefN = new double[total_nnz];
 
    // print_vector("storageJsize",nn_A,storageJsize);
@@ -360,14 +359,14 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
    // Set values
    iatN[0] = 0;
-   iReg nEnt, count = 0, entryPos;
+   ptrdiff_t nEnt, count = 0, entryPos;
 
    // Loop over all columns
-   for (iReg i = 0; i < nn_A; ++i){
+   for (ptrdiff_t i = 0; i < nn_A; ++i){
       nEnt = storageJsize[i];
       iatN[i+1] = iatN[i] + nEnt;
       // Loop over the max number of entries for each column
-      for (iReg j = 0; j < nEnt; ++j){
+      for (ptrdiff_t j = 0; j < nEnt; ++j){
          // Get where to save the column index or the value
          entryPos = i*n_step + j;
 
