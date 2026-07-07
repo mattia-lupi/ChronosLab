@@ -21,7 +21,7 @@
 
 // Define types for iReg, iExt and iGlo
 #define IREG_LONG 0
-#define IEXT_LONG 1
+#define IEXT_LONG 0
 #define IGLO_LONG 1
 
 /**

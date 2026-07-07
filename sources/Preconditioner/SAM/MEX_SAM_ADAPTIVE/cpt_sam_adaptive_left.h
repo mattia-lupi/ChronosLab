@@ -2,7 +2,7 @@
 #include <cstring>
 #include <iostream>
 
-void cpt_sam_adaptive_left(ptrdiff_t *iatk, ptrdiff_t *jak,double *coefk,
-                           ptrdiff_t *iat0, ptrdiff_t *ja0,double *coef0,
-                           ptrdiff_t nthread, ptrdiff_t n_step, ptrdiff_t step_size, double eps, ptrdiff_t nn_A,
-                           ptrdiff_t *&iatN, ptrdiff_t *&jaN, double *&coefN, double &avg_resRelNorm);
+void cpt_sam_adaptive_left(iExt *iatk, iReg *jak,double *coefk,
+                           iExt *iat0, iReg *ja0,double *coef0,
+                           iReg nthread, iReg n_step, iReg step_size, double eps, iExt nn_A,
+                           iExt *&iatN, iReg *&jaN, double *&coefN, double &avg_resRelNorm);

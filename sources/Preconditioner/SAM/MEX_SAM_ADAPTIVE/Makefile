@@ -13,9 +13,16 @@ ifeq ($(UNAME_S), Darwin)
     # macOS Configuration
     OPENBLAS_INC = -I/opt/homebrew/Cellar/openblas/0.3.33/include/
     LIBOMP_INC   = -I/opt/homebrew/Cellar/libomp/22.1.7/include/
+    LIBOMP_LIB   = -L/opt/homebrew/Cellar/libomp/22.1.7/lib/
 
     INCLUDES = $(OPENBLAS_INC) $(LIBOMP_INC)
-    LIBS = -llapack -lblas
+    # Append the library path and the explicit OpenMP library flag
+    LIBS = -llapack -lblas $(LIBOMP_LIB) -lomp
+
+	 M1_FLAGS = -mcpu=apple-m1 -ffast-math -flto
+    
+    CXXFLAGS += -Xpreprocessor -fopenmp -fPIC -mmacosx-version-min=15.0 $(M1_FLAGS)
+    LDFLAGS  += -mmacosx-version-min=15.0 -flto
 endif
 
 ifeq ($(UNAME_S), Linux)
@@ -37,7 +44,7 @@ debug: CXXFLAGS += -g -O0
 debug: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@

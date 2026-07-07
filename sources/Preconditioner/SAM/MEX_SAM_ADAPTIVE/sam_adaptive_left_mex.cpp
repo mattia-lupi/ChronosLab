@@ -11,9 +11,9 @@ public:
         checkArguments(outputs, inputs);
 
         // Extract scalar inputs
-        const ptrdiff_t nthread   = static_cast<ptrdiff_t>(inputs[6][0]);
-        const ptrdiff_t n_step    = static_cast<ptrdiff_t>(inputs[7][0]);
-        const ptrdiff_t step_size = static_cast<ptrdiff_t>(inputs[8][0]);
+        const int nthread   = static_cast<int>(inputs[6][0]);
+        const int n_step    = static_cast<int>(inputs[7][0]);
+        const int step_size = static_cast<int>(inputs[8][0]);
         const double eps    = static_cast<double>(inputs[9][0]);
 
         // Extract array inputs
@@ -25,21 +25,26 @@ public:
         matlab::data::TypedArray<double> ia0_in   = std::move(inputs[4]);
         matlab::data::TypedArray<double> coef0_in = std::move(inputs[5]);
 
-        const ptrdiff_t nn_A = static_cast<ptrdiff_t>(jatk_in.getNumberOfElements()) - 1;
+        const int nn_A = static_cast<int>(jatk_in.getNumberOfElements()) - 1;
 
-        std::vector<ptrdiff_t> iatk(jatk_in.begin(), jatk_in.end());
-        std::vector<ptrdiff_t> jak(iak_in.begin(), iak_in.end());
+        // Convert 1-based MATLAB indexing to 0-based C++ indexing for CSC structures
+        std::vector<int> iatk(jatk_in.begin(), jatk_in.end());
+        std::vector<int> jak(iak_in.begin(), iak_in.end());
+        for (auto& val : iatk) val--;
+        for (auto& val : jak)  val--;
 
-        std::vector<ptrdiff_t> iat0(jat0_in.begin(), jat0_in.end());
-        std::vector<ptrdiff_t> ja0(ia0_in.begin(), ia0_in.end());
+        std::vector<int> iat0(jat0_in.begin(), jat0_in.end());
+        std::vector<int> ja0(ia0_in.begin(), ia0_in.end());
+        for (auto& val : iat0) val--;
+        for (auto& val : ja0)  val--;
 
-        // Copy data to vector to obtain valid contiguous raw poptrdiff_ters, avoiding ArrayElementTypedRef errors
+        // Copy data to vector to obtain valid contiguous raw pointers, avoiding ArrayElementTypedRef errors
         std::vector<double> coefk(coefk_in.begin(), coefk_in.end());
         std::vector<double> coef0(coef0_in.begin(), coef0_in.end());
 
         // Output references to be populated by the function
-        ptrdiff_t* iatN = nullptr;
-        ptrdiff_t* jaN = nullptr;
+        int* iatN = nullptr;
+        int* jaN = nullptr;
         double* coefN = nullptr;
         double avg_resRelNorm = 0.0;
 
@@ -49,8 +54,8 @@ public:
                                nthread, n_step, step_size, eps, nn_A,
                                iatN, jaN, coefN, avg_resRelNorm);
 
-        // Determine number of non-zero elements from the generated CSC column poptrdiff_ter array
-        const ptrdiff_t nnz_N = iatN[nn_A];
+        // Determine number of non-zero elements from the generated CSC column pointer array
+        const int nnz_N = iatN[nn_A];
 
         // Allocate MATLAB output arrays using correct API factory method
         matlab::data::ArrayFactory factory;
@@ -58,10 +63,10 @@ public:
         matlab::data::TypedArray<double> col_N = factory.createArray<double>({static_cast<size_t>(nnz_N), 1});
         matlab::data::TypedArray<double> val_N = factory.createArray<double>({static_cast<size_t>(nnz_N), 1});
 
-        // Uncompress CSC ptrdiff_to COO format and convert to 1-based indexing
-        ptrdiff_t idx = 0;
-        for (ptrdiff_t col = 0; col < nn_A; ++col) {
-            for (ptrdiff_t p = iatN[col]; p < iatN[col + 1]; ++p) {
+        // Uncompress CSC into COO format and convert to 1-based indexing
+        int idx = 0;
+        for (int col = 0; col < nn_A; ++col) {
+            for (int p = iatN[col]; p < iatN[col + 1]; ++p) {
                 row_N[idx] = static_cast<double>(jaN[p] + 1);
                 col_N[idx] = static_cast<double>(col + 1);
                 val_N[idx] = coefN[p];

@@ -1,22 +1,20 @@
 #pragma once
 
-#include <iostream>
-#include <cstring>
 #include "precision.h"
 
-void fullA0k(ptrdiff_t nn_A, ptrdiff_t *iat0, ptrdiff_t *ja0, double *coef0, ptrdiff_t k, double *A0k);
+void fullA0k(iExt nn_A, iExt *iat0, iReg *ja0, double *coef0, iExt k, double *A0k);
 
-void findNonZeroInColJ(ptrdiff_t *J, ptrdiff_t *iatk, ptrdiff_t *jak, ptrdiff_t n2, ptrdiff_t *I, ptrdiff_t &sizeI);
+void findNonZeroInColJ(iReg *J, iExt *iatk, iReg *jak, iReg n2, iReg *I, iReg &sizeI);
 
-void getA0k(double *a0k, ptrdiff_t *I, ptrdiff_t sizeI, ptrdiff_t oldSizeI, ptrdiff_t *iat0, ptrdiff_t *ja0, double *coef0, ptrdiff_t k);
+void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k);
 
-void getAhat( ptrdiff_t *I, ptrdiff_t sizeI, ptrdiff_t *J, ptrdiff_t Jstart, ptrdiff_t Jend,
-             ptrdiff_t *iatk, ptrdiff_t *jak, double *coefk, double *Ahat, ptrdiff_t &Astart);
+void getAhat( iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
+             iExt *iatk, iReg *jak, double *coefk, double *Ahat, iExt &Astart);
 
-void getAJ(ptrdiff_t *J, ptrdiff_t Jsize, ptrdiff_t nn_A, ptrdiff_t *iatk, ptrdiff_t *jak, double *coefk, double *AJ);
+void getAJ(iReg *J, iReg Jsize, iExt nn_A, iExt *iatk, iReg *jak, double *coefk, double *AJ);
 
-void fillL(ptrdiff_t *L, double *res, ptrdiff_t nn_A, ptrdiff_t &usedL);
+void fillL(iReg *L, double *res, iExt nn_A, iReg &usedL);
 
-void findJtilde(ptrdiff_t *Jtilde, ptrdiff_t &JtildeSize, ptrdiff_t *L, ptrdiff_t sizeL, ptrdiff_t *iatk, ptrdiff_t *jak, ptrdiff_t *J, ptrdiff_t sizeJ);
+void findJtilde(iReg *Jtilde, iReg &JtildeSize, iReg *L, iReg sizeL, iExt *iatk, iReg *jak, iReg *J, iReg sizeJ);
 
-void fullAJtilde(ptrdiff_t nn_A, ptrdiff_t *iatk, ptrdiff_t *jak, double *coefk, ptrdiff_t *Jtilde, ptrdiff_t JtildeSize, double *AJtilde);
+void fullAJtilde(iExt nn_A, iExt *iatk, iReg *jak, double *coefk, iReg *Jtilde, iReg JtildeSize, double *AJtilde);
