@@ -14,6 +14,7 @@ void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R,
                     lapack_int &info){
    // Compute QR Factorization
    dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
+
    if (info != 0){
       printf("Exit at first QR due to error %d\n", static_cast<int>(info));
       return;
@@ -31,19 +32,6 @@ void applyFirstQt(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *tau,
    char side = 'L';
    char trans = 'T';
 
-   // printf("nrows %ld, ncols %ld, nrefl %ld, LDA %ld, LDC %ld\n",sizeI,sizeJ,sizeJ,sizeI,sizeI);
-
-   lapack_int lwork_query = -1;
-   double num_elements_allocated = 0.0;
-
-   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
-           Ahat, &sizeI, tau, a0k, &sizeI, &num_elements_allocated, &lwork_query, &info);
-
-   lapack_int optimal_lwork = static_cast<lapack_int>(num_elements_allocated);
-
-   if (optimal_lwork > lwork) {
-      printf("low workspace %ld > %ld\n", static_cast<long int>(optimal_lwork),static_cast<long int>(optimal_lwork));
-   }
    dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
           Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);
    if (info != 0){
@@ -90,13 +78,10 @@ void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart,
       LDC   = nRowsRHS;
       ofA0k = sizeJ[i];
       ofTau = sizeJ[i];
-//       printf("nrows %d, ncols %d, nrefl %d, LDA %d, LDC %d, ofA0k %d, ofTau %d\n",nrows,ncols,nrefl,LDA,LDC,ofA0k,ofTau);
-//       printf("it %d, ahat(1) %f, tau(1) %f, rhs(1) %f\n",i,Ahat[qStart[i] + sizeJ[i]],tau[ofTau],a0k[ofA0k]);
 
       dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
              &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
-      // Check why I needed to add the fortran string length sizes
-      // print_vector1("chat vec iter",nrowsA0k,a0k);// check why +i above
+
       if (info != 0){
          printf("Exit at Qt apply due to error %d\n", static_cast<int>(info));
          printf("nrows(3) %d, ncols(4) %d, nrefl(5) %d, lda(7) %d, ldc(10) %d\n", 

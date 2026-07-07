@@ -73,130 +73,152 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
    iReg maxJsize = n_step*step_size;
 
+   // Compute the values most used to avoid useless computations
+   iExt tmpVal = (n_step+1)*nthread;
+
+   // Allocate pointers to where the new factorization starts
+   std::vector<lapack_int> qStartvec(tmpVal);
+
+   // Allocate pointers to how big was I at each step
+   std::vector<lapack_int> sizeIvec(tmpVal);
+
+   // Allocate pointers to how big was J at each step
+   std::vector<lapack_int> sizeJvec((n_step+2)*nthread);
+
+   // Allocate Jtilde
+   tmpVal = nn_A*nthread;
+   std::vector<iReg> Jtildevec(tmpVal);
+
+   // Allocate I
+   std::vector<iReg> Ivec(tmpVal);
+
+   // Allocate J
+   std::vector<iReg> Jvec(maxJsize*nthread);
+
+   // Allocate space for the vector norms
+   std::vector<double> normvec(tmpVal);
+
+   // Allocate space for A0(I,k)
+   std::vector<double> a0kvec(tmpVal);
+
+   // Allocate space for mHat(I,k)
+   std::vector<double> mHatvec(tmpVal);
+
+   // Allocate space for A0(:,k)
+   std::vector<double> A0kvec(tmpVal);
+
+   // Allocate space for residuals
+   std::vector<double> resvec(tmpVal);
+
+   // Allocate space for L
+   std::vector<iReg> Lvec(tmpVal);
+
+   // Allocate Ahat buffer for the max possible size
+   tmpVal *= maxJsize;
+   std::vector<double> AhatBuffer(tmpVal);
+
+   // Allocate AJ buffer for the max possible size
+   // Contains the householder vectors for all the updates
+   std::vector<double> AJBuffer(tmpVal);
+
+   // Allocate AJtilde buffer for the max possible size
+   std::vector<double> AJtildeBuffer(nn_A*nn_A*nthread);
+
+   // Allocate tau for the max possible size
+   std::vector<double> tauVec(maxJsize*nthread);
+
+   // Allocate R for the max possible size
+   tmpVal = maxJsize*maxJsize*nthread;
+   std::vector<double> RVec(tmpVal);
+
+   // Allocate R for the max possible size (only triangular values)
+   std::vector<double> RtriangVec(tmpVal);
+
+   // Manual workspace allocation
+   char side = 'L';
+   char trans = 'T';
+   lapack_int N = static_cast<lapack_int>(nn_A);
+   lapack_int one = 1;
+   lapack_int lwork = -1;
+   lapack_int mxJ = static_cast<lapack_int>(maxJsize);
+   double work_query, work_query1;
+   lapack_int info;
+   
+   // Query workspace size
+   dormqr_(&side, &trans, &N, &one, &mxJ, AhatBuffer.data(), &N, 
+           tauVec.data(), a0kvec.data(), &N, &work_query1, &lwork, &info);
+   if (info != 0){
+      printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
+   }
+
+   // Query workspace size
+   dgeqrf_(&N, &mxJ, AhatBuffer.data(), &N, tauVec.data(), &work_query, &lwork, &info);
+   if (info != 0){
+      printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
+   }
+
+   lwork = static_cast<lapack_int>(work_query);
+   lwork = std::max(static_cast<lapack_int>(work_query1),lwork);
+   // Allocate workspace for the max possible size
+   std::vector<double> workVec(lwork*nthread);
+
    // Cycle over the columns
    #pragma omp parallel for num_threads(nthread)
    for (iReg k = 0; k < nn_A; ++k){
-      // All allocation could be done outside the cycle multiplying the size of the memory
-      // needed by the size of the parallel thread pool. Then each thread can read and write
-      // only on its part of the allocated memory. in this way the number of allocations is 
-      // reduced to 1 per object instead of being nn_A while also reducing the actual max size
-      // allocated
-
       double resRelNorm = 1.0, resNorm;
       iReg usedL, JtildeSize;
 
-      // Allocate pointers to where the new factorization starts
-      std::vector<lapack_int> qStartvec(n_step+1);
-      lapack_int *qStart = qStartvec.data();
-      qStart[0] = 0;
+      // Get local id number
+      iReg thId = omp_get_thread_num();
 
-      // Allocate pointers to how big was I at each step
-      std::vector<lapack_int> sizeIvec(n_step+1);
-      lapack_int *sizeI = sizeIvec.data();
+      // Compute most used values to avoid useless computations
+      iExt tmpLocVal = (n_step+1)*thId;
+      
+      // Get the local point for the data
+      lapack_int *qStart = qStartvec.data() + tmpLocVal;
+      qStart[0] = 0;
+      lapack_int *sizeI = sizeIvec.data() + tmpLocVal;
       sizeI[0] = 0;
 
-      // Allocate pointers to how big was J at each step
-      std::vector<lapack_int> sizeJvec(n_step+2);
-      lapack_int *sizeJ = sizeJvec.data();
+      lapack_int *sizeJ = sizeJvec.data() + (n_step+2)*thId;
       sizeJ[0] = 0;
       sizeJ[1] = 1;
 
-      // Allocate J
-      std::vector<iReg> Jvec(maxJsize);
-      iReg *J = Jvec.data();
+      // Get the local point for the data
+      tmpLocVal = nn_A*thId;
+      iReg *Jtilde = Jtildevec.data() + tmpLocVal;
+      iReg *I = Ivec.data() + tmpLocVal;
+      double *normColJ = normvec.data() + tmpLocVal;
+      double *a0k = a0kvec.data() + tmpLocVal;
+      double *mHat = mHatvec.data() + tmpLocVal;
+      double *A0k = A0kvec.data() + tmpLocVal;
+      double *res = resvec.data() + tmpLocVal;
+      iReg *L = Lvec.data() + tmpLocVal;
+
+      // Get the local point for the data
+      tmpLocVal *= maxJsize;
+      double *Ahat = AhatBuffer.data() + tmpLocVal;
+      double *AJ = AJBuffer.data() + tmpLocVal;
+
+
+      double *AJtilde = AJtildeBuffer.data() + nn_A*nn_A*thId;
+      double *tau = tauVec.data() + maxJsize*thId;
+      double *work = workVec.data() + lwork*thId;
+
+      // Get the local point for the data
+      tmpLocVal = maxJsize*maxJsize*thId;
+      double *R = RVec.data() + tmpLocVal;
+      double *Rtriang = RtriangVec.data() + tmpLocVal;
+
+      iReg *J = Jvec.data() + maxJsize*thId;
       // Set first sparsity pattern to be diagonal
       J[0] = k;
-
-      // Allocate Jtilde
-      std::vector<iReg> Jtildevec(nn_A);
-      iReg *Jtilde = Jtildevec.data();
-
-      // Allocate I
-      std::vector<iReg> Ivec(nn_A);
-      iReg *I = Ivec.data();
-
-      // Allocate space for the vector norms
-      std::vector<double> normvec(nn_A);
-      double *normColJ = normvec.data();
-
-      // Allocate space for A0(I,k)
-      std::vector<double> a0kvec(nn_A);
-      double *a0k = a0kvec.data();
-
-      // Allocate space for mHat(I,k)
-      std::vector<double> mHatvec(nn_A);
-      double *mHat = mHatvec.data();
-
-      // Allocate space for A0(:,k)
-      std::vector<double> A0kvec(nn_A);
-      double *A0k = A0kvec.data();
-
-      // Allocate space for residuals
-      std::vector<double> resvec(nn_A);
-      double *res = resvec.data();
-
-      // Allocate space for L
-      std::vector<iReg> Lvec(nn_A);
-      iReg *L = Lvec.data();
 
       // Fill the current column of the "old" matrix 
       // Do it once per column
       fullA0k(nn_A, iat0, ja0, coef0, k, A0k);
       // Compute the norm only once
-      lapack_int N = static_cast<lapack_int>(nn_A);
-      lapack_int one = 1;
       double normA0k = dnrm2_(&N,A0k,&one);
-
-      // Allocate Ahat buffer for the max possible size
-      std::vector<double> AhatBuffer(nn_A*maxJsize);
-      double *Ahat = AhatBuffer.data();
-
-      // Allocate AJ buffer for the max possible size
-      // Contains the householder vectors for all the updates
-      std::vector<double> AJBuffer(nn_A*maxJsize);
-      double *AJ = AJBuffer.data();
-
-      // Allocate AJtilde buffer for the max possible size
-      std::vector<double> AJtildeBuffer(nn_A*nn_A);
-      double *AJtilde = AJtildeBuffer.data();
-
-      // Allocate tau for the max possible size
-      std::vector<double> tauVec(maxJsize);
-      double *tau = tauVec.data();
-
-      // Allocate R for the max possible size
-      std::vector<double> RVec(maxJsize*maxJsize);
-      double *R = RVec.data();
-
-      // Allocate R for the max possible size (only triangular values)
-      std::vector<double> RtriangVec(maxJsize*maxJsize);
-      double *Rtriang = RtriangVec.data();
-
-      // Manual workspace allocation
-      char side = 'L';
-      char trans = 'T';
-      lapack_int lwork = -1;
-      lapack_int mxJ = static_cast<lapack_int>(maxJsize);
-      double work_query, work_query1;
-      lapack_int info;
-      
-      // Query workspace size
-      dormqr_(&side, &trans, &N, &one, &mxJ, Ahat, &N, tau, a0k, &N, &work_query1, &lwork, &info);
-      if (info != 0){
-         printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
-      }
-
-      // Query workspace size
-      dgeqrf_(&N, &mxJ, Ahat, &N, tau, &work_query, &lwork, &info);
-      if (info != 0){
-         printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
-      }
-
-      lwork = static_cast<lapack_int>(work_query);
-      lwork = std::max(static_cast<lapack_int>(work_query1),lwork);
-      // Allocate workspace for the max possible size
-      std::vector<double> workVec(lwork);
-      double *work = workVec.data();
 
       // Initialize the size of J to 1 as the number of entries
       iReg n2 = 1, n2old = 0;
@@ -330,9 +352,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                sizeJ[t+2] = n2;
             }
          }
-         if (checkLevel == t && k == checkCol && debug){
-            return;
-         }
       }
 
       // Compute the average relative residual norm
@@ -345,10 +364,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::memcpy(&(storageJ[k*n_step]),J,n2*sizeof(iReg));
       std::memcpy(&(storageN[k*n_step]),mHat,n2*sizeof(double));
       storageJsize[k] = n2;
-
-      if (k == checkCol && debug){
-         break;
-      }
    }
 
    // Take the average dividing by the number of rows once

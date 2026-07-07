@@ -21,8 +21,8 @@ ifeq ($(UNAME_S), Darwin)
 
 	 M1_FLAGS = -mcpu=apple-m1
     
-    CXXFLAGS += -Xpreprocessor -fopenmp -fPIC -mmacosx-version-min=15.0 $(M1_FLAGS)
-    LDFLAGS  += -mmacosx-version-min=15.0 -flto
+    CXXFLAGS += -Xpreprocessor -fopenmp -fPIC $(M1_FLAGS)
+    LDFLAGS  += -flto
 endif
 
 ifeq ($(UNAME_S), Linux)
