@@ -1,5 +1,3 @@
-#include "lapack.h"
-#include "precision.h"
 #include "qr_functions.h"
 
 // void print_vector1(const char* desc, iReg n, double* vec) {
@@ -9,9 +7,11 @@
 //     }
 // }
 
-void computeFirstQR(double *Ahat, iReg sizeI, iReg sizeJ, double *R, double *Rtriang, double *tau, double *work, iReg lwork, iReg &info){
+void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 
+                    double *Rtriang, double *tau, double *work, lapack_int lwork, 
+                    lapack_int &info){
    // Compute QR Factorization
-   dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
+   info = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR, sizeI, sizeJ, Ahat, sizeI, tau, work, lwork);
    if (info != 0){
       printf("Exit at first QR due to error %d\n", info);
       return;
@@ -24,12 +24,13 @@ void computeFirstQR(double *Ahat, iReg sizeI, iReg sizeJ, double *R, double *Rtr
    return;
 }
 
-void applyFirstQt(double *Ahat, iReg sizeI, iReg sizeJ, double *tau, double *a0k, double *work, iReg lwork, iReg &info){
+void applyFirstQt(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *tau, 
+                  double *a0k, double *work, lapack_int lwork, lapack_int &info){
    char side = 'L';
    char trans = 'T';
 
-   // Check why I needed to add the fortran string length sizes
-   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ, Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info,3,3);//,3,3
+   info = LAPACKE_dormqr_work(LAPACK_COL_MAJOR, side, trans, sizeI, sizeJ, sizeJ, 
+                              Ahat, sizeI, tau, a0k, sizeI, work, lwork);
    if (info != 0){
       printf("Exit at first Qt apply due to error %d\n", info);
       return;
@@ -38,31 +39,33 @@ void applyFirstQt(double *Ahat, iReg sizeI, iReg sizeJ, double *tau, double *a0k
    return;
 }
 
-void applyR(iReg sizeJ, double *R, double *a0k, iReg &info){
+void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
    char uplo = 'U';
    char trans = 'N';
    char diag = 'N';
-   iReg nrhs = 1;
+   lapack_int nrhs = 1;
 
-   // Check why I needed to add the fortran string length sizes
-   dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, R, &sizeJ, a0k, &sizeJ, &info,3,3,3);// ,3,3,3
-   if (info != 0){
-      printf("Exit at R apply due to error %d\n", info);
-      return;
+   info = LAPACKE_dtrtrs(LAPACK_COL_MAJOR, uplo, trans, diag, sizeJ, nrhs, 
+                         R, sizeJ, a0k, sizeJ);
+   
+   if (info != 0) {
+       printf("Exit at R apply due to error %d\n", info);
+       return;
    }
 
    return;
 }
 
-void applyQt(iReg t, iReg *sizeJ, iReg *sizeI, iReg *qStart, double *Ahat, 
-             double *tau, double *a0k, iReg nRowsRHS, iReg ncolsRHS, double *work, iReg lwork, iReg &info){
+void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart, 
+             double *Ahat, double *tau, double *a0k, lapack_int nRowsRHS, 
+             lapack_int ncolsRHS, double *work, lapack_int lwork, lapack_int &info){
 
    // Apply iteratively the Qs in the correct way
    char side = 'L';
    char trans = 'T';
 
    // Loop over all the matrices Q I have computed and apply them to the correct point
-   iReg nrows, ncols, nrefl, LDA, LDC, ofA0k = 0, ofTau = 0; 
+   lapack_int nrows, ncols, nrefl, LDA, LDC, ofA0k = 0, ofTau = 0; 
    for (iReg i = 0; i < t; ++i){
       // Get the values for the new iteration matrix
       nrows = sizeI[i+1] - sizeJ[i];
@@ -76,7 +79,9 @@ void applyQt(iReg t, iReg *sizeJ, iReg *sizeI, iReg *qStart, double *Ahat,
 //       printf("it %d, ahat(1) %f, tau(1) %f, rhs(1) %f\n",i,Ahat[qStart[i] + sizeJ[i]],tau[ofTau],a0k[ofA0k]);
 
       // Check why I needed to add the fortran string length sizes
-      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,3,3);// ,3,3
+      info = LAPACKE_dormqr_work(LAPACK_COL_MAJOR, side, trans, nrows, ncols, nrefl,
+                                 Ahat + qStart[i] + sizeJ[i], LDA, tau + ofTau, 
+                                 a0k + ofA0k, LDC, work, lwork);
       // print_vector1("chat vec iter",nrowsA0k,a0k);// check why +i above
       if (info != 0){
          printf("Exit at Qt apply due to error %d\n", info);
@@ -92,28 +97,31 @@ void applyQt(iReg t, iReg *sizeJ, iReg *sizeI, iReg *qStart, double *Ahat,
 // rowSizeB2 = J_add + I_add size
 // startB2   = oldSizeI*n2old + n2-n2old
 // rowSizeB  = sizeI
-void computeNewQR(iReg t, iReg *sizeI, iReg *sizeJ, iReg *qStart, double *Ahat, double *tau, double *R, 
-                  double *Rtriang, double *work, iReg lwork, iReg &info){
+void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qStart, 
+                  double *Ahat, double *tau, double *R, double *Rtriang, double *work, 
+                  lapack_int lwork, lapack_int &info){
    // Compute QR Factorization on the new part of the matrix
-   iReg oldSizeTau = sizeJ[t];
-   iReg colSizeB2  = sizeJ[t+1] - oldSizeTau;
-   iReg rowSizeB   = sizeI[t+1];
-   iReg rowSizeB2  = sizeI[t+1] - oldSizeTau;
-   iReg sqrtStartR = oldSizeTau;
+   lapack_int oldSizeTau = sizeJ[t];
+   lapack_int colSizeB2  = sizeJ[t+1] - oldSizeTau;
+   lapack_int rowSizeB   = sizeI[t+1];
+   lapack_int rowSizeB2  = sizeI[t+1] - oldSizeTau;
+   lapack_int sqrtStartR = oldSizeTau;
    // printf("sizeIt %d, sizeJt %d\n", sizeI[t+1],oldSizeTau);
    // Set the starting point for the new QR factorization
    qStart[t+1]    = qStart[t] + rowSizeB*colSizeB2;
-   iReg startB2    = qStart[t] + oldSizeTau;
+   lapack_int startB2    = qStart[t] + oldSizeTau;
 
    // Get the filled size of Rtriang
-   iReg startRtri = 0.5*sqrtStartR*(sqrtStartR+1);
+   lapack_int startRtri = 0.5*sqrtStartR*(sqrtStartR+1);
 
    // Copy the data into the triangular R first (colmajor)
-   iReg startB = qStart[t];
+   lapack_int startB = qStart[t];
    // printf("startB2 %d startB %d at t %d\n", startB2,startB, t);
    
    // Compute the new QR factorization
-   dgeqrf_(&rowSizeB2, &colSizeB2, Ahat+startB2, &rowSizeB, tau+oldSizeTau, work, &lwork, &info);
+   info = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR, rowSizeB2, colSizeB2, 
+                           Ahat + startB2, rowSizeB, tau + oldSizeTau, 
+                           work, lwork);
    if (info != 0){
       printf("Exit at first QR due to error %d\n", info);
       return;

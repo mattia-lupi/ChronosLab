@@ -3,7 +3,7 @@
 #include <cstring>
 #include <iostream>
 #include <numeric>
-#include "lapack.h"
+#include "lapacke.h"
 // #include "blas.h"
 #include "cpt_sam_adaptive_left.h"
 #include "qr_functions.h"
@@ -87,18 +87,18 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       iReg usedL, JtildeSize;
 
       // Allocate pointers to where the new factorization starts
-      std::vector<iExt> qStartvec(n_step+1);
-      iExt *qStart = qStartvec.data();
+      std::vector<lapack_int> qStartvec(n_step+1);
+      lapack_int *qStart = qStartvec.data();
       qStart[0] = 0;
 
       // Allocate pointers to how big was I at each step
-      std::vector<iReg> sizeIvec(n_step+1);
-      iReg *sizeI = sizeIvec.data();
+      std::vector<lapack_int> sizeIvec(n_step+1);
+      lapack_int *sizeI = sizeIvec.data();
       sizeI[0] = 0;
 
       // Allocate pointers to how big was J at each step
-      std::vector<iReg> sizeJvec(n_step+2);
-      iReg *sizeJ = sizeJvec.data();
+      std::vector<lapack_int> sizeJvec(n_step+2);
+      lapack_int *sizeJ = sizeJvec.data();
       sizeJ[0] = 0;
       sizeJ[1] = 1;
 
@@ -172,12 +172,13 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::vector<double> RtriangVec(maxJsize*maxJsize);
       double *Rtriang = RtriangVec.data();
 
-      // DGEQRF Workspace Query
-      iReg lwork = -1;
+      // Manual workspace allocation
+      lapack_int lwork = -1;
       double work_query;
-      iReg info;
+      lapack_int info;
       
-      dgeqrf_(&nn_A, &maxJsize, Ahat, &nn_A, tau, &work_query, &lwork, &info);
+      // Query workspace size
+      info = LAPACKE_dgeqrf_work(LAPACK_COL_MAJOR, nn_A, maxJsize, Ahat, nn_A, tau, &work_query, lwork);
       if (info != 0){
          printf("Error in allocating workspace, error %d\n",info);
       }

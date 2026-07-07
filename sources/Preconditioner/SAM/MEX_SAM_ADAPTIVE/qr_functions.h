@@ -1,15 +1,21 @@
 #pragma once
 
+#include "lapacke.h"
 #include "precision.h"
 
-void computeFirstQR(double *Ahat, iReg sizeI, iReg sizeJ, double *R, double *Rtriang, double *tau, double *work, iExt lwork, iReg &info);
+void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 
+                    double *Rtriang, double *tau, double *work, lapack_int lwork, 
+                    lapack_int &info);
 
-void applyFirstQt(double *Ahat, iReg sizeI, iReg sizeJ, double *tau, double *a0k, double *work, iExt lwork, iReg &info);
+void applyFirstQt(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *tau, 
+                  double *a0k, double *work, lapack_int lwork, lapack_int &info);
 
-void applyR(iReg sizeJ, double *R, double *a0k, iReg &info);
+void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info);
 
-void applyQt(iReg t, iReg *sizeJ, iReg *sizeI, iExt *qStart, double *Ahat, 
-             double *tau, double *a0k, iReg nrowsA0k, iReg ncolsA0k, double *work, iExt lwork, iReg &info);
+void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart, 
+             double *Ahat, double *tau, double *a0k, lapack_int nRowsRHS, 
+             lapack_int ncolsRHS, double *work, lapack_int lwork, lapack_int &info);
 
-void computeNewQR(iReg t, iReg *sizeI, iReg *sizeJ, iExt *qStart, double *Ahat, double *tau, double *R, 
-                  double *Rtriang, double *work, iExt lwork, iReg &info);
+void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qStart, 
+                  double *Ahat, double *tau, double *R, double *Rtriang, double *work, 
+                  lapack_int lwork, lapack_int &info);
