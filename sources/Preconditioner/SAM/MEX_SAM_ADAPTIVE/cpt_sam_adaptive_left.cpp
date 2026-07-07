@@ -74,6 +74,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    iReg maxJsize = n_step*step_size;
 
    // Cycle over the columns
+   #pragma omp parallel for num_threads(nthread)
    for (iReg k = 0; k < nn_A; ++k){
       // All allocation could be done outside the cycle multiplying the size of the memory
       // needed by the size of the parallel thread pool. Then each thread can read and write
@@ -300,7 +301,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                // if (k == checkCol) print_vector("Matrix Ajtilde", nn_A*JtildeSize, AJtilde);//print_matrix("Matrix Ajtilde", nn_A, JtildeSize, AJtilde, nn_A);
    
                // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
-               // cptRhoJ2(JtildeSize, normColJ, AJtilde, nn_A, res, mHat, resNorm);
+               cptRhoJ2(JtildeSize, normColJ, AJtilde, nn_A, res, mHat, resNorm);
                if (k == checkCol && debug) print_vector("Vector rhoJ2", JtildeSize, normColJ);
                // print_matrix("Matrix Ajtilde", JtildeSize, JtildeSize, AJtilde, nn_A);
 
@@ -338,7 +339,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       #pragma omp atomic 
       avg_resRelNorm += resRelNorm;
 
-      // printf("col %d, avgRes %.2g, t %d\n",k,resRelNorm,n2);
+      printf("col %d, avgRes %.2g, t %d\n",k,resRelNorm,n2);
 
       // Copy the results in the storage
       std::memcpy(&(storageJ[k*n_step]),J,n2*sizeof(iReg));
