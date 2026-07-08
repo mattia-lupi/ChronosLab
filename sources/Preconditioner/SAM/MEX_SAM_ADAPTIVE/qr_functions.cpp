@@ -1,4 +1,3 @@
-#pragma once
 #include "qr_functions.h"
 #include <iostream>
 
@@ -32,8 +31,13 @@ void applyFirstQt(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *tau,
    char side = 'L';
    char trans = 'T';
 
-   dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
-          Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);
+   #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
+      dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
+              Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info,1,1);
+   #else
+      dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
+              Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);
+   #endif
    if (info != 0){
       printf("Exit at first Qt apply due to error %d\n", static_cast<int>(info));
       return;
@@ -48,8 +52,13 @@ void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
    char diag = 'N';
    lapack_int nrhs = 1;
 
-   dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, 
-          R, &sizeJ, a0k, &sizeJ, &info); 
+   #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
+      dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, 
+              R, &sizeJ, a0k, &sizeJ, &info,1,1,1); 
+   #else
+      dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, 
+              R, &sizeJ, a0k, &sizeJ, &info); 
+   #endif
 
    if (info != 0) {
        printf("Exit at R apply due to error %d\n", static_cast<int>(info));
@@ -79,8 +88,13 @@ void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart,
       ofA0k = sizeJ[i];
       ofTau = sizeJ[i];
 
-      dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
-             &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
+      #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
+         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
+                 &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,1,1);
+      #else
+         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
+                 &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
+      #endif
 
       if (info != 0){
          printf("Exit at Qt apply due to error %d\n", static_cast<int>(info));

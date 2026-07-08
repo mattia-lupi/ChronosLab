@@ -219,7 +219,7 @@ void fillL(iReg *L, double *res, iExt nn_A, iReg &usedL){
    for (iReg i = 0; i < nn_A; ++i){
       // The residual is not numerically zero
       // Add it as a possible column to be computed
-      if (std::abs(res[i]) > 1e-13){
+      if (std::abs(res[i]) > 0){
          L[usedL] = i;
          usedL++;
       }

@@ -10,7 +10,7 @@
 #include "cpt_resRho.h"
 #include "omp.h"
 
-bool debug = false;
+#define debug false
 iReg checkCol = 0;
 iReg checkLevel = 0;
 
@@ -145,8 +145,13 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    lapack_int info;
    
    // Query workspace size
-   dormqr_(&side, &trans, &N, &one, &mxJ, AhatBuffer.data(), &N, 
-           tauVec.data(), a0kvec.data(), &N, &work_query1, &lwork, &info);
+   #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
+      dormqr_(&side, &trans, &N, &one, &mxJ, AhatBuffer.data(), &N, 
+              tauVec.data(), a0kvec.data(), &N, &work_query1, &lwork, &info,1,1);
+   #else
+      dormqr_(&side, &trans, &N, &one, &mxJ, AhatBuffer.data(), &N, 
+              tauVec.data(), a0kvec.data(), &N, &work_query1, &lwork, &info);
+   #endif
    if (info != 0){
       printf("Error in allocating workspace, error %d\n",static_cast<int>(info));
    }
@@ -163,7 +168,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    std::vector<double> workVec(lwork*nthread);
 
    // Cycle over the columns
+   #if debug == false
    #pragma omp parallel for num_threads(nthread)
+   #endif
    for (iReg k = 0; k < nn_A; ++k){
       double resRelNorm = 1.0, resNorm;
       iReg usedL, JtildeSize;
@@ -352,7 +359,19 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                sizeJ[t+2] = n2;
             }
          }
+
+         #if debug == true
+         if (t == checkLevel){
+            break;
+         }
+         #endif
       }
+
+#if debug == true
+      if (k == checkCol){
+         break;
+      }
+#endif
 
       // Compute the average relative residual norm
       #pragma omp atomic 
