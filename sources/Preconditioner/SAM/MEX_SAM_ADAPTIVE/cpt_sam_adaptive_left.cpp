@@ -11,7 +11,7 @@
 #include "omp.h"
 #include "SymmetrizePattern.h"
 
-#define debug true
+#define debug false
 iReg checkCol = 42;
 iReg checkLevel = 3;
 
@@ -67,10 +67,10 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    int err;
    double *tmp;
    // Symmetrize the pattern for the matrices
-   err =  SymmetrizePattern(nn_A, iatk, jak, coefk, tmp);
-   printf("%d\n",err);
-   err =  SymmetrizePattern(nn_A, iat0, ja0, coef0, tmp);
-   printf("%d\n",err);
+   // err =  SymmetrizePattern(nn_A, iatk, jak, coefk, tmp);
+   // printf("%d\n",err);
+   // err =  SymmetrizePattern(nn_A, iat0, ja0, coef0, tmp);
+   // printf("%d\n",err);
 
    // Allocate the space for storing the outputs of the loop over the columns
    std::vector<iReg> storageJsizevec(nn_A);
@@ -142,7 +142,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    std::vector<double> RVec(tmpVal);
 
    // Allocate R for the max possible size (only triangular values)
-   std::vector<double> RtriangVec(tmpVal);
+   std::vector<double> RtriangVec(maxJsize*(maxJsize+1)*nthread/2);
 
    // Manual workspace allocation
    char side = 'L';
@@ -178,9 +178,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    std::vector<double> workVec(lwork*nthread);
 
    // Cycle over the columns
-   #if debug == false
    #pragma omp parallel for num_threads(nthread)
-   #endif
    for (iReg k = 0; k < nn_A; ++k){
       double resRelNorm = 1.0, resNorm;
       iReg usedL, JtildeSize;
@@ -306,7 +304,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          if (k == checkCol && debug) print_vector("Vector mhat", n2, mHat);
 
          // Get the matrix A(:,J)
-         getAJ(J, n2, nn_A, iatk, jak, coefk, AJ);
+         getAJ(J, n2old, n2, nn_A, iatk, jak, coefk, AJ);
          // if (k == checkCol && debug) print_vector("Matrix Aj", nn_A*n2, AJ);
 
          // Assign the norm of A0(:,k) to resRelNorm

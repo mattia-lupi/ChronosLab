@@ -2,106 +2,62 @@
 #include <algorithm>
 #include <vector>
 #include <iostream>
+#include <unordered_set>
 
-bool mattia = false;
+bool mattia = true;
 void fullA0k(iExt nn_A, iExt *iat0, iReg *ja0, double *coef0, iExt k, double *A0k){
-   // Zero all the vector then focus on finding the nonzeros
    std::fill_n(A0k, nn_A, 0.0);
 
-   // Loop over the rows
    for (iReg row = 0; row < nn_A; ++row) {
       iReg row_start = iat0[row];
       iReg row_end = iat0[row+1];
+      iReg row_len = row_end - row_start;
 
-      // Loop over the single row entries
-      for (iReg i = row_start; i < row_end; ++i) {
-      	// If the column is the same of the current column k
-         // Get the nonzero index
-         if (ja0[i] == k) {
-            A0k[row] = coef0[i];
-            break;
+      if (row_len > 0) {
+         iReg *row_cols = &ja0[row_start];
+         auto it = std::lower_bound(row_cols, row_cols + row_len, k);
+         if (it != row_cols + row_len && *it == k) {
+            A0k[row] = coef0[row_start + (it - row_cols)];
          }
       }
    }
-   return;
 }
 
 void findNonZeroInColJ(iReg *J, iExt *iatk, iReg *jak, iReg n2, iReg *I, iReg &sizeI){
-   // Assume the pattern is symmetric
-   // the nonzero row entries in column J correspond to
-   // the nonzero column entries in row J
+   // Hash set to track unique items in O(1) time
+   std::unordered_set<iReg> seen(I, I + sizeI);
 
-   const iReg initial_count = sizeI;
-   iReg start, end;
-
-   // First time entering, copy all
-   if (initial_count == 0) {
-      // Direct copy without any duplicate checks
-      for (iReg i = 0; i < n2; ++i) {
-         start = iatk[J[i]];
-         end = iatk[J[i] + 1];
-         for (iReg j = start; j < end; ++j) {
-            I[sizeI] = jak[j];
-            sizeI++;
-         }
-      }
-   }
-   else {
-      bool duplicate;
-      iReg val;
-
-      // Cycle over J to select the rows to get, need to check for no repeated indices
-      for (iReg i = 0; i < n2; ++i) {
-         start = iatk[J[i]];
-         end = iatk[J[i] + 1];
-         for (iReg j = start; j < end; ++j) {
-            // Initialize the values for this jak
-            val = jak[j];
-            duplicate = false;
-
-            // Check for duplicate value
-            for (iReg q = 0; q < sizeI; ++q) {
-               if (I[q] == val) {
-                  duplicate = true;
-                  break;
-               }
-            }
-
-            // This index is not repeated, copy it
-            if (!duplicate) {
-               I[sizeI++] = val;
-            }
+   for (iReg i = 0; i < n2; ++i) {
+      iReg start = iatk[J[i]];
+      iReg end = iatk[J[i] + 1];
+      for (iReg j = start; j < end; ++j) {
+         iReg val = jak[j];
+         // insert().second is true only if the item didn't already exist in the set
+         if (seen.insert(val).second) {
+            I[sizeI++] = val;
          }
       }
    }
 }
 
 void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k){
-   iReg row, row_start, row_end;
-
-   // Cycle over I to get which columns to seach for
-   // Cycle over only the new entries of I
    for (iReg i = oldSizeI; i < sizeI; ++i) {
-      row = I[i];
-      row_start = iat0[row];
-      row_end = iat0[row + 1];
+      iReg row = I[i];
+      iReg row_start = iat0[row];
+      iReg row_end = iat0[row + 1];
+      iReg row_len = row_end - row_start;
 
-      // Set default value to 0.0
-      a0k[i] = 0.0;
+      a0k[i] = 0.0; // Default value
 
-      // Loop over the single row entries
-      for (iReg j = row_start; j < row_end; ++j) {
-      	// If entered here there is no column entry equal to k 
-      	// set to zero
-         if (ja0[j] == k) {
-            a0k[i] = coef0[j];
-            break; 
+      if (row_len > 0) {
+         iReg *row_cols = &ja0[row_start];
+         auto it = std::lower_bound(row_cols, row_cols + row_len, k);
+         if (it != row_cols + row_len && *it == k) {
+            a0k[i] = coef0[row_start + (it - row_cols)];
          }
       }
    }
-   return;
 }
-
 
 void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
              iExt *iatk, iReg *jak, double *coefk, double *Ahat, iReg &Astart) {
@@ -177,39 +133,32 @@ void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
    }
 }
 
+// Get the new columns and add them to AJ
+void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt nn_A, iExt *iatk, iReg *jak, double *coefk, double *AJ) {
+    // Initialize the newly added columns in AJ to zero
+    for (iReg j = Jstart; j < Jend; ++j) {
+        for (iExt i = 0; i < nn_A; ++i) {
+            AJ[j * nn_A + i] = 0.0;
+        }
+    }
 
-// AJ is saved rowwise then used as transposed in the blas gemm to have better memory access in creating it
-void getAJ(iReg *J, iReg Jsize, iExt nn_A, iExt *iatk, iReg *jak, double *coefk, double *AJ){
-   iReg Astart = 0;
-
-   // Cycle over the rows in I
-   for (iReg i = 0; i < nn_A; ++i){
-      // currJ = 0;
-
-      // Loop over all possible J
-      for (iReg currJ = 0; currJ < Jsize; ++currJ){
-      	// Cycle over the chosen row
-      	for(iExt k = iatk[i]; k < iatk[i+1]; ++k){
-      		// If column index is equal to the chosen J column then add it
-      		if(jak[k] == J[currJ]){
-      			// printf("A[%d] = %f\n", Astart,coefk[k]);
-      			AJ[Astart] = coefk[k];
-         		Astart++;
-         		break;
-      		}
-
-      		if(k == iatk[i+1] - 1){
-				   // If entered here there is no column entry equal to this J
-				   // set to zero
-				   // printf("A[%d] = %f\n", Astart,0);
-				   AJ[Astart] = 0;
-				   Astart++;
-				   break;
-				}
-      	}
-      }
-   }
-   return;
+    // Populate AJ with values from the CSR matrix A
+    for (iExt i = 0; i < nn_A; ++i) {
+        iExt row_start = iatk[i];
+        iExt row_end = iatk[i + 1];
+        
+        for (iExt k = row_start; k < row_end; ++k) {
+            iReg col_A = jak[k];
+            
+            // Search if the current column index exists in the active J window
+            for (iReg j = Jstart; j < Jend; ++j) {
+                if (J[j] == col_A) {
+                    // Column-major indexing: column * structural_rows + row
+                    AJ[j * nn_A + i] = coefk[k];
+                }
+            }
+        }
+    }
 }
 
 
@@ -228,57 +177,25 @@ void fillL(iReg *L, double *res, iExt nn_A, iReg &usedL){
 }
 
 void findJtilde(iReg *Jtilde, iReg &JtildeSize, iReg *L, iReg sizeL, iExt *iatk, iReg *jak, iReg *J, iReg sizeJ){
-
-   // Sanity check for sizeL == 0
    if (sizeL == 0){
       printf("sizeL == 0, check\n");
       return;
    }
 
-   // Initialize counter to 0
    JtildeSize = 0;
+   // Seed the set with existing J elements so we don't include them in Jtilde
+   std::unordered_set<iReg> seen(J, J + sizeJ);
 
-   // Flag for fast exit in case of repeated index
-   bool skip = false;
-   iReg maxJsize;
    for (iReg i = 0; i < sizeL; ++i){
-      for (iReg j = iatk[L[i]]; j < iatk[L[i] + 1]; ++j){
-         // Get the max size to search for duplicates
-         maxJsize = std::max(sizeJ,JtildeSize);
-         // std::cout << "maxJsize = " << maxJsize << std::endl;
-         // std::cout << "ja["<< j << "] = " << jak[j] << std::endl;
-         // Check for duplicate value
-         for (iReg q = 0; q < maxJsize; ++q){
-            // Check if it is already in Jtilde
-            if(q < JtildeSize){
-               if(jak[j] == Jtilde[q]){
-                  skip = true;
-                  break;
-               }
-            }
-
-            // Check if it is already in J
-            if (q < sizeJ){
-               if(jak[j] == J[q]){
-                  skip = true;
-                  break;
-               }
-            }
-         }
-   
-         // This index is repeated, fast exit
-         if (skip){
-            // Reset flag to false
-            skip = false;
-         }
-         else{
-            // Index is not repeated, add it
-            Jtilde[JtildeSize] = jak[j];
-            JtildeSize++;
+      iReg start = iatk[L[i]];
+      iReg end = iatk[L[i] + 1];
+      for (iReg j = start; j < end; ++j){
+         iReg val = jak[j];
+         if (seen.insert(val).second) {
+            Jtilde[JtildeSize++] = val;
          }
       }
    }
-   return;
 }
 
 // Compute A(:,Jtilde) in colmajor
@@ -315,26 +232,5 @@ void fullAJtilde(iExt nn_A, iExt *iatk, iReg *jak, double *coefk, iReg *Jtilde, 
            }
        }
    }
-   // // Loop over possible columns for Jtilde
-   // for (iReg j = 0; j < JtildeSize; ++j){
-   //    // Loop over the rows
-   //    for (iReg row = 0; row < nn_A; ++row){
-   //       // Loop over the single row entries
-   //       for (iReg i = iatk[row]; i < iatk[row+1]; ++i){
-         
-   //          // If the column is the same of the current column k
-   //          // Get the nonzero index
-   //          if (jak[i] == Jtilde[j]){
-   //             AJtilde[row + j*nn_A] = coefk[i];
-   //             break;
-   //          }
-   
-   //          // No entry was found, set to zero
-   //          if (i == iatk[i+1] - 1){
-   //             AJtilde[row + j*nn_A] = 0;
-   //          }
-   //       }
-   //    }
-   // }
    return;
 }

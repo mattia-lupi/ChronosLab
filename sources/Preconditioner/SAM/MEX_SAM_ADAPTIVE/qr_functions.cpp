@@ -141,14 +141,14 @@ void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qSta
       printf("Exit at first QR due to error %d\n", static_cast<int>(info));
       return;
    }
-   
+
    // Loop over the columns
-   for (iReg j = 0; j < colSizeB2; ++j){
-      // Loop over rows
-      for (iReg i = 0; i < rowSizeB; ++i){
-         // Save the new values carefully adjusting for the leading dimension
-         Rtriang[startRtri] = Ahat[startB + i + j*rowSizeB];
-         // Update the starting point
+   for (iReg j = 0; j < colSizeB2; ++j) {
+      // Loop over rows, stopping EXACTLY at the diagonal of the current column
+      for (iReg i = 0; i <= oldSizeTau + j; ++i) { 
+         // This now grabs ONLY valid R entries (both old and new)
+         Rtriang[startRtri] = Ahat[startB + i + j * rowSizeB];
+         // Update the starting point for packed storage
          startRtri++;
       }
    }
