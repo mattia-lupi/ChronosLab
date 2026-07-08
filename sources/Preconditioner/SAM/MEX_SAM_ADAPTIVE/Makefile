@@ -2,7 +2,7 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -ffast-math -flto
 TARGET = main
-SRCS = main.cpp cpt_sam_adaptive_left.cpp qr_functions.cpp find_stuff.cpp cpt_resRho.cpp
+SRCS = main.cpp cpt_sam_adaptive_left.cpp qr_functions.cpp find_stuff.cpp cpt_resRho.cpp SymmetrizePattern.cpp transpose.cpp merge_row_patt.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 # Detect Operating System

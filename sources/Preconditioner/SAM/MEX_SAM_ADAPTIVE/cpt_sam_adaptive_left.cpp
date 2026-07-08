@@ -9,10 +9,11 @@
 #include "find_stuff.h"
 #include "cpt_resRho.h"
 #include "omp.h"
+#include "SymmetrizePattern.h"
 
-#define debug false
-iReg checkCol = 0;
-iReg checkLevel = 0;
+#define debug true
+iReg checkCol = 42;
+iReg checkLevel = 3;
 
 // blas Fortran routines declarations
 extern "C" {
@@ -61,6 +62,15 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                            iExt *iat0, iReg *ja0, double *coef0,
                            iReg nthread, iReg n_step, iReg step_size, double eps, iExt nn_A,
                            iExt *&iatN, iReg *&jaN, double *&coefN, double &avg_resRelNorm){
+
+
+   int err;
+   double *tmp;
+   // Symmetrize the pattern for the matrices
+   err =  SymmetrizePattern(nn_A, iatk, jak, coefk, tmp);
+   printf("%d\n",err);
+   err =  SymmetrizePattern(nn_A, iat0, ja0, coef0, tmp);
+   printf("%d\n",err);
 
    // Allocate the space for storing the outputs of the loop over the columns
    std::vector<iReg> storageJsizevec(nn_A);
@@ -261,7 +271,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          // printf("Astart %d, Jstart %d, Jend %d\n", Astart,n2old,n2);
          getAhat(I, sizeIcurr, J, n2old, n2, iatk, jak, coefk, Ahat, Astart);
 
-         if (k == checkCol && debug) print_vector("init Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
+         // if (k == checkCol && debug) print_vector("init Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
          // print_vector("Vector sizeI", t+2, sizeI);
          // print_vector("Vector sizeJ", t+1, sizeJ);
 
@@ -269,7 +279,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
             // Compute the QR factorization of the first matrix
             computeFirstQR(Ahat, sizeIcurr, n2, R, Rtriang, tau, work, lwork, info);
             qStart[t+1] = sizeIcurr * n2;
-            if (k == checkCol && debug) print_vector("cpt 1 Matrix Ahat QR", sizeIcurr*n2, Ahat);
+            // if (k == checkCol && debug) print_vector("cpt 1 Matrix Ahat QR", sizeIcurr*n2, Ahat);
             if (k == checkCol && debug) print_vector("tau", n2, tau);
 
             // Apply Qt for the first matrix
@@ -278,13 +288,13 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          } else{
             // Apply the previously computed Q to the new Ahat part
             applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t], sizeI[t], sizeJ[t+1]-sizeJ[t], work, lwork, info);
-            if (k == checkCol && debug) print_vector("apply Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
+            // if (k == checkCol && debug) print_vector("apply Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
 
             computeNewQR(t, sizeI, sizeJ, qStart, Ahat, tau, R, Rtriang, work, lwork, info);
-            if (k == checkCol && debug) print_vector("cpt n Matrix Ahat QR", qStart[t+1], Ahat);
+            // if (k == checkCol && debug) print_vector("cpt n Matrix Ahat QR", qStart[t+1], Ahat);
             if (k == checkCol && debug) print_vector("tau", n2, tau);
             if (k == checkCol && debug) print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
-            if (k == checkCol && debug) print_vector("Vector chat", sizeI[t+1], mHat);
+            // if (k == checkCol && debug) print_vector("Vector chat", sizeI[t+1], mHat);
             applyQt(t+1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeIcurr, 1, work, lwork, info);
             if (k == checkCol && debug) print_vector("Vector chat", sizeI[t+1], mHat);
             // print_matrix("Matrix R", n2, n2, R, n2);
@@ -312,11 +322,11 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          if (t < n_step - 1){
             // Find the values for L
             fillL(L, res, nn_A, usedL);
-            // if (k == checkCol && debug) print_vector("L", usedL, L);
+            if (k == checkCol && debug) print_vector("L", usedL, L);
 
             // Find the values for Jtilde
             findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);
-            /// if (k == checkCol && debug) print_vector("Vector Jtilde", JtildeSize, Jtilde);
+            if (k == checkCol && debug) print_vector("Vector Jtilde", JtildeSize, Jtilde);
 
             // Nothing new to add
             if (JtildeSize == 0){
@@ -361,7 +371,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          }
 
          #if debug == true
-         if (t == checkLevel){
+         if (t == checkLevel && k == checkCol){
             break;
          }
          #endif
