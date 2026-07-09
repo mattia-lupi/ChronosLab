@@ -267,7 +267,7 @@ switch lower(solv_method)
 
         % Solve the system by SQMR
         fprintf('BEGIN: System solution by GMRES_CJ\n');
-        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
+        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,A21_scaled,inv_D22,x);
         [sol_scaled,flag,relres,iter,resvec] = gmres_RIGHT(A_scaled,rhs_scaled,restart,tol,itmax/restart,M);
         fprintf('END: System solution by GMRES_CJ\n\n');
 
@@ -276,7 +276,7 @@ switch lower(solv_method)
         % Solve the system by SQMR
         fprintf('BEGIN: System solution by SQMR\n');
         Afun = @(x) A_scaled*x;
-        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
+        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,A21_scaled,inv_D22,x);
         IDfun = @(x) x;
         [sol_scaled,flag,relres,iter,resvec] = SQMR(Afun,rhs_scaled,tol,itmax,M,IDfun);
         fprintf('END: System solution by SQMR\n\n');
