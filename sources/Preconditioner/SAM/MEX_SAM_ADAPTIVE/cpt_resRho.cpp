@@ -61,9 +61,6 @@ void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatA
       normColJ[i] = std::max(rho, 0.0);
    }
 
-   // Copy the result where needed
-   std::memcpy(res, tmpRes, JtildeSize * sizeof(double));
-
    return;
 }
 
@@ -147,6 +144,7 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ,
     // Final Global Math
     double normAjMh = std::sqrt(normAjMh_sq);
     resNorm = std::sqrt(sq_sum);
+    std::sort(L,L+usedL);
 
     resRelNorm = 2.0 * resNorm / (normAjMh + resRelNorm);
 }
