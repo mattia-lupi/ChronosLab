@@ -24,8 +24,8 @@ extern "C" {
                const lapack_int* incx, double* y, const lapack_int* incy);
 }
 
-void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt __restrict *jatAJtilde,  
-              const iReg __restrict *iaAJtilde, const double __restrict *coefAJtilde,      
+void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatAJtilde,
+              const iReg* RESTRICT iaAJtilde, const double* RESTRICT coefAJtilde,
               double *res, double *tmpRes, const double normRes) {
    const double normResSq = normRes * normRes;
    double dot, sum, val, rho;
@@ -75,101 +75,22 @@ iReg minIdx(double *rhoJ2, iReg JtildeSize){
     return static_cast<iReg>(std::distance(rhoJ2, min_element_ptr));
 }
 
-// void cptRes(iReg nn_A, iReg sizeJ, const double * __restrict A0k,
-//             const iExt * __restrict jatAJ, const iReg * __restrict iaAJ,
-//             const double * __restrict coefAJ, const double * __restrict mHat,
-//             double * __restrict res, double &resRelNorm, double &resNorm,
-//             int* __restrict ws_idx, double* __restrict ws_val) {
-
-//     // Initialize res and compute baseline sq_sum
-//     double sq_sum0 = 0.0, sq_sum1 = 0.0, sq_sum2 = 0.0, sq_sum3 = 0.0;
-//     iReg i = 0;
-
-//     // Unrolled from 0 to nn_A - 3, compute residual in a sparse accumulator
-//     for (; i <= nn_A - 4; i += 4) {
-//         double a0 = A0k[i];   double a1 = A0k[i+1];
-//         double a2 = A0k[i+2]; double a3 = A0k[i+3];
-
-//         res[i]   = -a0; res[i+1] = -a1;
-//         res[i+2] = -a2; res[i+3] = -a3;
-
-//         sq_sum0 += a0 * a0; sq_sum1 += a1 * a1;
-//         sq_sum2 += a2 * a2; sq_sum3 += a3 * a3;
-//     }
-//     // Loop from nn_A - 3 to the end
-//     for (; i < nn_A; ++i) {
-//         double a = A0k[i];
-//         res[i] = -a;
-//         sq_sum0 += a * a;
-//     }
-//     double sq_sum = sq_sum0 + sq_sum1 + sq_sum2 + sq_sum3;
-
-//     // Accumulate into dense ws_val, log unique rows in ws_idx, compute SpMV
-//     int ws_count = 0;
-//     for (iReg j = 0; j < sizeJ; ++j) {
-//         const double m_j = mHat[j];
-//         if (m_j == 0.0) continue;
-
-//         iExt start = jatAJ[j];
-//         iExt end   = jatAJ[j + 1];
-//         for (iExt k = start; k < end; ++k) {
-//             iReg row = iaAJ[k];
-//             double val = coefAJ[k] * m_j;
-
-//             // If this row hasn't been touched yet in this call, log its index
-//             if (ws_val[row] == 0.0) {
-//                 ws_idx[ws_count++] = row;
-//             }
-//             ws_val[row] += val;
-//         }
-//     }
-
-//     // Compute normAjMh and dynamically adjust res and sq_sum
-//     double normAjMh_sq = 0.0;
-//     for (int n = 0; n < ws_count; ++n) {
-//         iReg row = ws_idx[n];
-//         double val = ws_val[row];
-
-//         // Handles both true zeros and skips duplicate indices safely
-//         if (val == 0.0) continue;
-
-//         normAjMh_sq += val * val;
-
-//         double old_res = res[row]; // Currently holds -A0k[row]
-//         double new_res = old_res + val;
-//         res[row] = new_res;
-
-//         // Compute the total sum of squares
-//         sq_sum += (new_res * new_res) - (old_res * old_res);
-
-//         // Reset workspace to 0.0 for the next function call
-//         ws_val[row] = 0.0;
-//     }
-
-//     // Compute the relative residual norm
-//     double normAjMh = std::sqrt(normAjMh_sq);
-//     resNorm = std::sqrt(sq_sum);
-
-//     resRelNorm = 2.0 * resNorm / (normAjMh + resRelNorm);
-// }
-
-void cptRes(iReg sizeJ, 
-            const iExt * __restrict jatAJ, const iReg * __restrict iaAJ, const double * __restrict coefAJ, 
-            const double * __restrict mHat,
-            const iReg * __restrict A0k_idx, const double * __restrict A0k, iReg A0k_nnz,
-            double * __restrict res, iReg * __restrict L, iReg &usedL,
+void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ, 
+            const double * RESTRICT coefAJ, const double * RESTRICT mHat,
+            const iReg * RESTRICT A0k_idx, const double * RESTRICT A0k, iReg A0k_nnz,
+            double * RESTRICT res, iReg * RESTRICT L, iReg &usedL,
             double &resRelNorm, double &resNorm,
-            int* __restrict ws_idx, double* __restrict ws_val) {
+            int* RESTRICT ws_idx, double* RESTRICT ws_val) {
 
-    // 1. Sparse Reset: Clear ONLY the elements of 'res' that were modified 
-    //    in the PREVIOUS call, using the old L array.
+    // Clear the elements of 'res' that were modified 
+    // in the previous call, using the old L array.
     for (iReg n = 0; n < usedL; ++n) {
         res[L[n]] = 0.0;
     }
 
     int ws_count = 0;
 
-    // 2. Sparse SpMV Pass: Accumulate AJ * mHat into the workspace
+    // Compute AJ * mHat and save into the workspace
     for (iReg j = 0; j < sizeJ; ++j) {
         const double m_j = mHat[j];
         if (m_j == 0.0) continue;
@@ -185,14 +106,14 @@ void cptRes(iReg sizeJ,
         }
     }
 
-    // 3. Compute SpMV Norm: Look only at rows touched by the SpMV
+    // Compute the norm looking only at the full entries
     double normAjMh_sq = 0.0;
     for (int n = 0; n < ws_count; ++n) {
         double spmv_val = ws_val[ws_idx[n]];
         normAjMh_sq += spmv_val * spmv_val;
     }
 
-    // 4. Merge Sparse A0k: Subtract A0k from the workspace
+    // Subtract A0k from the workspace
     for (iReg n = 0; n < A0k_nnz; ++n) {
         iReg row = A0k_idx[n];
         if (ws_val[row] == 0.0) {
@@ -201,7 +122,7 @@ void cptRes(iReg sizeJ,
         ws_val[row] -= A0k[row]; 
     }
 
-    // 5. Final Pass: Populate res, generate L, and compute total sq_sum
+    // Populate res, generate L, and compute total sq_sum
     double sq_sum = 0.0;
     iReg local_usedL = 0;
 
@@ -216,14 +137,14 @@ void cptRes(iReg sizeJ,
             sq_sum += final_res * final_res;
         }
 
-        // Self-cleaning: Reset workspace to 0.0 for the next call
+        // Reset workspace to 0.0 for the next call
         ws_val[row] = 0.0;
     }
 
     // Update the reference with the new count of non-zeros
     usedL = local_usedL;
 
-    // 6. Final Global Math
+    // Final Global Math
     double normAjMh = std::sqrt(normAjMh_sq);
     resNorm = std::sqrt(sq_sum);
 

@@ -1,15 +1,16 @@
 #include "find_stuff.h"
 #include <algorithm>
+#include <cstring>
 #include <vector>
 #include <iostream>
 #include <unordered_set>
 
-void fullA0k(const iExt nn_A, const iExt * __restrict iat0,
-             const iReg * __restrict ja0, const double * __restrict coef0,
-             const iExt k, double * __restrict A0k,
-             iReg * __restrict A0k_idx, iReg &A0k_nnz) {
+void fullA0k(const iExt nn_A, const iExt * RESTRICT iat0,
+             const iReg * RESTRICT ja0, const double * RESTRICT coef0,
+             const iExt k, double * RESTRICT A0k,
+             iReg * RESTRICT A0k_idx, iReg &A0k_nnz) {
 
-   // 1. Sparse Reset: Clear ONLY the elements modified in the PREVIOUS call
+   // Clear the elements modified in the previous call
    for (iReg n = 0; n < A0k_nnz; ++n) {
       A0k[A0k_idx[n]] = 0.0;
    }
@@ -20,33 +21,16 @@ void fullA0k(const iExt nn_A, const iExt * __restrict iat0,
 
    iReg local_nnz = 0;
 
-   // 2. Populate only the active rows and log their indices
+   // Populate the active rows and log their indices
    for (iExt idx = col_start; idx < col_end; ++idx) {
       iReg row = ja0[idx];
       A0k[row] = coef0[idx];
       A0k_idx[local_nnz++] = row;
    }
 
-   // 3. Record how many non-zero elements we found in this column
+   // Record how many non-zero elements we found in this column
    A0k_nnz = local_nnz;
 }
-
-// void fullA0k(const iExt nn_A, const iExt __restrict *iat0, 
-//              const iReg __restrict *ja0, const double __restrict *coef0, 
-//              const iExt k, double *A0k){        
-//    // Initialize the dense output vector with zeros
-//    std::fill_n(A0k, nn_A, 0.0);                                                            
-//                                                                                            
-//    // Direct lookup of the start and end bounds for column k
-//    iExt col_start = iat0[k];                                                               
-//    iExt col_end   = iat0[k+1];                                                             
-//                                                                                            
-//    // Populate only the rows that have non-zero entries in this column
-//    for (iExt idx = col_start; idx < col_end; ++idx) {                                      
-//       iReg row = ja0[idx];                                                                
-//       A0k[row] = coef0[idx];                                                              
-//    }                                                                                       
-// }
 
 void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk, 
                        const iReg __restrict *jak, const iReg n2, iReg *I, iReg &sizeI){
@@ -72,18 +56,18 @@ void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *j
    iReg *col_rows = &ja0[col_start];
 
    // Loop over the new rows
-   for (iReg i = oldSizeI; i < sizeI; ++i) {        
-      iReg row = I[i];                                                                    
-      a0k[i] = 0.0; // Default value                                                      
-                                                                                          
+   for (iReg i = oldSizeI; i < sizeI; ++i) {
+      iReg row = I[i];
+      a0k[i] = 0.0; // Default value
+
       // Binary search for the 'row' within the contiguous rows of column k
-      if (col_len > 0) {                                                                  
-         auto it = std::lower_bound(col_rows, col_rows + col_len, row);                  
-         if (it != col_rows + col_len && *it == row) {                                        
-            a0k[i] = coef0[col_start + (it - col_rows)];                                   
-         }                                                                                
-      }                                                                                   
-   }                                                                                      
+      if (col_len > 0) {
+         auto it = std::lower_bound(col_rows, col_rows + col_len, row);
+         if (it != col_rows + col_len && *it == row) {
+            a0k[i] = coef0[col_start + (it - col_rows)];
+         }
+      }
+   }
 }
 
 void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
@@ -146,23 +130,8 @@ void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *jatk,iReg *iak,double *coefk,
 }
 
 
-void fillL(iReg *__restrict L, const double *__restrict res, iExt nn_A, iReg &usedL) {
-   iReg local_usedL = 0;
-
-   // Loop over all the rows
-   for (iExt i = 0; i < nn_A; ++i) {
-      if (res[i] != 0.0) { 
-         L[local_usedL] = static_cast<iReg>(i);
-         local_usedL++;
-      }
-   }
-
-   // Write back to the reference exactly once
-   usedL = local_usedL; 
-}
-
-void findJtilde(iReg *Jtilde, iReg &JtildeSize, const iReg __restrict *L, 
-                const iReg sizeL, const iExt __restrict *iatk, const iReg __restrict *jak, 
+void findJtilde(iReg *Jtilde, iReg &JtildeSize, const iReg* RESTRICT L,
+                const iReg sizeL, const iExt* RESTRICT iatk, const iReg* RESTRICT jak, 
                 iReg *J, iReg sizeJ) {
    if (sizeL == 0) {
       printf("sizeL == 0, check\n");

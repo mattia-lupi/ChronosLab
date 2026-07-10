@@ -212,7 +212,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    #pragma omp parallel for num_threads(nthread)
    for (iReg k = 0; k < nn_A; ++k){
       double resRelNorm = 1.0, resNorm;
-      iReg usedL, JtildeSize;
+      iReg usedL, JtildeSize = 0;
 
       // Get local id number
       iReg thId = omp_get_thread_num();
