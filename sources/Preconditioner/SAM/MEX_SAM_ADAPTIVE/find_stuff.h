@@ -6,9 +6,13 @@
 
 #include "precision.h"
 
-void fullA0k(const iExt nn_A, const iExt __restrict *iat0,                                 
-             const iReg __restrict *ja0, const double __restrict *coef0,                   
-             const iExt k, double *A0k);
+void fullA0k(const iExt nn_A, const iExt * __restrict iat0,
+             const iReg * __restrict ja0, const double * __restrict coef0,
+             const iExt k, double * __restrict A0k,
+             iReg * __restrict A0k_idx, iReg &A0k_nnz);
+// void fullA0k(const iExt nn_A, const iExt __restrict *iat0,                                 
+//              const iReg __restrict *ja0, const double __restrict *coef0,                   
+//              const iExt k, double *A0k);
 
 void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk,              
                        const iReg __restrict *jak, const iReg n2, iReg *I, iReg &sizeI);

@@ -64,8 +64,8 @@ int main() {
     }
 
     // Variables for the function
-    int nthread = 8;
-    int n_step = 2;
+    int nthread = 1;
+    int n_step = 15;
     int step_size = 1;
     double eps = 1e-5;
     int nn_A = mat_row_ptr.size() - 1;
@@ -89,6 +89,10 @@ int main() {
 
     std::cout << "Time taken: " << duration.count() << " microseconds" << std::endl;
     std::cout << "Time taken: " << duration.count() / 1000.0 << " milliseconds" << std::endl;
+
+    delete[] iat_N;
+    delete[] ja_N;
+    delete[] coef_N;
 
     return 0;
 }

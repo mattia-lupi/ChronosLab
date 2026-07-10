@@ -4,22 +4,49 @@
 #include <iostream>
 #include <unordered_set>
 
-void fullA0k(const iExt nn_A, const iExt __restrict *iat0, 
-             const iReg __restrict *ja0, const double __restrict *coef0, 
-             const iExt k, double *A0k){        
-   // Initialize the dense output vector with zeros
-   std::fill_n(A0k, nn_A, 0.0);                                                            
-                                                                                           
+void fullA0k(const iExt nn_A, const iExt * __restrict iat0,
+             const iReg * __restrict ja0, const double * __restrict coef0,
+             const iExt k, double * __restrict A0k,
+             iReg * __restrict A0k_idx, iReg &A0k_nnz) {
+
+   // 1. Sparse Reset: Clear ONLY the elements modified in the PREVIOUS call
+   for (iReg n = 0; n < A0k_nnz; ++n) {
+      A0k[A0k_idx[n]] = 0.0;
+   }
+
    // Direct lookup of the start and end bounds for column k
-   iExt col_start = iat0[k];                                                               
-   iExt col_end   = iat0[k+1];                                                             
-                                                                                           
-   // Populate only the rows that have non-zero entries in this column
-   for (iExt idx = col_start; idx < col_end; ++idx) {                                      
-      iReg row = ja0[idx];                                                                
-      A0k[row] = coef0[idx];                                                              
-   }                                                                                       
+   iExt col_start = iat0[k];
+   iExt col_end   = iat0[k+1];
+
+   iReg local_nnz = 0;
+
+   // 2. Populate only the active rows and log their indices
+   for (iExt idx = col_start; idx < col_end; ++idx) {
+      iReg row = ja0[idx];
+      A0k[row] = coef0[idx];
+      A0k_idx[local_nnz++] = row;
+   }
+
+   // 3. Record how many non-zero elements we found in this column
+   A0k_nnz = local_nnz;
 }
+
+// void fullA0k(const iExt nn_A, const iExt __restrict *iat0, 
+//              const iReg __restrict *ja0, const double __restrict *coef0, 
+//              const iExt k, double *A0k){        
+//    // Initialize the dense output vector with zeros
+//    std::fill_n(A0k, nn_A, 0.0);                                                            
+//                                                                                            
+//    // Direct lookup of the start and end bounds for column k
+//    iExt col_start = iat0[k];                                                               
+//    iExt col_end   = iat0[k+1];                                                             
+//                                                                                            
+//    // Populate only the rows that have non-zero entries in this column
+//    for (iExt idx = col_start; idx < col_end; ++idx) {                                      
+//       iReg row = ja0[idx];                                                                
+//       A0k[row] = coef0[idx];                                                              
+//    }                                                                                       
+// }
 
 void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk, 
                        const iReg __restrict *jak, const iReg n2, iReg *I, iReg &sizeI){

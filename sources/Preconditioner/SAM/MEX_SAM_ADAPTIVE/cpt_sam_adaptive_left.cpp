@@ -139,6 +139,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
    // Allocate space for A0(:,k)
    std::vector<double> A0kvec(tmpVal);
+   std::vector<iReg> A0k_idxvec(tmpVal);
+   std::vector<iReg> A0k_nnzvec(nthread);
+   iReg *A0k_nnz = A0k_nnzvec.data();
 
    // Allocate space for residuals
    std::vector<double> resvec(tmpVal);
@@ -235,6 +238,8 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *a0k = a0kvec.data() + tmpLocVal;
       double *mHat = mHatvec.data() + tmpLocVal;
       double *A0k = A0kvec.data() + tmpLocVal;
+      iReg *A0k_idx = A0k_idxvec.data() + tmpLocVal;
+      
       double *res = resvec.data() + tmpLocVal;
       iReg *L = Lvec.data() + tmpLocVal;
 
@@ -266,7 +271,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
       // Fill the current column of the "old" matrix 
       // Do it once per column
-      fullA0k(nn_A, iat0, ja0, coef0, k, A0k);
+      // fullA0k(nn_A, iat0, ja0, coef0, k, A0k);
+      A0k_nnz[thId] = 0;
+      fullA0k(nn_A, iat0, ja0, coef0, k, A0k, A0k_idx, A0k_nnz[thId]);
       // Compute the norm only once
       double normA0k = dnrm2_(&N,A0k,&one);
 
@@ -365,8 +372,10 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          resRelNorm = normA0k;
 
          // Compute res = AJ*mHat-A0k and save it in AJ
-         cptRes(nn_A, n2, A0k, jatAJ, iaAJ, coefAJ, mHat, res, resRelNorm, resNorm,iaAJtilde,coefAJtilde);
-         
+         // cptRes(nn_A, n2, A0k, jatAJ, iaAJ, coefAJ, mHat, res, resRelNorm, resNorm,iaAJtilde,coefAJtilde);
+         cptRes(n2, jatAJ, iaAJ, coefAJ, mHat, A0k_idx, A0k, A0k_nnz[thId],
+                res, L, usedL, resRelNorm, resNorm, iaAJtilde, coefAJtilde);
+
          // Debug prints
          #if debug
          if (k == checkCol) print_spVec("vector res", nn_A, res);
@@ -378,7 +387,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
          if (t < n_step - 1){
             // Find the values for L
-            fillL(L, res, nn_A, usedL);
+            // fillL(L, res, nn_A, usedL);
 
             // Find the values for Jtilde
             findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);

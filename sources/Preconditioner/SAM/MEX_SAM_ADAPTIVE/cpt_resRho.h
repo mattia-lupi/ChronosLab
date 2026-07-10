@@ -8,8 +8,16 @@ void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt __restrict *ja
 
 iReg minIdx(double *rhoJ2, iReg JtildeSize);
 
-void cptRes(iReg nn_A, iReg sizeJ, const double * __restrict A0k,
-            const iExt * __restrict jatAJ, const iReg * __restrict iaAJ,
-            const double * __restrict coefAJ, const double * __restrict mHat,
-            double * __restrict res, double &resRelNorm, double &resNorm,
+// void cptRes(iReg nn_A, iReg sizeJ, const double * __restrict A0k,
+//             const iExt * __restrict jatAJ, const iReg * __restrict iaAJ,
+//             const double * __restrict coefAJ, const double * __restrict mHat,
+//             double * __restrict res, double &resRelNorm, double &resNorm,
+//             int* __restrict ws_idx, double* __restrict ws_val);
+
+void cptRes(iReg sizeJ,
+            const iExt * __restrict jatAJ, const iReg * __restrict iaAJ, const double * __restrict coefAJ,
+            const double * __restrict mHat,
+            const iReg * __restrict A0k_idx, const double * __restrict A0k, iReg A0k_nnz,
+            double * __restrict res, iReg * __restrict L, iReg &usedL,
+            double &resRelNorm, double &resNorm,
             int* __restrict ws_idx, double* __restrict ws_val);
