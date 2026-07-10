@@ -64,7 +64,7 @@ int main() {
     }
 
     // Variables for the function
-    int nthread = 8;
+    int nthread = 1;
     int n_step = 15;
     int step_size = 1;
     double eps = 1e-5;

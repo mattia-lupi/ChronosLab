@@ -1,46 +1,46 @@
 #include "transpose.h"
+#include <omp.h>
 
-int transpose(const int nrows, const int ncols, const int *const iat, const int *const ja,
-              const double *const coef, int *&iat_T, int *&ja_T, double *&coef_T){
+/**
+ * Parallel transposition of a sparse matrix with a symmetric sparsity pattern.
+ * Parallelized using OpenMP based on the provided interface.
+ *
+ * @param nthread  Number of threads to use.
+ * @param nrows    Number of rows in the matrix.
+ * @param iat      Row pointers of the input matrix (size: nrows + 1).
+ * @param ja       Column indices of the input matrix (size: iat[nrows]).
+ * @param coef     Matrix coefficients of the input matrix (size: iat[nrows]).
+ * @param iat_T    Output row pointers (size: nrows + 1).
+ * @param ja_T     Output column indices (size: iat[nrows]).
+ * @param coef_T   Output matrix coefficients (size: iat[nrows]).
+ * @return         0 on success, -1 on error.
+ */
 
-   // Allocate output and scracth
-   iat_T = (int*) malloc((ncols+1) * sizeof(int));
-   int nterm = iat[nrows];
-   ja_T = (int*) malloc((nterm) * sizeof(int));
-   coef_T = (double*) malloc((nterm) * sizeof(double));
-   int *ISCR = (int*) malloc((ncols+1) * sizeof(int));
-   if (iat_T == nullptr || ja_T == nullptr || coef_T == nullptr || ISCR == nullptr){
-      // Allocation error
-      std::cout << "Allocation Error in transpose" << std::endl;
-      return 1;
-   }
-   
-   // Initialize pointers
-   std::fill_n(iat_T,ncols+1,0);
+int transpose(int nthread, const int nrows, const int *const iat, const int *const ja,
+              const double *const coef, int *iat_T, int *ja_T, double *coef_T) {
 
-   // Count non-zeroes for each column of the input matrix
-   for ( int i = 0; i < nrows; i++ ){
-      for ( int j = iat[i]; j < iat[i+1]; j++ ) iat_T[ja[j]]++;
-   }
+    const int nnz = iat[nrows];
 
-   // Set pointers
-   ISCR[0] = 0;
-   for ( int i = 1; i < ncols+1; i++ ) ISCR[i] = ISCR[i-1] + iat_T[i-1];
-   for ( int i = 0; i < ncols+1; i++ ) iat_T[i] = ISCR[i];
+    // Structural symmetry means iat and ja map perfectly to iat_T and ja_T.
+    std::memcpy(iat_T, iat, (nrows + 1) * sizeof(int));
+    std::memcpy(ja_T,  ja,  nnz * sizeof(int));
 
-   // Transpose column indices and coefficients
-   for ( int i = 0; i < nrows; i++ ){
-      for ( int j = iat[i]; j < iat[i+1]; j++ ){
-         int ind  = ISCR[ja[j]];
-         ja_T[ind] = i;
-         coef_T[ind] = coef[j];
-         ISCR[ja[j]] = ind+1;
-      }
-   }
+    // Loop over the rows
+    for (int i = 0; i < nrows; ++i) {
+        for (int k = iat[i]; k < iat[i+1]; ++k) {
+            const int j = ja[k];
 
-   // Deallocate scratch
-   free(ISCR);
+            // Binary search row j for column index i to find the destination pointer
+            const int* row_j_start = ja + iat[j];
+            const int* row_j_end   = ja + iat[j+1];
+            const int* match       = std::lower_bound(row_j_start, row_j_end, i);
 
-   return 0;
+            if (match != row_j_end && *match == i) {
+                const int target_pos = match - ja;
+                coef_T[target_pos] = coef[k];
+            }
+        }
+    }
 
+    return 0;
 }
