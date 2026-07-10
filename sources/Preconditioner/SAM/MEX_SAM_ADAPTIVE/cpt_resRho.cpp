@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm> // For std::max and std::min_element
 #include <iterator>  // For std::distance
+#include <cmath>
 #include "lapack.h"
 
 // blas Fortran routines declarations
@@ -23,53 +24,30 @@ extern "C" {
                const lapack_int* incx, double* y, const lapack_int* incy);
 }
 
-void cptRes(iReg nn_A, iReg sizeJ, double *A0k, double *AJ, double *mHat, double *res, double &resRelNorm, double &resNorm){
-   // AJ is column-major with nn_A rows and sizeJ columns.
-   // Matrix-vector multiplication computes: res = AJ * mHat
-   char trans = 'N';
-   lapack_int m_v = static_cast<lapack_int>(nn_A);
-   lapack_int n_v = static_cast<lapack_int>(sizeJ);
-   double alpha = 1.0;
-   double beta = 0.0;
-   lapack_int lda = m_v; 
-   lapack_int incx = 1;
-   lapack_int incy = 1;
-
-   // Compute AJ * mHat
-   dgemv_(&trans, &m_v, &n_v, &alpha, AJ, &lda, mHat, &incx, &beta, res, &incy);
-
-   // Compute the norm of AJ * mHat
-   lapack_int N = static_cast<lapack_int>(nn_A);
-   double normAjMh = dnrm2_(&N, res, &incx);
-
-   // Compute res = AJ * mHat - A0k
-   double alpha_axpy = -1.0;
-   daxpy_(&N, &alpha_axpy, A0k, &incx, res, &incy);
-
-   // Compute the residual norm
-   resNorm = dnrm2_(&N, res, &incx);
-
-   // Compute the relative version of the norm
-   resRelNorm = 2 * resNorm / (normAjMh + resRelNorm);
-
-   return;
-}
-
-void cptRhoJ2(iReg JtildeSize, double *normColJ, double *AJtilde, iReg nn_A, double *res, double *tmpRes, double normRes){
+void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt __restrict *jatAJtilde,  
+              const iReg __restrict *iaAJtilde, const double __restrict *coefAJtilde,      
+              const iExt nn_A, double *res, double *tmpRes, const double normRes) {
    const double normResSq = normRes * normRes;
+   double dot, sum, val, rho;
+   iExt colStart, colEnd;
+   iReg row;
 
-   // Fuse ddot, dgemv, and the final adjustments into a single pass
+   // Loop through each column of the CSC matrix
    for (iReg i = 0; i < JtildeSize; ++i) {
-      double dot = 0.0;
-      double sum = 0.0;
-      const double* col = &AJtilde[i * nn_A];
+      dot = 0.0;
+      sum = 0.0;
 
-      // This single inner loop streams a column into cache ONCE
-      // and performs both operations simultaneously.
-      for (iReg j = 0; j < nn_A; ++j) {
-         double val = col[j];
+      // Get the start and end boundaries for the current column 'i'
+      colStart = jatAJtilde[i];
+      colEnd   = jatAJtilde[i + 1];
+
+      // Iterate only over the non-zero elements of this column
+      for (iExt k = colStart; k < colEnd; ++k) {
+         row   = iaAJtilde[k];
+         val = coefAJtilde[k];
+
          dot += val * val;
-         sum += val * res[j];
+         sum += val * res[row];
       }
 
       if (dot == 0.0) {
@@ -77,9 +55,9 @@ void cptRhoJ2(iReg JtildeSize, double *normColJ, double *AJtilde, iReg nn_A, dou
       }
 
       tmpRes[i] = sum;
-      
+
       // Compute the rhoJ2 inline
-      double rho = normResSq - (sum * sum) / dot;
+      rho = normResSq - (sum * sum) / dot;
       normColJ[i] = std::max(rho, 0.0);
    }
 
@@ -95,4 +73,82 @@ iReg minIdx(double *rhoJ2, iReg JtildeSize){
     
     double* min_element_ptr = std::min_element(rhoJ2, rhoJ2 + JtildeSize);
     return static_cast<iReg>(std::distance(rhoJ2, min_element_ptr));
+}
+
+void cptRes(iReg nn_A, iReg sizeJ, const double * __restrict A0k,
+            const iExt * __restrict jatAJ, const iReg * __restrict iaAJ,
+            const double * __restrict coefAJ, const double * __restrict mHat,
+            double * __restrict res, double &resRelNorm, double &resNorm,
+            int* __restrict ws_idx, double* __restrict ws_val) {
+
+    // Initialize res and compute baseline sq_sum
+    double sq_sum0 = 0.0, sq_sum1 = 0.0, sq_sum2 = 0.0, sq_sum3 = 0.0;
+    iReg i = 0;
+
+    // Unrolled from 0 to nn_A - 3, compute residual in a sparse accumulator
+    for (; i <= nn_A - 4; i += 4) {
+        double a0 = A0k[i];   double a1 = A0k[i+1];
+        double a2 = A0k[i+2]; double a3 = A0k[i+3];
+
+        res[i]   = -a0; res[i+1] = -a1;
+        res[i+2] = -a2; res[i+3] = -a3;
+
+        sq_sum0 += a0 * a0; sq_sum1 += a1 * a1;
+        sq_sum2 += a2 * a2; sq_sum3 += a3 * a3;
+    }
+    // Loop from nn_A - 3 to the end
+    for (; i < nn_A; ++i) {
+        double a = A0k[i];
+        res[i] = -a;
+        sq_sum0 += a * a;
+    }
+    double sq_sum = sq_sum0 + sq_sum1 + sq_sum2 + sq_sum3;
+
+    // Accumulate into dense ws_val, log unique rows in ws_idx, compute SpMV
+    int ws_count = 0;
+    for (iReg j = 0; j < sizeJ; ++j) {
+        const double m_j = mHat[j];
+        if (m_j == 0.0) continue;
+
+        iExt start = jatAJ[j];
+        iExt end   = jatAJ[j + 1];
+        for (iExt k = start; k < end; ++k) {
+            iReg row = iaAJ[k];
+            double val = coefAJ[k] * m_j;
+
+            // If this row hasn't been touched yet in this call, log its index
+            if (ws_val[row] == 0.0) {
+                ws_idx[ws_count++] = row;
+            }
+            ws_val[row] += val;
+        }
+    }
+
+    // Compute normAjMh and dynamically adjust res and sq_sum
+    double normAjMh_sq = 0.0;
+    for (int n = 0; n < ws_count; ++n) {
+        iReg row = ws_idx[n];
+        double val = ws_val[row];
+
+        // Handles both true zeros and skips duplicate indices safely
+        if (val == 0.0) continue;
+
+        normAjMh_sq += val * val;
+
+        double old_res = res[row]; // Currently holds -A0k[row]
+        double new_res = old_res + val;
+        res[row] = new_res;
+
+        // Compute the total sum of squares
+        sq_sum += (new_res * new_res) - (old_res * old_res);
+
+        // Reset workspace to 0.0 for the next function call
+        ws_val[row] = 0.0;
+    }
+
+    // Compute the relative residual norm
+    double normAjMh = std::sqrt(normAjMh_sq);
+    resNorm = std::sqrt(sq_sum);
+
+    resRelNorm = 2.0 * resNorm / (normAjMh + resRelNorm);
 }

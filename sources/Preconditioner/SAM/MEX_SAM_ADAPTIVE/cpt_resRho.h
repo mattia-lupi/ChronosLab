@@ -2,8 +2,14 @@
 
 #include "precision.h"
 
-void cptRes(iExt nn_A, iReg sizeJ, double *A0k, double *AJ, double *mHat, double *res, double &resRelNorm, double &resNorm);
-
-void cptRhoJ2(iReg JtildeSize, double *normColJ, double *AJtilde, iExt nn_A, double *res, double *tmpRes, double normRes);
+void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt __restrict *jatAJtilde, 
+              const iReg __restrict *iaAJtilde, const double __restrict *coefAJtilde, 
+              const iExt nn_A, double *res, double *tmpRes, const double normRes);
 
 iReg minIdx(double *rhoJ2, iReg JtildeSize);
+
+void cptRes(iReg nn_A, iReg sizeJ, const double * __restrict A0k,
+            const iExt * __restrict jatAJ, const iReg * __restrict iaAJ,
+            const double * __restrict coefAJ, const double * __restrict mHat,
+            double * __restrict res, double &resRelNorm, double &resNorm,
+            int* __restrict ws_idx, double* __restrict ws_val);

@@ -5,25 +5,25 @@
 #include <unordered_set>
 
 bool mattia = true;
-void fullA0k(iExt nn_A, iExt *iat0, iReg *ja0, double *coef0, iExt k, double *A0k){
-   std::fill_n(A0k, nn_A, 0.0);
-
-   for (iReg row = 0; row < nn_A; ++row) {
-      iReg row_start = iat0[row];
-      iReg row_end = iat0[row+1];
-      iReg row_len = row_end - row_start;
-
-      if (row_len > 0) {
-         iReg *row_cols = &ja0[row_start];
-         auto it = std::lower_bound(row_cols, row_cols + row_len, k);
-         if (it != row_cols + row_len && *it == k) {
-            A0k[row] = coef0[row_start + (it - row_cols)];
-         }
-      }
-   }
+void fullA0k(const iExt nn_A, const iExt __restrict *iat0, 
+             const iReg __restrict *ja0, const double __restrict *coef0, 
+             const iExt k, double *A0k){        
+   // Initialize the dense output vector with zeros
+   std::fill_n(A0k, nn_A, 0.0);                                                            
+                                                                                           
+   // Direct lookup of the start and end bounds for column k
+   iExt col_start = iat0[k];                                                               
+   iExt col_end   = iat0[k+1];                                                             
+                                                                                           
+   // Populate only the rows that have non-zero entries in this column
+   for (iExt idx = col_start; idx < col_end; ++idx) {                                      
+      iReg row = ja0[idx];                                                                
+      A0k[row] = coef0[idx];                                                              
+   }                                                                                       
 }
 
-void findNonZeroInColJ(iReg *J, iExt *iatk, iReg *jak, iReg n2, iReg *I, iReg &sizeI){
+void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk, 
+                       const iReg __restrict *jak, const iReg n2, iReg *I, iReg &sizeI){
    // Hash set to track unique items in O(1) time
    std::unordered_set<iReg> seen(I, I + sizeI);
 
@@ -32,7 +32,6 @@ void findNonZeroInColJ(iReg *J, iExt *iatk, iReg *jak, iReg n2, iReg *I, iReg &s
       iReg end = iatk[J[i] + 1];
       for (iReg j = start; j < end; ++j) {
          iReg val = jak[j];
-         // insert().second is true only if the item didn't already exist in the set
          if (seen.insert(val).second) {
             I[sizeI++] = val;
          }
@@ -41,22 +40,24 @@ void findNonZeroInColJ(iReg *J, iExt *iatk, iReg *jak, iReg n2, iReg *I, iReg &s
 }
 
 void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k){
-   for (iReg i = oldSizeI; i < sizeI; ++i) {
-      iReg row = I[i];
-      iReg row_start = iat0[row];
-      iReg row_end = iat0[row + 1];
-      iReg row_len = row_end - row_start;
+   // 1. Look up column k boundaries ONCE outside the loop
+   iExt col_start = iat0[k];
+   iExt col_end   = iat0[k+1];
+   iReg col_len   = col_end - col_start;
+   iReg *col_rows = &ja0[col_start];
 
-      a0k[i] = 0.0; // Default value
-
-      if (row_len > 0) {
-         iReg *row_cols = &ja0[row_start];
-         auto it = std::lower_bound(row_cols, row_cols + row_len, k);
-         if (it != row_cols + row_len && *it == k) {
-            a0k[i] = coef0[row_start + (it - row_cols)];
-         }
-      }
-   }
+   for (iReg i = oldSizeI; i < sizeI; ++i) {        
+      iReg row = I[i];                                                                    
+      a0k[i] = 0.0; // Default value                                                      
+                                                                                          
+      // 2. Binary search for the 'row' within the contiguous rows of column k
+      if (col_len > 0) {                                                                  
+         auto it = std::lower_bound(col_rows, col_rows + col_len, row);                  
+         if (it != col_rows + col_len && *it == row) {                                        
+            a0k[i] = coef0[col_start + (it - col_rows)];                                   
+         }                                                                                
+      }                                                                                   
+   }                                                                                      
 }
 
 void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
@@ -134,103 +135,102 @@ void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
 }
 
 // Get the new columns and add them to AJ
-void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt nn_A, iExt *iatk, iReg *jak, double *coefk, double *AJ) {
-    // Initialize the newly added columns in AJ to zero
-    for (iReg j = Jstart; j < Jend; ++j) {
-        for (iExt i = 0; i < nn_A; ++i) {
-            AJ[j * nn_A + i] = 0.0;
-        }
-    }
+void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt nn_A, iExt *jatk,iReg *iak,double *coefk,
+           iExt *jatAJ, iReg *iaAJ, double *coefAJ) {
 
-    // Populate AJ with values from the CSR matrix A
-    for (iExt i = 0; i < nn_A; ++i) {
-        iExt row_start = iatk[i];
-        iExt row_end = iatk[i + 1];
-        
-        for (iExt k = row_start; k < row_end; ++k) {
-            iReg col_A = jak[k];
-            
-            // Search if the current column index exists in the active J window
-            for (iReg j = Jstart; j < Jend; ++j) {
-                if (J[j] == col_A) {
-                    // Column-major indexing: column * structural_rows + row
-                    AJ[j * nn_A + i] = coefk[k];
-                }
-            }
-        }
-    }
+   // Find starting point
+   iExt current_nnz = jatAJ[Jstart];
+
+   // Loop through the requested column indices in J
+   for (iReg i = Jstart; i < Jend; ++i) {
+      // Get the source column index from matrix Ak
+      iReg col_A = J[i];
+      
+      // Find the start and end of this column inside Ak
+      iExt start_A = jatk[col_A];
+      iExt end_A   = jatk[col_A + 1];
+      iExt num_elements = end_A - start_A;
+
+      // Copy row indices
+      std::memcpy(&iaAJ[current_nnz], &iak[start_A], num_elements * sizeof(iReg));
+    
+      // Copy coefficients
+      std::memcpy(&coefAJ[current_nnz], &coefk[start_A], num_elements * sizeof(double));
+    
+      // Get new nnz
+      current_nnz += num_elements;
+
+      // Update the column pointer for the next column of AJ
+      jatAJ[i + 1] = current_nnz;
+   }
 }
 
 
-void fillL(iReg *L, double *res, iExt nn_A, iReg &usedL){
-   usedL = 0;
-   // Loop over all residual entries
-   for (iReg i = 0; i < nn_A; ++i){
-      // The residual is not numerically zero
-      // Add it as a possible column to be computed
-      if (std::abs(res[i]) > 0){
-         L[usedL] = i;
-         usedL++;
+void fillL(iReg *__restrict L, const double *__restrict res, iExt nn_A, iReg &usedL) {
+   iReg local_usedL = 0;
+
+   // Loop over all the rows
+   for (iExt i = 0; i < nn_A; ++i) {
+      if (res[i] != 0.0) { 
+         L[local_usedL] = static_cast<iReg>(i);
+         local_usedL++;
       }
    }
-   return;
+
+   // Write back to the reference exactly once
+   usedL = local_usedL; 
 }
 
-void findJtilde(iReg *Jtilde, iReg &JtildeSize, iReg *L, iReg sizeL, iExt *iatk, iReg *jak, iReg *J, iReg sizeJ){
-   if (sizeL == 0){
+void findJtilde(iReg *Jtilde, iReg &JtildeSize, const iReg __restrict *L, 
+                const iReg sizeL, const iExt __restrict *iatk, const iReg __restrict *jak, 
+                iReg *J, iReg sizeJ) {
+   if (sizeL == 0) {
       printf("sizeL == 0, check\n");
       return;
    }
 
    JtildeSize = 0;
-   // Seed the set with existing J elements so we don't include them in Jtilde
-   std::unordered_set<iReg> seen(J, J + sizeJ);
+   iReg l_idx, start, end, val;
 
-   for (iReg i = 0; i < sizeL; ++i){
-      iReg start = iatk[L[i]];
-      iReg end = iatk[L[i] + 1];
-      for (iReg j = start; j < end; ++j){
-         iReg val = jak[j];
-         if (seen.insert(val).second) {
+   // Find the maximum ID to size our tracking array
+   iReg max_val = 0;
+   iReg jj;
+   for (iReg i = 0; i < sizeJ; ++i) {
+      jj = J[i];
+      if (jj > max_val) max_val = jj;
+   }
+   for (iReg i = 0; i < sizeL; ++i) {
+      l_idx = L[i];
+      start = iatk[l_idx];
+      end = iatk[l_idx + 1];
+      for (iReg j = start; j < end; ++j) {
+         if (jak[j] > max_val) max_val = jak[j];
+      }
+   }
+
+   // Use a flat vector lookups
+   std::vector<bool> seen(max_val + 1, false);
+
+   // Seed the array with existing J elements
+   for (iReg i = 0; i < sizeJ; ++i) {
+      seen[J[i]] = true;
+   }
+
+   // Loop over the L
+   for (iReg i = 0; i < sizeL; ++i) {
+      l_idx = L[i]; 
+      start = iatk[l_idx];
+      end = iatk[l_idx + 1];
+
+      // Loop over the row L[i]
+      for (iReg j = start; j < end; ++j) {
+         val = jak[j];
+
+         if (!seen[val]) {
+            seen[val] = true;
             Jtilde[JtildeSize++] = val;
          }
       }
    }
 }
 
-// Compute A(:,Jtilde) in colmajor
-void fullAJtilde(iExt nn_A, iExt *iatk, iReg *jak, double *coefk, iReg *Jtilde, iReg JtildeSize, double *AJtilde){
-   
-   std::fill_n(AJtilde, nn_A * JtildeSize, 0.0);
-
-   // Find both the minimum and maximum column indices in Jtilde
-   auto minmax = std::minmax_element(Jtilde, Jtilde + JtildeSize);
-   iReg min_col = *minmax.first;
-   iReg max_col = *minmax.second;
-   iReg range = max_col - min_col + 1;
-
-   // Fill the lookup array based purely on the range span
-   std::vector<iReg> lookup(range, -1);
-   for (iReg c = 0; c < JtildeSize; ++c) {
-       lookup[Jtilde[c] - min_col] = c; // Apply the negative offset
-   }
-
-   // Iterate through the CSR matrix
-   for (iReg r = 0; r < nn_A; ++r) {
-       iReg row_end = iatk[r + 1];
-       for (iExt k = iatk[r]; k < row_end; ++k) {
-           iReg col = jak[k];
-           
-           // Quick bounds check using the min/max cluster boundaries
-           if (col >= min_col && col <= max_col) {
-               iReg c = lookup[col - min_col]; // Apply same offset to query
-               
-               if (c != -1) {
-                   // Compute column-major index: row + (col_index * total_rows)
-                   AJtilde[r + c * nn_A] = coefk[k];
-               }
-           }
-       }
-   }
-   return;
-}
