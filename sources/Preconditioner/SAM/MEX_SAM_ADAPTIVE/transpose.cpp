@@ -1,9 +1,8 @@
 #include "transpose.h"
-#include <omp.h>
+#include <cstring>
 
 /**
  * Parallel transposition of a sparse matrix with a symmetric sparsity pattern.
- * Parallelized using OpenMP based on the provided interface.
  *
  * @param nrows    Number of rows in the matrix.
  * @param iat      Row pointers of the input matrix (size: nrows + 1).
