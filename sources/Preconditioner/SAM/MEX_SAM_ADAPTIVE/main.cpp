@@ -64,8 +64,8 @@ int main() {
     }
 
     // Variables for the function
-    int nthread = 1;
-    int n_step = 15;
+    int nthread = 8;
+    int n_step = 2;
     int step_size = 1;
     double eps = 1e-5;
     int nn_A = mat_row_ptr.size() - 1;

@@ -26,7 +26,7 @@ extern "C" {
 
 void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt __restrict *jatAJtilde,  
               const iReg __restrict *iaAJtilde, const double __restrict *coefAJtilde,      
-              const iExt nn_A, double *res, double *tmpRes, const double normRes) {
+              double *res, double *tmpRes, const double normRes) {
    const double normResSq = normRes * normRes;
    double dot, sum, val, rho;
    iExt colStart, colEnd;

@@ -5,7 +5,6 @@
  * Parallel transposition of a sparse matrix with a symmetric sparsity pattern.
  * Parallelized using OpenMP based on the provided interface.
  *
- * @param nthread  Number of threads to use.
  * @param nrows    Number of rows in the matrix.
  * @param iat      Row pointers of the input matrix (size: nrows + 1).
  * @param ja       Column indices of the input matrix (size: iat[nrows]).
@@ -16,7 +15,7 @@
  * @return         0 on success, -1 on error.
  */
 
-int transpose(int nthread, const int nrows, const int *const iat, const int *const ja,
+int transpose(const int nrows, const int *const iat, const int *const ja,
               const double *const coef, int *iat_T, int *ja_T, double *coef_T) {
 
     const int nnz = iat[nrows];

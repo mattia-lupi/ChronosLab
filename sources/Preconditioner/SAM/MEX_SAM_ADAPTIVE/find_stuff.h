@@ -19,7 +19,7 @@ void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *j
 void getAhat( iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
              iExt *iatk, iReg *jak, double *coefk, double *Ahat, iExt &Astart);
 
-void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt nn_A, iExt *iatk, iReg *jak, 
+void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *iatk, iReg *jak, 
            double *coefk, iExt *jatAJ, iReg *iaAJ, double *coefAJ);
 
 void fillL(iReg *__restrict L, const double *__restrict res, iExt nn_A, iReg &usedL);

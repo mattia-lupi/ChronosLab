@@ -4,7 +4,6 @@
 #include <iostream>
 #include <unordered_set>
 
-bool mattia = true;
 void fullA0k(const iExt nn_A, const iExt __restrict *iat0, 
              const iReg __restrict *ja0, const double __restrict *coef0, 
              const iExt k, double *A0k){        
@@ -24,7 +23,6 @@ void fullA0k(const iExt nn_A, const iExt __restrict *iat0,
 
 void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk, 
                        const iReg __restrict *jak, const iReg n2, iReg *I, iReg &sizeI){
-   // Hash set to track unique items in O(1) time
    std::unordered_set<iReg> seen(I, I + sizeI);
 
    for (iReg i = 0; i < n2; ++i) {
@@ -40,17 +38,18 @@ void findNonZeroInColJ(const iReg __restrict *J, const iExt __restrict *iatk,
 }
 
 void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k){
-   // 1. Look up column k boundaries ONCE outside the loop
+   // Look up column k boundaries
    iExt col_start = iat0[k];
    iExt col_end   = iat0[k+1];
    iReg col_len   = col_end - col_start;
    iReg *col_rows = &ja0[col_start];
 
+   // Loop over the new rows
    for (iReg i = oldSizeI; i < sizeI; ++i) {        
       iReg row = I[i];                                                                    
       a0k[i] = 0.0; // Default value                                                      
                                                                                           
-      // 2. Binary search for the 'row' within the contiguous rows of column k
+      // Binary search for the 'row' within the contiguous rows of column k
       if (col_len > 0) {                                                                  
          auto it = std::lower_bound(col_rows, col_rows + col_len, row);                  
          if (it != col_rows + col_len && *it == row) {                                        
@@ -63,79 +62,33 @@ void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *j
 void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
              iExt *iatk, iReg *jak, double *coefk, double *Ahat, iReg &Astart) {
 
-   if(mattia == true){
-      // Cycle over the columns in J that have been added
-      for (iReg j = Jstart; j < Jend; ++j){
-         // Cycle over the rows in I
-         for (iReg i = 0; i < sizeI; ++i){
-            // Cycle over the chosen row
-            for(iExt k = iatk[I[i]]; k < iatk[I[i]+1]; ++k){
-               // If the column in the row coincides with the column added then get the nonzero value
-               // printf("%d %d %d ", k, jak[k], J[j]);
-               if(jak[k] == J[j]){
-                  Ahat[Astart] = coefk[k];
-                  // printf("%f\n", coefk[k]);
-                  Astart++;
-                  break;
-               }
+   // Cycle over the columns in J that have been added
+   for (iReg j = Jstart; j < Jend; ++j){
+      // Cycle over the rows in I
+      for (iReg i = 0; i < sizeI; ++i){
+         // Cycle over the chosen row
+         for(iExt k = iatk[I[i]]; k < iatk[I[i]+1]; ++k){
+            // If the column in the row coincides with the column added then get the nonzero value
+            if(jak[k] == J[j]){
+               Ahat[Astart] = coefk[k];
+               Astart++;
+               break;
+            }
 
-               if(k == iatk[I[i] + 1] - 1){
-                  // If entered here there is no column entry equal to k
-                  // set to zero
-                  // printf("0\n");
-                  Ahat[Astart] = 0;
-                  Astart++;
-               }
-               // else{
-               //    // printf("\n");
-               // }
-
+            if(k == iatk[I[i] + 1] - 1){
+               // If entered here there is no column entry equal to k
+               // set to zero
+               Ahat[Astart] = 0;
+               Astart++;
             }
          }
       }
-      return;
-   }else{
-      iReg num_cols = Jend - Jstart;
-      iReg row, row_start, row_end, row_len;
-      iReg target_col, dest_idx, k;
-      iReg *row_cols, *it;
-
-      // Loop over rows
-      for (iReg i = 0; i < sizeI; ++i) {
-         row = I[i];
-         row_start = iatk[row];
-         row_end = iatk[row + 1];
-         row_len = row_end - row_start;
-
-         // Loop over the added columns
-         for (iReg j = Jstart; j < Jend; ++j) {
-            target_col = J[j];
-
-            // Calculate the exact 1D destination index in Ahat
-            dest_idx = Astart + (j - Jstart) * sizeI + i;
-
-            // Binary search assuming 'jak' is sorted per row
-            row_cols = &jak[row_start];
-            it = std::lower_bound(row_cols, row_cols + row_len, target_col);
-
-            // Assign value if found, otherwise explicitly assign 0 (fixes the empty row bug)
-            if (it != row_cols + row_len && *it == target_col) {
-               k = row_start + (it - row_cols);
-               Ahat[dest_idx] = coefk[k];
-            } else {
-               Ahat[dest_idx] = 0.0;
-            }
-         }
-      }
-
-      // Update Astart once at the very end
-      Astart += num_cols * sizeI;
-      return;
    }
+   return;
 }
 
 // Get the new columns and add them to AJ
-void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt nn_A, iExt *jatk,iReg *iak,double *coefk,
+void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *jatk,iReg *iak,double *coefk,
            iExt *jatAJ, iReg *iaAJ, double *coefAJ) {
 
    // Find starting point

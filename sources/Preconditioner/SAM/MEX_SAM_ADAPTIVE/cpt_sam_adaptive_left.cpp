@@ -89,7 +89,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    double *coefkT = coefkTvec.data();
 
    // Transpose the matrix
-   int info1 = transpose(nthread,nn_A,iatk,jak,coefk,iatkT,jakT,coefkT);
+   int info1 = transpose(nn_A,iatk,jak,coefk,iatkT,jakT,coefkT);
    if (info1 != 0 ){
       printf("error in tranposing matrix\n");
       return;
@@ -206,7 +206,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    std::vector<double> workVec(lwork*nthread);
 
    // Cycle over the columns
-   // #pragma omp parallel for num_threads(nthread)
+   #pragma omp parallel for num_threads(nthread)
    for (iReg k = 0; k < nn_A; ++k){
       double resRelNorm = 1.0, resNorm;
       iReg usedL, JtildeSize;
@@ -276,80 +276,101 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       iReg Astart = 0;
 
       for (iReg t = 0; t < n_step; ++t){
-         if (k == checkCol && debug) printf("-------------------------------------------------------\n");
-         if (k == checkCol && debug) printf("----------------------- %d -----------------------------\n",t);
-         if (k == checkCol && debug) printf("-------------------------------------------------------\n");
          oldSizeI = sizeIcurr;
-
-         if (k == checkCol && debug) print_vector("Vector J", n2, J);
-         // print_vector("Vector iatk", nn_A+1, iatk);
-         // print_vector("Vector jak", 30, jak);
 
          // Get the row entries of the matrix in columns J
          findNonZeroInColJ(J, iatk, jak, n2, I, sizeIcurr);
          sizeI[t+1] = sizeIcurr;
-         // printf("%d -> %d\n", oldSizeI,sizeIcurr);
 
-         // check what happens if I does not change
-         if (k == checkCol && debug) print_vector("Vector I", sizeIcurr, I);
+         // Debug prints
+         #if debug
+         if (k == checkCol) printf("-------------------------------------------------------\n");
+         if (k == checkCol) printf("----------------------- %d -----------------------------\n",t);
+         if (k == checkCol) printf("-------------------------------------------------------\n");
+         if (k == checkCol) print_vector("Vector J", n2, J);
+         if (k == checkCol) print_vector("Vector I", sizeIcurr, I);
+         #endif
 
          // Get the new piece of A0k and add it to ak0
          getA0k(a0k, I, sizeIcurr, oldSizeI, iat0, ja0, coef0, k);
 
          // Copy into mHat to be modified later
          std::memcpy(mHat,a0k,sizeIcurr*sizeof(double));
-         if (k == checkCol && debug) print_vector("Vector A0k", sizeIcurr, a0k);
-
+         
          // Add to Ahat the new part of the matrix on which to work
-         // printf("Astart %d, Jstart %d, Jend %d\n", Astart,n2old,n2);
          getAhat(I, sizeIcurr, J, n2old, n2, iatk, jak, coefk, Ahat, Astart);
 
-         if (k == checkCol && debug) print_spVec("init Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
-         // print_vector("Vector sizeI", t+2, sizeI);
-         // print_vector("Vector sizeJ", t+1, sizeJ);
+         // Debug prints
+         #if debug
+         if (k == checkCol) print_vector("Vector A0k", sizeIcurr, a0k);
+         if (k == checkCol) print_spVec("init Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
+         #endif
 
          if (t == 0){
             // Compute the QR factorization of the first matrix
             computeFirstQR(Ahat, sizeIcurr, n2, R, Rtriang, tau, work, lwork, info);
             qStart[t+1] = sizeIcurr * n2;
-            if (k == checkCol && debug) print_spVec("cpt 1 Matrix Ahat QR", sizeIcurr*n2, Ahat);
-            if (k == checkCol && debug) print_vector("tau", n2, tau);
 
             // Apply Qt for the first matrix
             applyFirstQt(Ahat, sizeIcurr, n2, tau, mHat, work, lwork, info);
-            if (k == checkCol && debug) print_spVec("Vector chat", sizeIcurr, mHat);
+
+            // Debug prints
+            #if debug
+            if (k == checkCol) print_spVec("cpt 1 Matrix Ahat QR", qStart[t+1], Ahat);
+            if (k == checkCol) print_vector("tau", n2, tau);
+            if (k == checkCol) print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
+            if (k == checkCol) print_vector("Vector chat", sizeI[t+1], mHat);
+            #endif
          } else{
+
             // Apply the previously computed Q to the new Ahat part
             applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t], sizeI[t], sizeJ[t+1]-sizeJ[t], work, lwork, info);
-            if (k == checkCol && debug) print_spVec("apply Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
 
+            // Debug prints
+            #if debug
+            if (k == checkCol) print_spVec("apply Matrix Ahat QR", qStart[t] + sizeI[t+1]*(sizeJ[t+1]- sizeJ[t]), Ahat);
+            #endif
+
+            // Compute the new part of the qr_factorization
             computeNewQR(t, sizeI, sizeJ, qStart, Ahat, tau, R, Rtriang, work, lwork, info);
-            if (k == checkCol && debug) print_spVec("cpt n Matrix Ahat QR", qStart[t+1], Ahat);
-            if (k == checkCol && debug) print_vector("tau", n2, tau);
-            if (k == checkCol && debug) print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
-            // if (k == checkCol && debug) print_vector("Vector chat", sizeI[t+1], mHat);
+            
+            // Apply the Qt to the rhs to get chat
             applyQt(t+1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeIcurr, 1, work, lwork, info);
-            if (k == checkCol && debug) print_vector("Vector chat", sizeI[t+1], mHat);
-            // print_matrix("Matrix R", n2, n2, R, n2);
+            
+            // Debug prints
+            #if debug
+            if (k == checkCol) print_spVec("cpt n Matrix Ahat QR", qStart[t+1], Ahat);
+            if (k == checkCol) print_vector("tau", n2, tau);
+            if (k == checkCol) print_vector("Rtriang", n2*(n2+1)/2, Rtriang);
+            if (k == checkCol) print_vector("Vector chat", sizeI[t+1], mHat);
+            #endif
          }
-         // print_vector("qStart", t+2, qStart);
+
          // Solve the triangolar system
          applyR(n2, R, mHat, info);
-         if (k == checkCol && debug) print_matrix("Matrix R", n2, n2, R, n2);
-         if (k == checkCol && debug) print_vector("Vector mhat", n2, mHat);
 
          // Get the matrix A(:,J)
-         getAJ(J, n2old, n2, nn_A, iatkT, jakT, coefkT, jatAJ, iaAJ, coefAJ);
-         if (k == checkCol && debug) print_vector("vector jatAJ", n2+1, jatAJ);
-         if (k == checkCol && debug) print_vector("vector iaAJ", jatAJ[n2], iaAJ);
-         if (k == checkCol && debug) print_vector("vector coefAJ", jatAJ[n2], coefAJ);
+         getAJ(J, n2old, n2, iatkT, jakT, coefkT, jatAJ, iaAJ, coefAJ);
+
+         // Debug prints
+         #if debug
+         if (k == checkCol) print_matrix("Matrix R", n2, n2, R, n2);
+         if (k == checkCol) print_vector("Vector mhat", n2, mHat);
+         if (k == checkCol) print_vector("vector jatAJ", n2+1, jatAJ);
+         if (k == checkCol) print_vector("vector iaAJ", jatAJ[n2], iaAJ);
+         if (k == checkCol) print_vector("vector coefAJ", jatAJ[n2], coefAJ);
+         #endif
 
          // Assign the norm of A0(:,k) to resRelNorm
          resRelNorm = normA0k;
 
          // Compute res = AJ*mHat-A0k and save it in AJ
          cptRes(nn_A, n2, A0k, jatAJ, iaAJ, coefAJ, mHat, res, resRelNorm, resNorm,iaAJtilde,coefAJtilde);
-         if (k == checkCol && debug) print_spVec("vector res", nn_A, res);
+         
+         // Debug prints
+         #if debug
+         if (k == checkCol) print_spVec("vector res", nn_A, res);
+         #endif
 
          if (resRelNorm < eps){
             break;
@@ -358,12 +379,16 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          if (t < n_step - 1){
             // Find the values for L
             fillL(L, res, nn_A, usedL);
-            if (k == checkCol && debug) print_vector("L", usedL, L);
 
             // Find the values for Jtilde
             findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);
             std::sort(Jtilde, Jtilde + JtildeSize);
-            if (k == checkCol && debug) print_vector("Vector Jtilde", JtildeSize, Jtilde);
+
+            // Debug prints
+            #if debug
+            if (k == checkCol) print_vector("L", usedL, L);
+            if (k == checkCol) print_vector("Vector Jtilde", JtildeSize, Jtilde);
+            #endif
 
             // Nothing new to add
             if (JtildeSize == 0){
@@ -373,16 +398,19 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
             // If there is more than one need to decide which to add
             if (JtildeSize != 1){
                // Find A(:,Jtilde)
-               getAJ(Jtilde, 0, JtildeSize, nn_A, iatk, jak, coefk, jatAJtilde, iaAJtilde, coefAJtilde);
-               // if (k == checkCol && debug) print_vector("vector jatAJtilde", n2+1, jatAJtilde);            
-               // if (k == checkCol && debug) print_vector("vector iaAJtilde", jatAJtilde[n2], iaAJtilde);         
-               // if (k == checkCol && debug) print_vector("vector coefAJtilde", jatAJtilde[n2], coefAJtilde); 
+               getAJ(Jtilde, 0, JtildeSize, iatk, jak, coefk, jatAJtilde, iaAJtilde, coefAJtilde);
 
                // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
                cptRhoJ2(JtildeSize, normColJ, jatAJtilde, iaAJtilde, coefAJtilde, 
-                        nn_A, res, mHat, resNorm);
-               if (k == checkCol && debug) print_vector("Vector rhoJ2", JtildeSize, normColJ);
-               // print_matrix("Matrix Ajtilde", JtildeSize, JtildeSize, AJtilde, nn_A);
+                        res, mHat, resNorm);
+
+               // Debug prints
+               #if debug
+               // if (k == checkCol) print_vector("vector jatAJtilde", n2+1, jatAJtilde);
+               // if (k == checkCol) print_vector("vector iaAJtilde", jatAJtilde[n2], iaAJtilde);
+               // if (k == checkCol) print_vector("vector coefAJtilde", jatAJtilde[n2], coefAJtilde);
+               if (k == checkCol) print_vector("Vector rhoJ2", JtildeSize, normColJ);
+               #endif
 
                // Add a single one
                if (step_size == 1){
@@ -396,7 +424,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
                }
                else{
                   printf("Error, not implemented yet\n");
-                  //return;
                }
             }
             else{
@@ -410,18 +437,18 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
             }
          }
 
-         #if debug == true
+         #if debug
          if (t == checkLevel && k == checkCol){
             break;
          }
          #endif
       }
 
-#if debug == true
+      #if debug
       if (k == checkCol){
          break;
       }
-#endif
+      #endif
 
       // Compute the average relative residual norm
       #pragma omp atomic 
@@ -447,10 +474,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    jaN = new iReg[total_nnz];
    coefN = new double[total_nnz];
 
-   // print_vector("storageJsize",nn_A,storageJsize);
-   // print_matrix("storageJ",n_step, nn_A, storageJ, n_step);
-   // print_matrix("storageN",n_step, nn_A, storageN, n_step);
-
    // Set values
    iatN[0] = 0;
    iReg nEnt, count = 0, entryPos;
@@ -472,10 +495,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          count++;
       }
    }
-
-   // print_vector("iatN",nn_A+1,iatN);
-   // print_vector("jaN",total_nnz,jaN);
-   // print_vector("iatN",total_nnz,coefN);
 
    return;
 }
