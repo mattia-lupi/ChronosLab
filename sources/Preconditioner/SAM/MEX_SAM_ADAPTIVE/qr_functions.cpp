@@ -1,13 +1,6 @@
 #include "qr_functions.h"
 #include <iostream>
 
-// void print_vector1(const char* desc, iReg n, double* vec) {
-//     printf("\n--- %s ---\n", desc);
-//     for (iReg i = 0; i < n; i++) {
-//         printf("%10.4g\n", vec[i]);
-//     }
-// }
-
 void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 
                     double *Rtriang, double *tau, double *work, lapack_int lwork, 
                     lapack_int &info){
@@ -68,7 +61,8 @@ void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
    return;
 }
 
-void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart, 
+void applyQt(iReg t, const lapack_int __restrict *sizeJ, 
+             const lapack_int __restrict *sizeI, lapack_int *qStart, 
              double *Ahat, double *tau, double *a0k, lapack_int nRowsRHS, 
              lapack_int ncolsRHS, double *work, lapack_int lwork, lapack_int &info){
 
@@ -80,19 +74,19 @@ void applyQt(iReg t, lapack_int *sizeJ, lapack_int *sizeI, lapack_int *qStart,
    lapack_int nrows, ncols, nrefl, LDA, LDC, ofA0k = 0, ofTau = 0; 
    for (iReg i = 0; i < t; ++i){
       // Get the values for the new iteration matrix
-      nrows = sizeI[i+1] - sizeJ[i];
+      ofA0k = sizeJ[i];
+      nrows = sizeI[i+1] - ofA0k;
       ncols = ncolsRHS;
-      nrefl = sizeJ[i+1] - sizeJ[i];
+      nrefl = sizeJ[i+1] - ofA0k;
       LDA   = nrows;
       LDC   = nRowsRHS;
-      ofA0k = sizeJ[i];
-      ofTau = sizeJ[i];
+      ofTau = ofA0k;
 
       #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
-         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
+         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + ofA0k, 
                  &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,1,1);
       #else
-         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + sizeJ[i], 
+         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + ofA0k, 
                  &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
       #endif
 
