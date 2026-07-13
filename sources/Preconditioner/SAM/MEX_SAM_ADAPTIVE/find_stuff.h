@@ -31,9 +31,11 @@ void getAhat( iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
 void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *iatk, iReg *jak,
            double *coefk, iExt *jatAJ, iReg *iaAJ, double *coefAJ);
 
-void findJtilde(iReg *Jtilde, iReg &JtildeSize, const iReg* RESTRICT L,
-                const iReg sizeL, const iExt* RESTRICT iatk, const iReg* RESTRICT jak,
-                iReg *J, iReg sizeJ);
+void findJtilde(iReg *Jtilde, iReg &JtildeSize,                                            
+                const iReg* RESTRICT L, const iReg sizeL,                                  
+                const iExt* RESTRICT iatk, const iReg* RESTRICT jak,                       
+                const iReg* RESTRICT J, const iReg sizeJ,                                  
+                uint8_t* RESTRICT seen);
 
 void getAJtilde(iExt nn_A, iExt *iatk, iReg *jak, double *coefk, iReg *Jtilde,
                 iReg JtildeSize, iExt* jatAJtilde, iReg *iaAJtilde, double *coefAJtilde,

@@ -145,6 +145,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    // Allocate space for mHat(I,k)
    std::vector<double> mHatvec(tmpVal);
 
+   // Allocate space for workspace in findJtilde
+   std::vector<uint8_t> JtildeWorkvec(tmpVal);
+
    // Allocate space for A0(:,k)
    std::vector<double> A0kvec(tmpVal);
    std::vector<iReg> A0k_idxvec(tmpVal);
@@ -249,6 +252,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *mHat = mHatvec.data() + tmpLocVal;
       double *A0k = A0kvec.data() + tmpLocVal;
       iReg *A0k_idx = A0k_idxvec.data() + tmpLocVal;
+      uint8_t *JtildeWork = JtildeWorkvec.data() + tmpLocVal;
       
       double *res = resvec.data() + tmpLocVal;
       iReg *resIdx = resIdxvec.data() + tmpLocVal;
@@ -401,7 +405,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          if (t < n_step - 1){
 
             // Find the values for Jtilde
-            findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2);
+            findJtilde(Jtilde, JtildeSize, L, usedL, iatk, jak, J, n2, JtildeWork);
             std::sort(Jtilde, Jtilde + JtildeSize);
 
             // Debug prints

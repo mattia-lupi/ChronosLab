@@ -129,57 +129,43 @@ void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *jatk,iReg *iak,double *coefk,
    }
 }
 
+void findJtilde(iReg *Jtilde, iReg &JtildeSize,
+                const iReg* RESTRICT L, const iReg sizeL,
+                const iExt* RESTRICT iatk, const iReg* RESTRICT jak,
+                const iReg* RESTRICT J, const iReg sizeJ,
+                uint8_t* RESTRICT seen) {
+    if (sizeL == 0) {
+        printf("sizeL == 0, check\n");
+        return;
+    }
 
-void findJtilde(iReg *Jtilde, iReg &JtildeSize, const iReg* RESTRICT L,
-                const iReg sizeL, const iExt* RESTRICT iatk, const iReg* RESTRICT jak, 
-                iReg *J, iReg sizeJ) {
-   if (sizeL == 0) {
-      printf("sizeL == 0, check\n");
-      return;
-   }
+    JtildeSize = 0;
 
-   JtildeSize = 0;
-   iReg l_idx, start, end, val;
+    // Fill the array with existing J elements
+    for (iReg i = 0; i < sizeJ; ++i) {
+        seen[J[i]] = 1;
+    }
 
-   // Find the maximum ID to size our tracking array
-   iReg max_val = 0;
-   iReg jj;
-   for (iReg i = 0; i < sizeJ; ++i) {
-      jj = J[i];
-      if (jj > max_val) max_val = jj;
-   }
-   for (iReg i = 0; i < sizeL; ++i) {
-      l_idx = L[i];
-      start = iatk[l_idx];
-      end = iatk[l_idx + 1];
-      for (iReg j = start; j < end; ++j) {
-         if (jak[j] > max_val) max_val = jak[j];
-      }
-   }
+    // Main processing loop
+    for (iReg i = 0; i < sizeL; ++i) {
+        const iReg l_idx = L[i];
+        const iExt start = iatk[l_idx];
+        const iExt end   = iatk[l_idx + 1];
 
-   // Use a flat vector lookups
-   std::vector<bool> seen(max_val + 1, false);
+        for (iExt j = start; j < end; ++j) {
+            const iReg val = jak[j];
+            if (!seen[val]) {
+                seen[val] = 1;
+                Jtilde[JtildeSize++] = val;
+            }
+        }
+    }
 
-   // Seed the array with existing J elements
-   for (iReg i = 0; i < sizeJ; ++i) {
-      seen[J[i]] = true;
-   }
-
-   // Loop over the L
-   for (iReg i = 0; i < sizeL; ++i) {
-      l_idx = L[i]; 
-      start = iatk[l_idx];
-      end = iatk[l_idx + 1];
-
-      // Loop over the row L[i]
-      for (iReg j = start; j < end; ++j) {
-         val = jak[j];
-
-         if (!seen[val]) {
-            seen[val] = true;
-            Jtilde[JtildeSize++] = val;
-         }
-      }
-   }
+    // Selective zeroing
+    for (iReg i = 0; i < sizeJ; ++i) {
+        seen[J[i]] = 0;
+    }
+    for (iReg i = 0; i < JtildeSize; ++i) {
+        seen[Jtilde[i]] = 0;
+    }
 }
-
