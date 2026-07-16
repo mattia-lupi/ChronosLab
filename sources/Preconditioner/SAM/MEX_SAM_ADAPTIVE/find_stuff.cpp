@@ -78,20 +78,21 @@ void getAhat(iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
       // Cycle over the rows in I
       for (iReg i = 0; i < sizeI; ++i){
          // Cycle over the chosen row
-         for(iExt k = iatk[I[i]]; k < iatk[I[i]+1]; ++k){
+         iExt k, row = I[i];
+         for(k = iatk[row]; k < iatk[row+1]; ++k){
             // If the column in the row coincides with the column added then get the nonzero value
             if(jak[k] == J[j]){
                Ahat[Astart] = coefk[k];
                Astart++;
                break;
             }
+         }
 
-            if(k == iatk[I[i] + 1] - 1){
-               // If entered here there is no column entry equal to k
-               // set to zero
-               Ahat[Astart] = 0;
-               Astart++;
-            }
+         if(k == iatk[row + 1]){
+            // If entered here there is no column entry equal to k
+            // set to zero
+            Ahat[Astart] = 0;
+            Astart++;
          }
       }
    }

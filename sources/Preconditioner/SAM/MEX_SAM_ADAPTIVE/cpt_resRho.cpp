@@ -50,15 +50,10 @@ void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatA
          sum += val * res[row];
       }
 
-      if (dot == 0.0) {
-         dot = 1e25;
-      }
-
       tmpRes[i] = sum;
 
       // Compute the rhoJ2 inline
-      rho = normResSq - (sum * sum) / dot;
-      normColJ[i] = std::max(rho, 0.0);
+      normColJ[i] = normResSq - (sum * sum) / dot;
    }
 
    return;
