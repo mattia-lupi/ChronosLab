@@ -148,6 +148,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    // Allocate space for workspace in findJtilde
    std::vector<uint8_t> JtildeWorkvec(tmpVal);
 
+   // Allocate space for workspace in findIcolJ
+   std::vector<iReg> findIWorkvec(nn_A*nthread);
+
    // Allocate space for A0(:,k)
    std::vector<double> A0kvec(tmpVal);
    std::vector<iReg> A0k_idxvec(tmpVal);
@@ -169,14 +172,14 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    // Allocate AJ buffer for the max possible size
    // Allocate it for csc matrix
    std::vector<iExt> jatAJvec((maxJsize+1)*nthread);
-   std::vector<iReg> iaAJvec(nnzAk*nthread);
-   std::vector<double> coefAJvec(nnzAk*nthread);
+   std::vector<const iReg*> iaAJvec(maxJsize * nthread);
+   std::vector<const double*> coefAJvec(maxJsize * nthread);
 
    // Allocate AJtilde buffer for the max possible size
    // Allocate it for csc matrix
    std::vector<iExt> jatAtildeVec((nn_A+1)*nthread);
-   std::vector<iReg> iaAtildeVec(nnzAk*nthread);
-   std::vector<double> coefAtildeVec(nnzAk*nthread);
+   std::vector<const iReg*> iaAtildeVec(nn_A * nthread);
+   std::vector<const double*> coefAtildeVec(nn_A * nthread);
 
    // Allocate tau for the max possible size
    std::vector<double> tauVec(maxJsize*nthread);
@@ -253,6 +256,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *A0k = A0kvec.data() + tmpLocVal;
       iReg *A0k_idx = A0k_idxvec.data() + tmpLocVal;
       uint8_t *JtildeWork = JtildeWorkvec.data() + tmpLocVal;
+      iReg *findIWork = findIWorkvec.data() + nn_A*thId;
       
       double *res = resvec.data() + tmpLocVal;
       iReg *resIdx = resIdxvec.data() + tmpLocVal;
@@ -264,14 +268,14 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       double *Ahat = AhatBuffer.data() + tmpLocVal;
 
       // Get local pointer for AJ csc
-      iExt   *jatAJ  = jatAJvec.data() + (maxJsize+1)*thId;
-      iReg   *iaAJ   =  iaAJvec.data() + nnzAk*thId;
-      double *coefAJ = coefAJvec.data()+ nnzAk*thId;
-
+      iExt          *jatAJ  = jatAJvec.data() + (maxJsize + 1) * thId;
+      const iReg   **iaAJ   = iaAJvec.data()  + maxJsize * thId; 
+      const double **coefAJ = coefAJvec.data() + maxJsize * thId; 
+      
       // Get local pointer for Atilde csc
-      iExt   *jatAJtilde  = jatAtildeVec.data() + (nn_A+1)*thId;
-      iReg   *iaAJtilde   =  iaAtildeVec.data() + nnzAk*thId;
-      double *coefAJtilde = coefAtildeVec.data()+ nnzAk*thId;
+      iExt          *jatAJtilde  = jatAtildeVec.data() + (nn_A + 1) * thId;
+      const iReg   **iaAJtilde   = iaAtildeVec.data()  + nn_A * thId;
+      const double **coefAJtilde = coefAtildeVec.data() + nn_A * thId;
 
       double *tau = tauVec.data() + maxJsize*thId;
       double *work = workVec.data() + lwork*thId;
@@ -303,7 +307,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          oldSizeI = sizeIcurr;
 
          // Get the row entries of the matrix in columns J
-         findNonZeroInColJ(J, iatk, jak, n2, I, sizeIcurr);
+         // findNonZeroInColJ(J, iatk, jak, n2, I, sizeIcurr);
+         findNonZeroInColJ(J, iatk, jak, n2, I, sizeIcurr,findIWork,k+1);
+
          sizeI[t+1] = sizeIcurr;
 
          // Debug prints
@@ -374,7 +380,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          applyR(n2, R, mHat, info);
 
          // Get the matrix A(:,J)
-         getAJ(J, n2old, n2, iatkT, jakT, coefkT, jatAJ, iaAJ, coefAJ);
+         getAJ(J, n2old, n2, iatkT, jakT, coefkT, iaAJ, coefAJ, jatAJ);
 
          // Debug prints
          #if debug
@@ -392,7 +398,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          // Find the values for L as well
          cptRes(n2, jatAJ, iaAJ, coefAJ, mHat, A0k_idx, A0k, A0k_nnz[thId],
                 res, L, usedL, resRelNorm, resNorm, resIdx, resWS);
-
+         
          // Debug prints
          #if debug
          // if (k == checkCol) print_spVec("vector res", nn_A, res);
@@ -422,7 +428,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
             // If there is more than one need to decide which to add
             if (JtildeSize != 1){
                // Find A(:,Jtilde) and get it from the transposed so copying the columns is easy
-               getAJ(Jtilde, 0, JtildeSize, iatkT, jakT, coefkT, jatAJtilde, iaAJtilde, coefAJtilde);
+               getAJ(Jtilde, 0, JtildeSize, iatkT, jakT, coefkT, iaAJtilde, coefAJtilde, jatAJtilde);
 
                // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
                cptRhoJ2(JtildeSize, normColJ, jatAJtilde, iaAJtilde, coefAJtilde, 

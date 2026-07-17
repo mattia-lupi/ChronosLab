@@ -19,24 +19,23 @@ void fullA0k(const iExt nn_A, const iExt * RESTRICT iat0,
              const iExt k, double * RESTRICT A0k,
              iReg * RESTRICT A0k_idx, iReg &A0k_nnz);
 
-void findNonZeroInColJ(const iReg* RESTRICT J, const iExt* RESTRICT iatk,
-                       const iReg* RESTRICT jak, const iReg n2, iReg *I, iReg &sizeI);
+void findNonZeroInColJ(const iReg *RESTRICT J, const iExt *RESTRICT iatk,
+                       const iReg *RESTRICT jak, const iReg n2, 
+                       iReg *RESTRICT I, iReg &sizeI,
+                       iReg *RESTRICT visited, const int t);
 
 void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0,
             double *coef0, iExt k);
 
-void getAhat( iReg *I, iReg sizeI, iReg *J, iReg Jstart, iReg Jend,
-             iExt *iatk, iReg *jak, double *coefk, double *Ahat, iExt &Astart);
+void getAhat(iReg * RESTRICT I, iReg sizeI, iReg * RESTRICT J, iReg Jstart, 
+             iReg Jend, iExt * RESTRICT iatk, iReg * RESTRICT jak, 
+             double * RESTRICT coefk, double * RESTRICT Ahat, iReg &Astart);
 
-void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *iatk, iReg *jak,
-           double *coefk, iExt *jatAJ, iReg *iaAJ, double *coefAJ);
+void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *jatk, iReg *iak, double *coefk,
+           const iReg **iaAJ, const double **coefAJ, iExt *jatAJ);
 
 void findJtilde(iReg *Jtilde, iReg &JtildeSize,                                            
                 const iReg* RESTRICT L, const iReg sizeL,                                  
                 const iExt* RESTRICT iatk, const iReg* RESTRICT jak,                       
                 const iReg* RESTRICT J, const iReg sizeJ,                                  
                 uint8_t* RESTRICT seen);
-
-void getAJtilde(iExt nn_A, iExt *iatk, iReg *jak, double *coefk, iReg *Jtilde,
-                iReg JtildeSize, iExt* jatAJtilde, iReg *iaAJtilde, double *coefAJtilde,
-                iExt *workspace);

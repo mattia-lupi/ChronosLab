@@ -8,56 +8,120 @@
 #include <cmath>
 #include "lapack.h"
 
-// blas Fortran routines declarations
-extern "C" {
-   void dgemv_(const char* trans, const lapack_int* m, const lapack_int* n,
-               const double* alpha, const double* a, const lapack_int* lda,
-               const double* x, const lapack_int* incx, const double* beta,
-               double* y, const lapack_int* incy);
-               
-   double ddot_(const lapack_int* n, const double* x, const lapack_int* incx, 
-                const double* y, const lapack_int* incy);
+void cptRhoJ2(const iReg JtildeSize, 
+              double * RESTRICT normColJ, 
+              const iExt* RESTRICT jatAJtilde,
+              const iReg * const * RESTRICT iaAJtilde, 
+              const double * const * RESTRICT coefAJtilde,
+              const double * RESTRICT res, // Added const and RESTRICT
+              double * RESTRICT tmpRes,     // Added RESTRICT
+              const double normRes) {
+    
+    const double normResSq = normRes * normRes;
 
-   double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
-   
-   void daxpy_(const lapack_int* n, const double* alpha, const double* x, 
-               const lapack_int* incx, double* y, const lapack_int* incy);
+    // Parallelize the outer loop. Use guided scheduling to handle 
+    // load-imbalance if some columns have significantly more non-zero elements.
+    for (iReg i = 0; i < JtildeSize; ++i) {
+        // Get direct pointers to this column's row indices and coefficients
+        const iReg* RESTRICT col_ia = iaAJtilde[i];
+        const double* RESTRICT col_coef = coefAJtilde[i];
+
+        // Determine how many non-zero elements are in this column
+        const iExt colStart = jatAJtilde[i];
+        const iExt colEnd = jatAJtilde[i + 1];
+        const iExt num_elements = colEnd - colStart;
+
+        // Multiple accumulators to break dependency chains
+        double dot0 = 0.0, dot1 = 0.0, dot2 = 0.0, dot3 = 0.0;
+        double sum0 = 0.0, sum1 = 0.0, sum2 = 0.0, sum3 = 0.0;
+
+        iExt k = 0;
+        // Unroll by 4 to expose Memory-Level Parallelism (MLP)
+        for (; k + 3 < num_elements; k += 4) {
+            iReg r0 = col_ia[k];
+            iReg r1 = col_ia[k + 1];
+            iReg r2 = col_ia[k + 2];
+            iReg r3 = col_ia[k + 3];
+
+            double v0 = col_coef[k];
+            double v1 = col_coef[k + 1];
+            double v2 = col_coef[k + 2];
+            double v3 = col_coef[k + 3];
+
+            dot0 += v0 * v0;
+            dot1 += v1 * v1;
+            dot2 += v2 * v2;
+            dot3 += v3 * v3;
+
+            // These four loads can now run concurrently in the memory pipeline
+            sum0 += v0 * res[r0];
+            sum1 += v1 * res[r1];
+            sum2 += v2 * res[r2];
+            sum3 += v3 * res[r3];
+        }
+
+        // Combine unrolled accumulators
+        double dot = (dot0 + dot1) + (dot2 + dot3);
+        double sum = (sum0 + sum1) + (sum2 + sum3);
+
+        // Clean up remaining elements
+        for (; k < num_elements; ++k) {
+            iReg r = col_ia[k];
+            double v = col_coef[k];
+            dot += v * v;
+            sum += v * res[r];
+        }
+
+        tmpRes[i] = sum;
+
+        // Prevent division-by-zero/NaN if the column is entirely empty
+        if (dot > 0.0) {
+            normColJ[i] = normResSq - (sum * sum) / dot;
+        } else {
+            normColJ[i] = normResSq;
+        }
+    }
 }
+// void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatAJtilde,
+//               const iReg * const * RESTRICT iaAJtilde, const double * const * RESTRICT coefAJtilde,
+//               double *res, double *tmpRes, const double normRes) {
+//    const double normResSq = normRes * normRes;
+//    double dot, sum, val;
+//    iReg row;
 
-void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatAJtilde,
-              const iReg* RESTRICT iaAJtilde, const double* RESTRICT coefAJtilde,
-              double *res, double *tmpRes, const double normRes) {
-   const double normResSq = normRes * normRes;
-   double dot, sum, val, rho;
-   iExt colStart, colEnd;
-   iReg row;
+//    // Loop through each column of the CSC matrix
+//    for (iReg i = 0; i < JtildeSize; ++i) {
+//       dot = 0.0;
+//       sum = 0.0;
 
-   // Loop through each column of the CSC matrix
-   for (iReg i = 0; i < JtildeSize; ++i) {
-      dot = 0.0;
-      sum = 0.0;
+//       // Get direct pointers to this column's row indices and coefficients
+//       const iReg* RESTRICT col_ia = iaAJtilde[i];
+//       const double* RESTRICT col_coef = coefAJtilde[i];
 
-      // Get the start and end boundaries for the current column 'i'
-      colStart = jatAJtilde[i];
-      colEnd   = jatAJtilde[i + 1];
+//       // Determine how many non-zero elements are in this column
+//       iExt colStart = jatAJtilde[i];
+//       iExt colEnd   = jatAJtilde[i + 1];
+//       iExt num_elements = colEnd - colStart;
 
-      // Iterate only over the non-zero elements of this column
-      for (iExt k = colStart; k < colEnd; ++k) {
-         row   = iaAJtilde[k];
-         val = coefAJtilde[k];
+//       // Iterate only over the non-zero elements of this column locally
+//       for (iExt k = 0; k < num_elements; ++k) {
+//          row = col_ia[k];
+//          val = col_coef[k];
 
-         dot += val * val;
-         sum += val * res[row];
-      }
+//          dot += val * val;
+//          sum += val * res[row];
+//       }
 
-      tmpRes[i] = sum;
+//       tmpRes[i] = sum;
 
-      // Compute the rhoJ2 inline
-      normColJ[i] = normResSq - (sum * sum) / dot;
-   }
+//       // Compute the rhoJ2 inline
+//       normColJ[i] = normResSq - (sum * sum) / dot;
+//    }
 
-   return;
-}
+//    return;
+// }
+
+
 
 // Find the index of the minimum 
 iReg minIdx(double *rhoJ2, iReg JtildeSize){
@@ -67,8 +131,10 @@ iReg minIdx(double *rhoJ2, iReg JtildeSize){
     return static_cast<iReg>(std::distance(rhoJ2, min_element_ptr));
 }
 
-void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ, 
-            const double * RESTRICT coefAJ, const double * RESTRICT mHat,
+void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, 
+            const iReg * const * RESTRICT iaAJ, 
+            const double * const * RESTRICT coefAJ, 
+            const double * RESTRICT mHat,
             const iReg * RESTRICT A0k_idx, const double * RESTRICT A0k, iReg A0k_nnz,
             double * RESTRICT res, iReg * RESTRICT L, iReg &usedL,
             double &resRelNorm, double &resNorm,
@@ -87,14 +153,22 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ,
         const double m_j = mHat[j];
         if (m_j == 0.0) continue;
 
+        // Get the direct pointers to this column's row indices and coefficients
+        const iReg* RESTRICT col_ia = iaAJ[j];
+        const double* RESTRICT col_coef = coefAJ[j];
+
+        // Determine how many non-zero elements are in this column
         iExt start = jatAJ[j];
         iExt end   = jatAJ[j + 1];
-        for (iExt k = start; k < end; ++k) {
-            iReg row = iaAJ[k];
+        iExt num_elements = end - start;
+
+        // Loop over the elements locally (0 to num_elements)
+        for (iExt k = 0; k < num_elements; ++k) {
+            iReg row = col_ia[k];
             if (ws_val[row] == 0.0) {
                 ws_idx[ws_count++] = row;
             }
-            ws_val[row] += coefAJ[k] * m_j;
+            ws_val[row] += col_coef[k] * m_j;
         }
     }
 
@@ -139,7 +213,7 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ,
     // Final Global Math
     double normAjMh = std::sqrt(normAjMh_sq);
     resNorm = std::sqrt(sq_sum);
-    std::sort(L,L+usedL);
+    std::sort(L, L + usedL);
 
     resRelNorm = 2.0 * resNorm / (normAjMh + resRelNorm);
 }

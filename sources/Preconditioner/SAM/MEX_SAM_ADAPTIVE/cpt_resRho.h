@@ -9,15 +9,22 @@
     #define RESTRICT
 #endif
 
-void cptRhoJ2(const iReg JtildeSize, double *normColJ, const iExt* RESTRICT jatAJtilde, 
-              const iReg* RESTRICT iaAJtilde, const double* RESTRICT coefAJtilde, 
-              double *res, double *tmpRes, const double normRes);
+void cptRhoJ2(const iReg JtildeSize, 
+              double * RESTRICT normColJ, 
+              const iExt* RESTRICT jatAJtilde,
+              const iReg * const * RESTRICT iaAJtilde, 
+              const double * const * RESTRICT coefAJtilde,
+              const double * RESTRICT res, // Added const and RESTRICT
+              double * RESTRICT tmpRes,     // Added RESTRICT
+              const double normRes);
 
 iReg minIdx(double *rhoJ2, iReg JtildeSize);
 
-void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, const iReg * RESTRICT iaAJ,           
-            const double * RESTRICT coefAJ, const double * RESTRICT mHat,                  
-            const iReg * RESTRICT A0k_idx, const double * RESTRICT A0k, iReg A0k_nnz,      
-            double * RESTRICT res, iReg * RESTRICT L, iReg &usedL,                         
-            double &resRelNorm, double &resNorm,                                           
+void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ, 
+            const iReg * const * RESTRICT iaAJ, 
+            const double * const * RESTRICT coefAJ, 
+            const double * RESTRICT mHat,
+            const iReg * RESTRICT A0k_idx, const double * RESTRICT A0k, iReg A0k_nnz,
+            double * RESTRICT res, iReg * RESTRICT L, iReg &usedL,
+            double &resRelNorm, double &resNorm,
             int* RESTRICT ws_idx, double* RESTRICT ws_val);
