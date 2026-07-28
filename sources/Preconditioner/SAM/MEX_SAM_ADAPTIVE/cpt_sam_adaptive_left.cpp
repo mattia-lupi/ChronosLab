@@ -17,16 +17,7 @@ iReg checkLevel = 2;
 
 // blas Fortran routines declarations
 extern "C" {
-    void dgemm_(const char* transa, const char* transb, const lapack_int* m, 
-                const lapack_int* n, const lapack_int* k, const double* alpha, 
-                const double* a, const lapack_int* lda, const double* b, 
-                const lapack_int* ldb, const double* beta, double* c, 
-                const lapack_int* ldc);
-
     double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
-    
-    void daxpy_(const lapack_int* n, const double* alpha, const double* x, 
-                const lapack_int* incx, double* y, const lapack_int* incy);
 }
 
 
@@ -101,6 +92,17 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    if (info1 != 0 ){
       printf("error in tranposing matrix\n");
       return;
+   }
+
+   std::vector<double> colANormVec(nn_A);
+   double *colANorm = colANormVec.data();
+
+   #pragma omp parallel for num_threads(nthread) 
+   for(int i = 0; i < nn_A; i++){
+      int startCol = iatkT[i];
+      int size = iatkT[i+1] - startCol;
+      int one = 1;
+      colANorm[i] = dnrm2_(&size, &(coefkT[startCol]), &one);
    }
 
    // Allocate the space for storing the outputs of the loop over the columns
@@ -293,8 +295,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       // Do it once per column
       A0k_nnz[thId] = 0;
       fullA0k(nn_A, iat0, ja0, coef0, k, A0k, A0k_idx, A0k_nnz[thId]);
-      // print_spVec("coef A0K",nn_A,A0k);
-      // print_spVec("idx A0K",nn_A,A0k_idx);
       // Compute the norm only once
       double normA0k = dnrm2_(&N,A0k,&one);
 
@@ -432,7 +432,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
                // Compute rhoJ2 = norm(res)^2 - (rTA.^2 ./ sum_A2) and save it in normColJ
                cptRhoJ2(JtildeSize, normColJ, jatAJtilde, iaAJtilde, coefAJtilde, 
-                        res, mHat, resNorm);
+                        res, mHat, resNorm,colANorm,Jtilde);
 
                // Debug prints
                #if debug

@@ -14,9 +14,10 @@ void cptRhoJ2(const iReg JtildeSize,
               const iExt* RESTRICT jatAJtilde,
               const iReg * const * RESTRICT iaAJtilde, 
               const double * const * RESTRICT coefAJtilde,
-              const double * RESTRICT res, // Added const and RESTRICT
-              double * RESTRICT tmpRes,     // Added RESTRICT
-              const double normRes);
+              const double * RESTRICT res,
+              double * RESTRICT tmpRes,
+              const double normRes, const double * RESTRICT colANorm,                       
+              const iReg * RESTRICT Jtilde);
 
 iReg minIdx(double *rhoJ2, iReg JtildeSize);
 
