@@ -6,6 +6,9 @@ N = speye(size(A,1));
 mHatkOld = N(:,1);
 avg_resnorm = 0;
 
+% Precompute outside the main loop
+col_norms_sq = full(sum(A.^2, 1));
+
 for k = 1:size(A,1)
    % Diagonal initialization
    J = k;
@@ -98,10 +101,10 @@ for k = 1:size(A,1)
    
       if t < nstep
          % Get nonzero indices for res
-         L = find(abs(res) > 1e-12); 
+         L = abs(res) > 0; 
       
          % Find potential new column indices
-         [~, Jtilde] = find(A(L, :));
+         [Jtilde, ~] = find(A(:,L));
          Jtilde = unique(Jtilde);
       
          % Take away the indices that already are in J
@@ -113,11 +116,9 @@ for k = 1:size(A,1)
       
          % Compute the residual improvement given by index j
          rTA = res' * A(:, Jtilde);
-         sum_A2 = sum(A(:, Jtilde).^2, 1);
-         sum_A2(sum_A2 == 0) = inf; 
+         sum_A2 = col_norms_sq(Jtilde);
          
          rho_j2 = norm(res, 2)^2 - (rTA.^2 ./ sum_A2); 
-         rho_j2(rho_j2 < 0) = 0;
       
          % Select the minimum
          if step_size == 1
@@ -136,7 +137,7 @@ for k = 1:size(A,1)
       end
    end
 
-   fprintf("avg %e t %d\n",res_norm,t);
+   % fprintf("avg %e t %d\n",res_norm,t);
    avg_resnorm = avg_resnorm + res_norm;
 
    % Update SPAI matrix

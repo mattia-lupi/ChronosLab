@@ -4,8 +4,9 @@
 #include <vector>
 #include <iostream>
 #include <unordered_set>
+#include <cmath>
 
-void fullA0k(const iExt nn_A, const iExt * RESTRICT iat0,
+double fullA0k(const iExt * RESTRICT iat0,
              const iReg * RESTRICT ja0, const double * RESTRICT coef0,
              const iExt k, double * RESTRICT A0k,
              iReg * RESTRICT A0k_idx, iReg &A0k_nnz) {
@@ -20,16 +21,25 @@ void fullA0k(const iExt nn_A, const iExt * RESTRICT iat0,
    iExt col_end   = iat0[k+1];
 
    iReg local_nnz = 0;
+   double sq_sum  = 0.0;
 
    // Populate the active rows and log their indices
    for (iExt idx = col_start; idx < col_end; ++idx) {
+      // Get "handles"
       iReg row = ja0[idx];
-      A0k[row] = coef0[idx];
+      const double val = coef0[idx];
+
+      // Fill dense vector
+      A0k[row] = val;
       A0k_idx[local_nnz++] = row;
+
+      // Compute the norm
+      sq_sum += val * val;
    }
 
    // Record how many non-zero elements we found in this column
    A0k_nnz = local_nnz;
+   return std::sqrt(sq_sum);
 }
 
 void findNonZeroInColJ(const iReg *RESTRICT J, const iExt *RESTRICT iatk,

@@ -14,7 +14,7 @@
     #define RESTRICT
 #endif
 
-void fullA0k(const iExt nn_A, const iExt * RESTRICT iat0,
+double fullA0k(const iExt * RESTRICT iat0,
              const iReg * RESTRICT ja0, const double * RESTRICT coef0,
              const iExt k, double * RESTRICT A0k,
              iReg * RESTRICT A0k_idx, iReg &A0k_nnz);

@@ -29,7 +29,7 @@ all: CXXFLAGS += -O3 -ffast-math -flto
 all: LDFLAGS += -flto
 all: $(TARGET)
 
-xtrace: CXXFLAGS += -g -O1 -ffast-math -fno-inline
+xtrace: CXXFLAGS += -g3 -O0 -fno-omit-frame-pointer -fno-inline
 ifeq ($(UNAME_S), Darwin)
 xtrace: GEN_DSYM = dsymutil $(TARGET)
 endif

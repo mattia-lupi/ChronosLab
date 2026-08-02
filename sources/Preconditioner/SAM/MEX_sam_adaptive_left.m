@@ -1,6 +1,13 @@
 % MEX_sam_adaptive_left.m
 function [N, res_norm] = MEX_sam_adaptive_left(Ak, A0, nthread,nstep,step_size,eps)
 
+% Check to not break the algorithm
+if nstep*step_size < 1
+   N = speye(size(A,1));
+   res_norm = normSAM(Ak,A0);
+   return;
+end
+
 % Convert the input matrix A to CSR format for efficient processing
 [jatk, iak, coefk] = unpack_csc(Ak);
 
