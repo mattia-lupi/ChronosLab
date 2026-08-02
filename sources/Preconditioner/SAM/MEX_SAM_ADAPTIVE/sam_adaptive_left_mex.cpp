@@ -11,19 +11,20 @@ public:
         checkArguments(outputs, inputs);
 
         // Extract scalar inputs
-        const int nthread   = static_cast<int>(inputs[6][0]);
-        const int n_step    = static_cast<int>(inputs[7][0]);
-        const int step_size = static_cast<int>(inputs[8][0]);
-        const double eps    = static_cast<double>(inputs[9][0]);
+        const int nthread   = static_cast<int>(inputs[7][0]);
+        const int n_step    = static_cast<int>(inputs[8][0]);
+        const int step_size = static_cast<int>(inputs[9][0]);
+        const double eps    = static_cast<double>(inputs[10][0]);
 
         // Extract array inputs
         matlab::data::TypedArray<double> jatk_in  = std::move(inputs[0]);
         matlab::data::TypedArray<double> iak_in   = std::move(inputs[1]);
         matlab::data::TypedArray<double> coefk_in = std::move(inputs[2]);
+        matlab::data::TypedArray<double> coefkT_in = std::move(inputs[3]);
         
-        matlab::data::TypedArray<double> jat0_in  = std::move(inputs[3]);
-        matlab::data::TypedArray<double> ia0_in   = std::move(inputs[4]);
-        matlab::data::TypedArray<double> coef0_in = std::move(inputs[5]);
+        matlab::data::TypedArray<double> jat0_in  = std::move(inputs[4]);
+        matlab::data::TypedArray<double> ia0_in   = std::move(inputs[5]);
+        matlab::data::TypedArray<double> coef0_in = std::move(inputs[6]);
 
         const int nn_A = static_cast<int>(jatk_in.getNumberOfElements()) - 1;
 
@@ -40,6 +41,7 @@ public:
 
         // Copy data to vector to obtain valid contiguous raw pointers, avoiding ArrayElementTypedRef errors
         std::vector<double> coefk(coefk_in.begin(), coefk_in.end());
+        std::vector<double> coefkT(coefkT_in.begin(), coefkT_in.end());
         std::vector<double> coef0(coef0_in.begin(), coef0_in.end());
 
         // Output references to be populated by the function
@@ -49,7 +51,7 @@ public:
         double avg_resRelNorm = 0.0;
 
         // Execute core algorithm
-        cpt_sam_adaptive_left(iatk.data(), jak.data(), coefk.data(),
+        cpt_sam_adaptive_left(iatk.data(), jak.data(), coefk.data(), coefkT.data(),
                                iat0.data(), ja0.data(), coef0.data(),
                                nthread, n_step, step_size, eps, nn_A,
                                iatN, jaN, coefN, avg_resRelNorm);
@@ -91,9 +93,9 @@ private:
         matlab::data::ArrayFactory factory;
         std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr = getEngine();
 
-        if (inputs.size() != 10) {
+        if (inputs.size() != 11) {
             matlabPtr->feval(u"error", 0, std::vector<matlab::data::Array>({
-                factory.createScalar("Ten inputs required.") }));
+                factory.createScalar("Eleven inputs required.") }));
         }
         if (outputs.size() > 4) {
             matlabPtr->feval(u"error", 0, std::vector<matlab::data::Array>({

@@ -30,6 +30,7 @@ std::vector<T> load_vector_from_file(const std::string& filename) {
 int main() {
     // 1. Load the FIRST matrix from .dat files
     std::vector<double> mat_vals    = load_vector_from_file<double>("coef.dat");
+    std::vector<double> mat_valsT   = load_vector_from_file<double>("coefT.dat");
     std::vector<int> mat_cols       = load_vector_from_file<int>("ja.dat");
     std::vector<int> mat_row_ptr    = load_vector_from_file<int>("iat.dat");
 
@@ -77,7 +78,7 @@ int main() {
     auto start = std::chrono::steady_clock::now();
     
     // Pass mat2_* which now holds either your loaded data or the fallback identity data
-    cpt_sam_adaptive_left(mat_row_ptr.data(), mat_cols.data(), mat_vals.data(),
+    cpt_sam_adaptive_left(mat_row_ptr.data(), mat_cols.data(), mat_vals.data(), mat_valsT.data(),
                           mat2_row_ptr.data(), mat2_cols.data(), mat2_vals.data(),
                           nthread, n_step, step_size, eps, nn_A,
                           iat_N, ja_N, coef_N, resNorm);

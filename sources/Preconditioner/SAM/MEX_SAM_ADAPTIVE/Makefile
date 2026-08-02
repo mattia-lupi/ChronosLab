@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
 TARGET = main
-SRCS = main.cpp cpt_sam_adaptive_left.cpp qr_functions.cpp find_stuff.cpp cpt_resRho.cpp transpose.cpp
+SRCS = main.cpp cpt_sam_adaptive_left.cpp qr_functions.cpp find_stuff.cpp cpt_resRho.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 UNAME_S := $(shell uname -s)

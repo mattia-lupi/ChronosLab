@@ -9,7 +9,6 @@
 #include "find_stuff.h"
 #include "cpt_resRho.h"
 #include "omp.h"
-#include "transpose.h"
 
 #define debug false
 iReg checkCol = 0;
@@ -26,26 +25,13 @@ void print_vector(const char* desc, iReg n, iReg* vec);
 void print_spVec(const char* desc, iReg n, double* vec);
 void print_spVec(const char* desc, iReg n, int* vec);
 
-void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
+void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                            iExt *iat0, iReg *ja0, double *coef0,
                            iReg nthread, iReg n_step, iReg step_size, double eps, iExt nn_A,
                            iExt *&iatN, iReg *&jaN, double *&coefN, double &avg_resRelNorm) {
 
-   // Compute the number of nonzeros
-   iExt nnzAk = iatk[nn_A];
-
-   // Transpose the matrix
-   std::vector<double> coefkTVec(nnzAk);
    iExt *iatkT = iatk;
    iReg *jakT = jak;
-   double *coefkT = coefkTVec.data();
-
-   int info1 = transpose(nn_A, iatk, jak, coefk, coefkT);
-   if (info1 != 0) {
-      printf("error in tranposing matrix\n");
-      return;
-   }
-
    iReg dCol = 0, dCol0 = 0;
 
    #pragma omp parallel num_threads(nthread)
@@ -133,6 +119,8 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::vector<iReg> JtildeVec(maxJtildeSize);
       std::vector<iReg> IVec(maxISize);
       std::vector<iReg> JVec(maxJsize);
+      std::vector<iReg> LVec(maxLSize);
+      std::vector<double> AhatVec(maxISize * maxJsize);
       
       std::vector<double> normColJVec(nn_A);
       std::vector<double> a0kVec(nn_A);
@@ -145,18 +133,16 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::vector<iReg> resIdxVec(nn_A);
       std::vector<double> resWSVec(nn_A);
       
-      std::vector<iReg> LVec(maxLSize);
-      std::vector<double> AhatVec(maxISize * maxJsize);
-      std::vector<iExt> jatAJVec(maxJsize + 1);
-      std::vector<const iReg*> iaAJVec(maxJsize);
-      std::vector<const double*> coefAJVec(maxJsize);
-      std::vector<iExt> jatAtildeVec(maxJtildeSize + 1);
-      
-      std::vector<const iReg*> iaAtildeVec(maxJtildeSize);
-      std::vector<const double*> coefAtildeVec(maxJtildeSize);
       std::vector<double> tauVec(maxJsize);
       std::vector<double> RVec(maxJsize * maxJsize);
       std::vector<double> RtriangVec(maxJsize * (maxJsize + 1));
+      std::vector<iExt> jatAJVec(maxJsize + 1);
+      std::vector<const iReg*> iaAJVec(maxJsize);
+      std::vector<const double*> coefAJVec(maxJsize);
+
+      std::vector<iExt> jatAtildeVec(maxJtildeSize + 1);
+      std::vector<const iReg*> iaAtildeVec(maxJtildeSize);
+      std::vector<const double*> coefAtildeVec(maxJtildeSize);
       std::vector<double> workVec(lwork);
 
       // Get handles
@@ -368,6 +354,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
    }
 
    iReg total_nnz = iatN[nn_A];
+   printf("nnzr = %4.6f, nnz = %d, avgResNorm = %f\n",static_cast<double>(total_nnz)/static_cast<double>(nn_A),total_nnz,avg_resRelNorm);
    jaN = new iReg[total_nnz];
    coefN = new double[total_nnz];
 
