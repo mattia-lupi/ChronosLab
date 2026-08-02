@@ -8,72 +8,66 @@
 #include <cmath>
 #include "lapack.h"
 
-void cptRhoJ2(const iReg JtildeSize, 
-              double * RESTRICT normColJ, 
+
+void cptRhoJ2(const iReg JtildeSize,
+              double * RESTRICT normColJ,
               const iExt* RESTRICT jatAJtilde,
-              const iReg * const * RESTRICT iaAJtilde, 
+              const iReg * const * RESTRICT iaAJtilde,
               const double * const * RESTRICT coefAJtilde,
               const double * RESTRICT res,
-              double * RESTRICT tmpRes,
-              const double normRes) {
-    
+              const double normRes, const double * RESTRICT colANorm,
+              const iReg * RESTRICT Jtilde) {
+
     const double normResSq = normRes * normRes;
 
     for (iReg i = 0; i < JtildeSize; ++i) {
-        // Get direct pointers to this column's row indices and coefficients
-        const iReg* RESTRICT col_ia = iaAJtilde[i];
-        const double* RESTRICT col_coef = coefAJtilde[i];
+        const iReg* RESTRICT ptr_ia = iaAJtilde[i];
+        const double* RESTRICT ptr_coef = coefAJtilde[i];
 
-        // Determine how many non-zero elements are in this column
-        const iExt colStart = jatAJtilde[i];
-        const iExt colEnd = jatAJtilde[i + 1];
-        const iExt num_elements = colEnd - colStart;
+        const iExt num_elements = jatAJtilde[i + 1] - jatAJtilde[i];
 
-        // Multiple accumulators to break dependency chains
-        double dot0 = 0.0, dot1 = 0.0, dot2 = 0.0, dot3 = 0.0;
+        // 8 independent accumulators to break latency chains
         double sum0 = 0.0, sum1 = 0.0, sum2 = 0.0, sum3 = 0.0;
+        double sum4 = 0.0, sum5 = 0.0, sum6 = 0.0, sum7 = 0.0;
 
-        iExt k = 0;
-        // Unroll by 4 to expose Memory-Level Parallelism (MLP)
-        for (; k + 3 < num_elements; k += 4) {
-            iReg r0 = col_ia[k];
-            iReg r1 = col_ia[k + 1];
-            iReg r2 = col_ia[k + 2];
-            iReg r3 = col_ia[k + 3];
+        // Process blocks of 8 using pointer offsets
+        const iReg* end_block = ptr_ia + (num_elements & ~7);
 
-            double v0 = col_coef[k];
-            double v1 = col_coef[k + 1];
-            double v2 = col_coef[k + 2];
-            double v3 = col_coef[k + 3];
+        while (ptr_ia < end_block) {
+            // Fetch 8 indices
+            iReg r0 = ptr_ia[0];  iReg r1 = ptr_ia[1];
+            iReg r2 = ptr_ia[2];  iReg r3 = ptr_ia[3];
+            iReg r4 = ptr_ia[4];  iReg r5 = ptr_ia[5];
+            iReg r6 = ptr_ia[6];  iReg r7 = ptr_ia[7];
 
-            dot0 += v0 * v0;
-            dot1 += v1 * v1;
-            dot2 += v2 * v2;
-            dot3 += v3 * v3;
+            // Issue 8 parallel loads & multiplications
+            sum0 += ptr_coef[0] * res[r0];
+            sum1 += ptr_coef[1] * res[r1];
+            sum2 += ptr_coef[2] * res[r2];
+            sum3 += ptr_coef[3] * res[r3];
+            sum4 += ptr_coef[4] * res[r4];
+            sum5 += ptr_coef[5] * res[r5];
+            sum6 += ptr_coef[6] * res[r6];
+            sum7 += ptr_coef[7] * res[r7];
 
-            // These four loads can now run concurrently in the memory pipeline
-            sum0 += v0 * res[r0];
-            sum1 += v1 * res[r1];
-            sum2 += v2 * res[r2];
-            sum3 += v3 * res[r3];
+            // Single pointer increment per 8 elements
+            ptr_ia += 8;
+            ptr_coef += 8;
         }
 
-        // Combine unrolled accumulators
-        double dot = (dot0 + dot1) + (dot2 + dot3);
-        double sum = (sum0 + sum1) + (sum2 + sum3);
+        // Tree reduction for minimum floating-point addition latency
+        double sum = ((sum0 + sum1) + (sum2 + sum3)) +
+                     ((sum4 + sum5) + (sum6 + sum7));
 
-        // Clean up remaining elements
-        for (; k < num_elements; ++k) {
-            iReg r = col_ia[k];
-            double v = col_coef[k];
-            dot += v * v;
-            sum += v * res[r];
+        // Tail loop for remaining elements (0 to 7)
+        const iReg* end_ia = iaAJtilde[i] + num_elements;
+        while (ptr_ia < end_ia) {
+            sum += ptr_coef[0] * res[ptr_ia[0]];
+            ptr_ia++;
+            ptr_coef++;
         }
 
-        tmpRes[i] = sum;
-
-        // Get the final result
-        normColJ[i] = normResSq - (sum * sum) / dot;
+        normColJ[i] = normResSq - (sum * sum) / colANorm[Jtilde[i]];
     }
 }
 
