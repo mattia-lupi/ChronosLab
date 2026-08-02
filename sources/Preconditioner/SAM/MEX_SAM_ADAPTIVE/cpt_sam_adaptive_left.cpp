@@ -46,9 +46,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       return;
    }
 
-   std::vector<double> colANormVec(nn_A);
-   double *colANorm = colANormVec.data();
-
    iReg dCol = 0, dCol0 = 0;
 
    #pragma omp parallel num_threads(nthread)
@@ -66,9 +63,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
          }
    
          // Compute column norms in parallel
-         lapack_int one = 1;
-         colANorm[i] = dnrm2_(&size, &(coefkT[startCol]), &one);
-   
          iReg size0 = static_cast<iReg>(iat0[i + 1] - iat0[i]);
          if (size0 > local_d0_col) {
             local_d0_col = size0;
@@ -85,7 +79,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       }
    }
 
-   printf("%d %d\n",dCol,dCol0);
    // Allocate space for storing column output metadata
    std::vector<iReg> storageJsizeVec(nn_A);
    iReg *storageJsize = storageJsizeVec.data();
@@ -310,7 +303,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
 
                   // Compute the residual reductions
                   cptRhoJ2(JtildeSize, normColJ, jatAtilde, iaAtilde, coefAtilde,
-                           res, mHat, resNorm, colANorm, Jtilde);
+                           res, mHat, resNorm);
 
                   #if debug
                   if (k == checkCol) print_spVec("Vector rhoJ2", JtildeSize, normColJ);
@@ -389,6 +382,49 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk,
       std::memcpy(&coefN[dstOffset], &storageN[srcOffset], nEnt * sizeof(double));
    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void print_matrix(const char* desc, iReg m, iReg n, double* mat, iReg lda) {
    printf("\n--- %s (%dx%d) ---\n", desc, m, n);

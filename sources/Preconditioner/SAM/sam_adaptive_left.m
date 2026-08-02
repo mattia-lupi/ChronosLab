@@ -6,9 +6,6 @@ N = speye(size(A,1));
 mHatkOld = N(:,1);
 avg_resnorm = 0;
 
-% Precompute outside the main loop
-col_norms_sq = full(sum(A.^2, 1));
-
 for k = 1:size(A,1)
    % Diagonal initialization
    J = k;
@@ -116,7 +113,7 @@ for k = 1:size(A,1)
       
          % Compute the residual improvement given by index j
          rTA = res' * A(:, Jtilde);
-         sum_A2 = col_norms_sq(Jtilde);
+         sum_A2 = sum(A(:, Jtilde).^2, 1);
          
          rho_j2 = norm(res, 2)^2 - (rTA.^2 ./ sum_A2); 
       

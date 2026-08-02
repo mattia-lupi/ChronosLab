@@ -10,6 +10,8 @@ end
 
 % Convert the input matrix A to CSR format for efficient processing
 [jatk, iak, coefk] = unpack_csc(Ak);
+% Prepare also the transposed to speed up everything
+[~, ~, coefkT]     = unpack_csr(Ak);
 
 % Convert the input matrix A to CSC format for efficient processing
 [jat0, ia0, coef0] = unpack_csr(A0);

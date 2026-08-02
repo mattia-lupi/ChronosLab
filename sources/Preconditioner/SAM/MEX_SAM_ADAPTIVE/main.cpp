@@ -67,7 +67,7 @@ int main() {
     int nthread = 8;
     int n_step = 5;
     int step_size = 1;
-    double eps = 1e-3;
+    double eps = 1e-4;
     int nn_A = mat_row_ptr.size() - 1;
     int *iat_N = nullptr;
     int *ja_N = nullptr;
