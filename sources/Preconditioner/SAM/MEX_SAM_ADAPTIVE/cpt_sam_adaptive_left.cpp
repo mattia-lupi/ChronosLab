@@ -348,7 +348,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
          #pragma omp atomic
          avg_resRelNorm += resRelNorm;
 
-         printf("col %d, avgRes %.2g, t %d\n", k, resRelNorm, n2);
+         //printf("col %d, avgRes %.2g, t %d\n", k, resRelNorm, n2);
 
          // Copy results to storage
          std::memcpy(&(storageJ[k * maxJsize]), J, n2 * sizeof(iReg));

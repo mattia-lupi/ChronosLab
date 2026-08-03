@@ -81,38 +81,45 @@ void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, double* fullA0k) {
     }
 }
 
-void getAhat(iReg * RESTRICT I, iReg sizeI, iReg * RESTRICT J, iReg Jstart, 
-             iReg Jend, iExt * RESTRICT iatk, iReg * RESTRICT jak, 
-             double * RESTRICT coefk, double * RESTRICT Ahat, iReg &Astart) {
+void getAhat(iReg * RESTRICT I, iReg sizeI, 
+             iReg * RESTRICT J, iReg Jstart, iReg Jend, 
+             iExt * RESTRICT iatk, iReg * RESTRICT jak,
+             double * RESTRICT coefk, double * RESTRICT Ahat, 
+             iReg &Astart) 
+{
+    const iReg nJ = Jend - Jstart;
+    const iReg base_Astart = Astart;
 
-   // Cycle over the columns in J that have been added
-   for (iReg j = Jstart; j < Jend; ++j){
-      iReg colJ = J[j];
-      // Cycle over the rows in I
-      for (iReg i = 0; i < sizeI; ++i){
-         iExt k, row = I[i];
-         const iExt row_start = iatk[row];
-         const iExt row_end = iatk[row+1];
+    // Cycle over rows I on the outer loop
+    for (iReg i = 0; i < sizeI; ++i) {
+        const iExt row = I[i];
+        const iExt row_start = iatk[row];
+        const iExt row_end   = iatk[row + 1];
 
-         // Cycle over the chosen row
-         for(k = row_start; k < row_end; ++k){
-            // If the column in the row coincides with the column added then get the nonzero value
-            if(jak[k] == colJ){
-               Ahat[Astart] = coefk[k];
-               Astart++;
-               break;
+        // Cycle over columns J on the inner loop
+        for (iReg j = Jstart; j < Jend; ++j) {
+            const iReg colJ = J[j];
+
+            // Compute the target index in Ahat to preserve colmajor ordering
+            const iReg dest_idx = base_Astart + (j - Jstart) * sizeI + i;
+
+            iExt k;
+            // Check if the current row has entry in the current column
+            for (k = row_start; k < row_end; ++k) {
+                if (jak[k] == colJ) {
+                    Ahat[dest_idx] = coefk[k];
+                    break;
+                }
             }
-         }
 
-         if(k == row_end){
-            // If entered here there is no column entry equal to k
-            // set to zero
-            Ahat[Astart] = 0;
-            Astart++;
-         }
-      }
-   }
-   return;
+            if (k == row_end) {
+                Ahat[dest_idx] = 0.0;
+            }
+        }
+    }
+
+    // Advance Astart by total entries written
+    Astart += sizeI * nJ;
 }
 
 // Get the new columns by storing pointers to the values inside matrix Ak
@@ -132,8 +139,7 @@ void getAJ(iReg *J, iReg Jstart, iReg Jend, iExt *jatk, iReg *iak, double *coefk
       iExt end_A   = jatk[col_A + 1];
       iExt num_elements = end_A - start_A;
 
-      // ZERO COPY: Store the pointer directly to the slice inside Ak
-      // Note: We index these by the column offset 'i' instead of 'current_nnz'
+      // Store the pointer directly to the slice inside Ak
       iaAJ[i]   = &iak[start_A];
       coefAJ[i] = &coefk[start_A];
     
