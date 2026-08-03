@@ -10,18 +10,20 @@ end
 
 % Convert the input matrix A to CSR format for efficient processing
 [jatk, iak, coefk] = unpack_csc(Ak);
-% Prepare also the transposed to speed up everything
-[~, ~, coefkT]     = unpack_csr(Ak);
+
+% Prepare also the nonzeros of the trasposed to speed up everything
+coefkT     = nonzeros(Ak');
 
 % Convert the input matrix A to CSC format for efficient processing
 [jat0, ia0, coef0] = unpack_csr(A0);
 
+% Compute the SAM
 [row_N, col_N, val_N, res_norm] = sam_adaptive_left_mex(...
     jatk, iak, coefk, coefkT, ...
     jat0, ia0, coef0, ...
     nthread,nstep,step_size,eps);
 
-% Get the trasposed one
+% Get the trasposed N
 N = sparse(col_N,row_N, val_N, size(A0,1), size(A0,1));
 
 end
