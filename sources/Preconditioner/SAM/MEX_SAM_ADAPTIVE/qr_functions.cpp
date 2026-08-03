@@ -63,7 +63,7 @@ void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
 
 void applyQt(iReg t, const lapack_int* RESTRICT sizeJ, 
              const lapack_int* RESTRICT sizeI, lapack_int *qStart, 
-             double *Ahat, double *tau, double *a0k, lapack_int nRowsRHS, 
+             double *Ahat, double *tau, double *a0k, 
              lapack_int ncolsRHS, iReg ldc, double *work, lapack_int lwork,
              lapack_int &info){
 

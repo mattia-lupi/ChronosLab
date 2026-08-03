@@ -239,7 +239,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                #endif
             } else {
                // Apply Q transposed in the correct place
-               applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t], oldSizeI,
+               applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t],
                        n2 - n2old, sizeIcurr, work, lwork, info);
                
                // Compute new QR factor 
@@ -247,7 +247,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                             info);
 
                // Apply the new Q transpose
-               applyQt(t + 1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeIcurr, 1, 
+               applyQt(t + 1, sizeJ, sizeI, qStart, Ahat, tau, mHat, 1, 
                        sizeIcurr, work, lwork, info);
 
                #if debug
