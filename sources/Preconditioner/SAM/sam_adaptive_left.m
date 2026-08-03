@@ -27,7 +27,7 @@ for k = 1:size(A,1)
       % First iteration, solve full qr
       if t == 1
          % Get contracted initial matrix for column k
-         a0k = full(A0(I,k));
+         a0k = full(A0kk(I));
 
          % Get contracted matrix A
          AHat = full(A(I,J));
@@ -47,7 +47,7 @@ for k = 1:size(A,1)
          n2tilde = length(J_add);
 
          % Get contracted initial matrix for column k
-         a0k = [a0k; A0(Itilde,k)];
+         a0k = [a0k; A0kk(Itilde)];
 
          % Find matrix 1,2 in equation 14 in the paper
          A_I_Jadd = full(A(Iold,J_add));

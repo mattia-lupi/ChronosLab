@@ -64,7 +64,8 @@ void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
 void applyQt(iReg t, const lapack_int* RESTRICT sizeJ, 
              const lapack_int* RESTRICT sizeI, lapack_int *qStart, 
              double *Ahat, double *tau, double *a0k, lapack_int nRowsRHS, 
-             lapack_int ncolsRHS, double *work, lapack_int lwork, lapack_int &info){
+             lapack_int ncolsRHS, iReg ldc, double *work, lapack_int lwork,
+             lapack_int &info){
 
    // Apply iteratively the Qs in the correct way
    char side = 'L';
@@ -78,8 +79,8 @@ void applyQt(iReg t, const lapack_int* RESTRICT sizeJ,
       nrows = sizeI[i+1] - ofA0k;
       ncols = ncolsRHS;
       nrefl = sizeJ[i+1] - ofA0k;
-      LDA   = nrows;
-      LDC   = nRowsRHS;
+      LDA   = sizeI[i+1];
+      LDC   = static_cast<lapack_int>(ldc);
       ofTau = ofA0k;
 
       #if defined(__clang__) && !defined(MATLAB_MEX_FILE)
@@ -109,13 +110,14 @@ void applyQt(iReg t, const lapack_int* RESTRICT sizeJ,
 void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qStart, 
                   double *Ahat, double *tau, double *R, double *Rtriang, double *work, 
                   lapack_int lwork, lapack_int &info){
+
    // Compute QR Factorization on the new part of the matrix
    lapack_int oldSizeTau = sizeJ[t];
    lapack_int colSizeB2  = sizeJ[t+1] - oldSizeTau;
    lapack_int rowSizeB   = sizeI[t+1];
-   lapack_int rowSizeB2  = sizeI[t+1] - oldSizeTau;
+   lapack_int rowSizeB2  = rowSizeB - oldSizeTau;
    lapack_int sqrtStartR = oldSizeTau;
-   // printf("sizeIt %d, sizeJt %d\n", sizeI[t+1],oldSizeTau);
+
    // Set the starting point for the new QR factorization
    qStart[t+1]    = qStart[t] + rowSizeB*colSizeB2;
    lapack_int startB2    = qStart[t] + oldSizeTau;
@@ -125,7 +127,6 @@ void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qSta
 
    // Copy the data into the triangular R first (colmajor)
    lapack_int startB = qStart[t];
-   // printf("startB2 %d startB %d at t %d\n", startB2,startB, t);
    
    // Compute the new QR factorization
    dgeqrf_(&rowSizeB2, &colSizeB2, Ahat + startB2, &rowSizeB,

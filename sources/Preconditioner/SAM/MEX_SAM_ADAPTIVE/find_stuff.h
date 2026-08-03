@@ -24,8 +24,7 @@ void findNonZeroInColJ(const iReg *RESTRICT J, const iExt *RESTRICT iatk,
                        iReg *RESTRICT I, iReg &sizeI,
                        iReg *RESTRICT visited, const int t);
 
-void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0,
-            double *coef0, iExt k);
+void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, double* fullA0k);
 
 void getAhat(iReg * RESTRICT I, iReg sizeI, iReg * RESTRICT J, iReg Jstart, 
              iReg Jend, iExt * RESTRICT iatk, iReg * RESTRICT jak, 

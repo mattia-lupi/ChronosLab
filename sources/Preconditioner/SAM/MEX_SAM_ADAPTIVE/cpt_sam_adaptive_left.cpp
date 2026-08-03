@@ -11,7 +11,7 @@
 #include "omp.h"
 
 #define debug false
-iReg checkCol = 80185;
+iReg checkCol = 80110;
 iReg checkLevel = 1;
 
 // BLAS Fortran routines declarations
@@ -201,7 +201,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
          J[0] = k;
 
          double normA0k = fullA0k(iat0, ja0, coef0, k, A0k, A0k_idx, A0k_nnz);
-
+         
          iReg n2 = 1, n2old = 0;
          iReg oldSizeI, sizeIcurr = 0;
          iReg Astart = 0;
@@ -221,7 +221,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
             #endif
 
             // Append the new entries of a0k in the vector. Then overwrite mHat
-            getA0k(a0k, I, sizeIcurr, oldSizeI, iat0, ja0, coef0, k);
+            getA0k(a0k, I, sizeIcurr, oldSizeI, A0k);
             std::memcpy(mHat, a0k, sizeIcurr * sizeof(double));
 
             // Get the Ahat matrix in the new position to prepare for the QR
@@ -239,15 +239,16 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                #endif
             } else {
                // Apply Q transposed in the correct place
-               applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t], sizeI[t],
-                       sizeJ[t + 1] - sizeJ[t], work, lwork, info);
+               applyQt(t, sizeJ, sizeI, qStart, Ahat, tau, Ahat + qStart[t], oldSizeI,
+                       n2 - n2old, sizeIcurr, work, lwork, info);
+               
                // Compute new QR factor 
                computeNewQR(t, sizeI, sizeJ, qStart, Ahat, tau, R, Rtriang, work, lwork,
                             info);
 
                // Apply the new Q transpose
-               applyQt(t + 1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeIcurr, 1, work,
-                       lwork, info);
+               applyQt(t + 1, sizeJ, sizeI, qStart, Ahat, tau, mHat, sizeIcurr, 1, 
+                       sizeIcurr, work, lwork, info);
 
                #if debug
                if (k == checkCol) print_vector("tau", n2, tau);
@@ -300,7 +301,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                            res, resNorm, colANorm, Jtilde);
 
                   #if debug
-                  if (k == checkCol) print_spVec("Vector rhoJ2", JtildeSize, normColJ);
+                  // if (k == checkCol) print_spVec("Vector rhoJ2", JtildeSize, normColJ);
                   #endif
 
                   if (step_size == 1) {
@@ -312,7 +313,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                      n2++;
                      sizeJ[t + 2] = n2;
                   } else {
-                     printf("Not functioning correctly as of now\n");
                      multiMinIdx(step_size, JtildeSize, Jtilde, normColJ, J + n2);
 
                      // Update sizes

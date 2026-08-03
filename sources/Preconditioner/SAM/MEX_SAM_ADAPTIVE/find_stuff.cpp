@@ -48,46 +48,36 @@ void findNonZeroInColJ(const iReg *RESTRICT J, const iExt *RESTRICT iatk,
                        iReg *RESTRICT I, iReg &sizeI,
                        iReg *RESTRICT visited, const int t) {
     
-    // Mark pre-existing elements of I as visited in the current t
-    for (iReg k = 0; k < sizeI; ++k) {
-        visited[I[k]] = t;
-    }
+   // Mark pre-existing elements of I as visited in the current t
+   for (iReg k = 0; k < sizeI; ++k) {
+      visited[I[k]] = t;
+   }
 
-    for (iReg i = 0; i < n2; ++i) {
-        const iReg start = iatk[J[i]];
-        const iReg end = iatk[J[i] + 1];
-        
-        for (iReg j = start; j < end; ++j) {
-            const iReg val = jak[j];
-            if (visited[val] != t) {
-                visited[val] = t;
-                I[sizeI++] = val;
-            }
-        }
-    }
+   // Loop over all J
+   for (iReg i = 0; i < n2; ++i) {
+      // Get handles
+      iReg row = J[i];
+      const iReg start = iatk[row];
+      const iReg end = iatk[row + 1];
+      
+      // Loop over row J[i]
+      for (iReg j = start; j < end; ++j) {
+         const iReg val = jak[j];
+         // If not seen before, add it
+         if (visited[val] != t) {
+            visited[val] = t;
+            I[sizeI++] = val;
+         }
+      }
+   }
 }
 
-void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k) {
-    iExt col_start = iat0[k];
-    iExt col_end   = iat0[k+1];
-    iReg col_len   = col_end - col_start;
-    iReg *col_rows = &ja0[col_start];
+void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, double* fullA0k) {
 
     // Loop over the new additions
     for (iReg i = oldSizeI; i < sizeI; ++i) {
-        iReg row = I[i];
-        a0k[i] = 0.0; // Default value
-
-        // loop over the new columns to add
-        for (iReg j = 0; j < col_len; ++j) {
-            iReg cur_row = col_rows[j];
-            if (cur_row >= row) {
-                if (cur_row == row) {
-                    a0k[i] = coef0[col_start + j];
-                }
-                break; // Stop scanning once row index is met or exceeded
-            }
-        }
+        // Get the value from the full vector
+        a0k[i] = fullA0k[I[i]];
     }
 }
 
