@@ -11,8 +11,8 @@
 #include "omp.h"
 
 #define debug false
-iReg checkCol = 0;
-iReg checkLevel = 2;
+iReg checkCol = 80185;
+iReg checkLevel = 1;
 
 // BLAS Fortran routines declarations
 extern "C" {
@@ -53,8 +53,9 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
 
          // Compute column norms in parallel
          lapack_int one = 1;
-         colANorm[i] = dnrm2_(&size, &(coefkT[startCol]), &one);
-   
+         double norm = dnrm2_(&size, &(coefkT[startCol]), &one);
+         colANorm[i] = norm * norm;
+
          // Compute column norms in parallel
          iReg size0 = static_cast<iReg>(iat0[i + 1] - iat0[i]);
          if (size0 > local_d0_col) {
@@ -73,15 +74,15 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
    }
 
    // Allocate space for storing column output metadata
+   iReg maxJsize = n_step * step_size;
    std::vector<iReg> storageJsizeVec(nn_A);
    iReg *storageJsize = storageJsizeVec.data();
-   std::vector<iReg> storageJVec(n_step * nn_A);
+   std::vector<iReg> storageJVec(maxJsize * nn_A);
    iReg *storageJ = storageJVec.data();
-   std::vector<double> storageNVec(n_step * nn_A);
+   std::vector<double> storageNVec(maxJsize * nn_A);
    double *storageN = storageNVec.data();
 
    avg_resRelNorm = 0.0;
-   iReg maxJsize = n_step * step_size;
 
    // LAPACK Workspace Query (performed once before parallel processing)
    iReg maxISize = std::min(nn_A,maxJsize*dCol);
@@ -116,7 +117,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
    lwork = static_cast<lapack_int>(work_query);
    lwork = std::max(static_cast<lapack_int>(work_query1), lwork);
 
-   #pragma omp parallel num_threads(nthread) reduction(+:avg_resRelNorm)
+   #pragma omp parallel num_threads(nthread)
    {
       // Allocate the arrays
       std::vector<lapack_int> qStartVec(n_step + 1);
@@ -184,12 +185,13 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
       double *R = RVec.data();
       double *Rtriang = RtriangVec.data();
       double *work = workVec.data();
+      iReg usedL = 0;
 
       // Dynamically assign columns to available threads
       #pragma omp for schedule(dynamic)
       for (iReg k = 0; k < nn_A; ++k) {
          double resRelNorm = 1.0, resNorm;
-         iReg usedL = 0, JtildeSize = 0;
+         iReg JtildeSize = 0;
 
          qStart[0] = 0;
          sizeI[0] = 0;
@@ -198,7 +200,6 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
 
          J[0] = k;
 
-         A0k_nnz = 0;
          double normA0k = fullA0k(iat0, ja0, coef0, k, A0k, A0k_idx, A0k_nnz);
 
          iReg n2 = 1, n2old = 0;
@@ -311,7 +312,13 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
                      n2++;
                      sizeJ[t + 2] = n2;
                   } else {
-                     printf("Error, not implemented yet\n");
+                     printf("Not functioning correctly as of now\n");
+                     multiMinIdx(step_size, JtildeSize, Jtilde, normColJ, J + n2);
+
+                     // Update sizes
+                     n2old = n2;
+                     n2+=JtildeSize;
+                     sizeJ[t + 2] = n2;
                   }
                } else {
                   // There is only one entry
@@ -344,8 +351,8 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
          printf("col %d, avgRes %.2g, t %d\n", k, resRelNorm, n2);
 
          // Copy results to storage
-         std::memcpy(&(storageJ[k * n_step]), J, n2 * sizeof(iReg));
-         std::memcpy(&(storageN[k * n_step]), mHat, n2 * sizeof(double));
+         std::memcpy(&(storageJ[k * maxJsize]), J, n2 * sizeof(iReg));
+         std::memcpy(&(storageN[k * maxJsize]), mHat, n2 * sizeof(double));
          storageJsize[k] = n2;
       }
    }
@@ -370,14 +377,12 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
    for (iReg i = 0; i < nn_A; ++i) {
       iReg nEnt = storageJsize[i];
       iReg dstOffset = iatN[i];
-      iReg srcOffset = i * n_step;
+      iReg srcOffset = i * maxJsize;
 
       std::memcpy(&jaN[dstOffset], &storageJ[srcOffset], nEnt * sizeof(iReg));
       std::memcpy(&coefN[dstOffset], &storageN[srcOffset], nEnt * sizeof(double));
    }
 }
-
-
 
 
 

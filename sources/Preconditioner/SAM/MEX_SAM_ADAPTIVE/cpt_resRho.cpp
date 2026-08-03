@@ -94,6 +94,7 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ,
     // in the previous call, using the old L array.
     for (iReg n = 0; n < usedL; ++n) {
         res[L[n]] = 0.0;
+        L[n] = 0;
     }
 
     int ws_count = 0;
@@ -167,3 +168,90 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ,
 
     resRelNorm = 2.0 * resNorm / (normAjMh + resRelNorm);
 }
+
+
+// Sifts down the root of a max-heap of size k
+inline void replace_max_heap_top(MinCandidate* heap, iReg k, double new_val, iReg new_j) {
+    iReg i = 0;
+    while (true) {
+        iReg left = 2 * i + 1;
+        iReg right = 2 * i + 2;
+        iReg largest = i;
+
+        if (left < k && heap[largest].val < heap[left].val) {
+            largest = left;
+        }
+        if (right < k && heap[largest].val < heap[right].val) {
+            largest = right;
+        }
+        if (largest == i) break;
+
+        heap[i] = heap[largest];
+        i = largest;
+    }
+    heap[i] = { new_val, new_j };
+}
+
+void multiMinIdx(iReg step_size, iReg &JtildeSize, const iReg *Jtilde, const double *rhoJ2, iReg *Jstart) {
+    step_size = std::min(step_size, JtildeSize);
+    if (step_size <= 0) return;
+
+    // Fixed stack buffer to prevent dynamic memory allocation
+    constexpr size_t STACK_CAPACITY = 64;
+    MinCandidate local_buffer[STACK_CAPACITY];
+
+    // Safety fallback: if step_size ever exceeds stack capacity
+    MinCandidate* heap = local_buffer;
+    std::vector<MinCandidate> fallback_vec;
+    if (static_cast<size_t>(step_size) > STACK_CAPACITY) {
+        fallback_vec.resize(step_size);
+        heap = fallback_vec.data();
+    }
+
+    // 1. Initialize max-heap with the first step_size elements
+    for (iReg i = 0; i < step_size; ++i) {
+        heap[i] = { rhoJ2[i], Jtilde[i] };
+    }
+    std::make_heap(heap, heap + step_size);
+
+    // 2. Single pass over the remaining elements (N - k iterations)
+    for (iReg i = step_size; i < JtildeSize; ++i) {
+        double current_val = rhoJ2[i];
+        // Fast rejection filter: only update if current_val is smaller than maximum in heap
+        if (current_val < heap[0].val) {
+            replace_max_heap_top(heap, step_size, current_val, Jtilde[i]);
+        }
+    }
+ 
+    // 3. Sort the top-k elements ascending by rhoJ2 (matches MATLAB's sort output)
+    std::sort(heap, heap + step_size, [](const MinCandidate& a, const MinCandidate& b) {
+        return a.val < b.val;
+    });
+
+    // 4. Output values into Jstart
+    for (iReg i = 0; i < step_size; ++i) {
+        Jstart[i] = heap[i].j_val;
+    }
+    JtildeSize = step_size;
+}
+// // Finds the step_size minimum indices inside rhoJ2
+// void multiMinIdx(iReg step_size, iReg JtildeSize, iReg *Jtilde, double *rhoJ2, iReg *Jstart){
+//    
+//    // Get at most JtildeSize elements
+//    step_size = std::min(step_size, JtildeSize);
+// 
+//    // Copy the first n as a first minimum assumption
+//    std::memcpy(Jstart,Jtilde,step_size * sizeof(iReg));
+// 
+//    // Loop over Jtilde/rhoJ2, start from step_size as the first step_size have alreay been
+//    // copied in the vector J
+//    for(int i = step_size; i < JtildeSize; i++){
+//       // Loop over the current minima
+//       for(int j = 0; j < step_size; j++){
+//          if(){
+// 
+//          }
+//       }
+//    }
+//    return;
+// }

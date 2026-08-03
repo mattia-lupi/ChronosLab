@@ -28,3 +28,16 @@ void cptRes(iReg sizeJ, const iExt * RESTRICT jatAJ,
             double * RESTRICT res, iReg * RESTRICT L, iReg &usedL,
             double &resRelNorm, double &resNorm,
             int* RESTRICT ws_idx, double* RESTRICT ws_val);
+
+struct MinCandidate {
+    double val;
+    iReg j_val;
+
+    // Max-heap comparator: largest value stays at root (index 0)
+    bool operator<(const MinCandidate& other) const {
+        return val < other.val;
+    }
+};
+
+inline void replace_max_heap_top(MinCandidate* heap, iReg k, double new_val, iReg new_j);
+void multiMinIdx(iReg step_size, iReg &JtildeSize, const iReg *Jtilde, const double *rhoJ2, iReg *Jstart);

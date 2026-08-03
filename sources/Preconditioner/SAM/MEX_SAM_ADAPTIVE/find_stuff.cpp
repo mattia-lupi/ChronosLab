@@ -14,6 +14,7 @@ double fullA0k(const iExt * RESTRICT iat0,
    // Clear the elements modified in the previous call
    for (iReg n = 0; n < A0k_nnz; ++n) {
       A0k[A0k_idx[n]] = 0.0;
+      A0k_idx[n] = 0;
    }
 
    // Direct lookup of the start and end bounds for column k
@@ -66,26 +67,28 @@ void findNonZeroInColJ(const iReg *RESTRICT J, const iExt *RESTRICT iatk,
     }
 }
 
-void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k){
-   // Look up column k boundaries
-   iExt col_start = iat0[k];
-   iExt col_end   = iat0[k+1];
-   iReg col_len   = col_end - col_start;
-   iReg *col_rows = &ja0[col_start];
+void getA0k(double *a0k, iReg *I, iReg sizeI, iReg oldSizeI, iExt *iat0, iReg *ja0, double *coef0, iExt k) {
+    iExt col_start = iat0[k];
+    iExt col_end   = iat0[k+1];
+    iReg col_len   = col_end - col_start;
+    iReg *col_rows = &ja0[col_start];
 
-   // Loop over the new rows
-   for (iReg i = oldSizeI; i < sizeI; ++i) {
-      iReg row = I[i];
-      a0k[i] = 0.0; // Default value
+    // Loop over the new additions
+    for (iReg i = oldSizeI; i < sizeI; ++i) {
+        iReg row = I[i];
+        a0k[i] = 0.0; // Default value
 
-      // Binary search for the 'row' within the contiguous rows of column k
-      if (col_len > 0) {
-         auto it = std::lower_bound(col_rows, col_rows + col_len, row);
-         if (it != col_rows + col_len && *it == row) {
-            a0k[i] = coef0[col_start + (it - col_rows)];
-         }
-      }
-   }
+        // loop over the new columns to add
+        for (iReg j = 0; j < col_len; ++j) {
+            iReg cur_row = col_rows[j];
+            if (cur_row >= row) {
+                if (cur_row == row) {
+                    a0k[i] = coef0[col_start + j];
+                }
+                break; // Stop scanning once row index is met or exceeded
+            }
+        }
+    }
 }
 
 void getAhat(iReg * RESTRICT I, iReg sizeI, iReg * RESTRICT J, iReg Jstart, 
