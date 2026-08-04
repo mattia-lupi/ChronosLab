@@ -1,4 +1,5 @@
 // sam_preprocess_left_mex.cpp
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "MatlabDataArray.hpp"
