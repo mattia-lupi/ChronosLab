@@ -2,7 +2,11 @@
 clc;
 clear;
 
-Name = "richardsBig";%richards richardsBig stickSlipFast StickSlipOpenBig nicolas
+nstep = 5;
+step_size = 1;
+epss = 1e-3;
+
+Name = "dpMedium";%richards richardsBig stickSlipFast StickSlipOpenBig nicolas
 files = dir('mats/'+Name+'/'+Name+'_*.mat');
 fileNames = {files.name};
 if contains(Name,"richards") || contains(Name,"dp")
@@ -63,7 +67,7 @@ normm = zeros(sizeSeq,sizeSeq);
 
 for i = 1:sizeSeq
    for j = 1:i-1
-      normm(i,j) = 2 * norm(A{j}-A{i},'f')/(norm(A{j},'f')+norm(A{i},'f'));
+      normm(i,j) = samNorm(A{j},A{i});
    end
 end
 
@@ -120,15 +124,14 @@ else
       for j = 1:i-1   
          tic
          sam1{i,j} = MEX_sam_compute_left(A{i},A{j},pre_mex1);
+         normmSam1(i,j) = normSAM(sam1{i,j}*A{i},A{j});
          time_compute1(i,j) = toc;
          nnzSam1(i,j) = nnz(sam1{i,j});
-         normmSam1(i,j) = 2 * norm(A{j}-sam1{i,j}*A{i},'f')/(norm(A{j},'f')+norm(sam1{i,j}*A{i},'f'));
-   
-         % tic
-         % sam2{i,j} = MEX_sam_compute_left(A{i},A{j},pre_mex2);
-         % time_compute2(i,j) = toc;
-         % nnzSam2(i,j) = nnz(sam2{i,j});
-         % normmSam2(i,j) = 2 * norm(A{j}-sam2{i,j}*A{i},'f')/(norm(A{j},'f')+norm(sam2{i,j}*A{i},'f'));
+         
+         tic
+         [sam2{i,j}, normmSam2(i,j)] = MEX_sam_adaptive_left(A{i},A{j},8,nstep,step_size,epss);
+         time_compute2(i,j) = toc;
+         nnzSam2(i,j) = nnz(sam2{i,j});
       end
    end
 end
@@ -151,115 +154,115 @@ fprintf('done in %.3f s\n\n', t_amg0);
 
 %% Solve the system
 
-% for i = 1:sizeSeq
-% 
-%    uni = ones(size(A{i},1),1);
-% 
-%    if i > 1
-%       if ~lagrange
-%          [MM{i},time(i)] = computeAMG(A{i},TV0{i},false,0);
-%       else
-%          [MM{i},time(i)] = computeRACP(A{i},TV0{i},false,0);
-%       end
-%    else
-%       MM{i} = P0_amg;
-%    end
-%    t0 = tic;
-%    [~, ~, ~, it_recomp(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, MM{i}, []);
-%    t_solve_recomp(i) = toc(t0);
-%    it(i,1) = (it_recomp(i,1)-1)*gmres_restart + it_recomp(i,2);
-% 
-%    Pfun_new = @(v) sam_apply_left(speye(size(A{i},1)), P0_amg, v);
-%    t0 = tic;
-%    [~, ~, ~, it_reuse(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-%    t_solve_reuse(i) = toc(t0);
-%    it(i,2) = (it_reuse(i,1)-1)*gmres_restart + it_reuse(i,2);
-% 
-%    for j = 1:i-1
-%       Pfun_new = @(v) sam_apply_left(sam1{i,j}, MM{j}, v);
-%       t0 = tic;
-%       [~, ~, ~, it_sam1(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-%       t_solve_sam1(i,j) = toc(t0);
-%       itsam1(i,j) = (it_sam1(i,1)-1)*gmres_restart + it_sam1(i,2);
-% 
-% 
-%       % Pfun_new = @(v) sam_apply_left(sam2{i,j}, MM{j}, v);
-%       % t0 = tic;
-%       % [~, ~, ~, it_sam2(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-%       % t_solve_sam2(i,j) = toc(t0);
-%       % itsam2(i,j) = (it_sam2(i,1)-1)*gmres_restart + it_sam2(i,2);
-%    end
-% end
-
-
-%% Solve the system
-
 for i = 1:sizeSeq
 
    uni = ones(size(A{i},1),1);
 
    if i > 1
       if ~lagrange
-         [MM,time(i)] = computeAMG(A{i},TV0{i},false,0);
+         [MM{i},time(i)] = computeAMG(A{i},TV0{i},false,0);
       else
-         [MM,time(i)] = computeRACP(A{i},TV0{i},false,0);
+         [MM{i},time(i)] = computeRACP(A{i},TV0{i},false,0);
       end
    else
-      MM = P0_amg;
+      MM{i} = P0_amg;
    end
    t0 = tic;
-   [~, ~, ~, it_recomp(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, MM, []);
+   [~, ~, ~, it_recomp(i,:)] = gmres_RIGHT(@(v) A{i}*v, b{i}, gmres_restart, gmres_tol, gmres_maxit, MM{i}, []);
    t_solve_recomp(i) = toc(t0);
-   it(i,1) = (it_recomp(i,1)-1)*gmres_restart + it_recomp(i,2);
+   itRecycle(i,i) = (it_recomp(i,1)-1)*gmres_restart + it_recomp(i,2);
 
-   if contains(Name,"richards") 
-      q = [5 8 9 10 11 12 13];
-      if ismember(i,q)
-         [P0_amg1,timm] = computeAMG(A{i},TV0{i},false,0);
-      elseif i < q(1)
-         P0_amg1 = P0_amg;
-         timm = 0;
-      end
-   else
-      P0_amg1 = P0_amg; 
-      timm = 0;
-   end
-
-   Pfun_new = @(v) sam_apply_left(speye(size(A{i},1)), P0_amg1, v);
-   t0 = tic;
-   [~, ~, ~, it_reuse(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-   t_solve_reuse(i) = toc(t0) + timm;
-   it(i,2) = (it_reuse(i,1)-1)*gmres_restart + it_reuse(i,2);
-
-   if i > 1
-      if contains(Name,"richards") 
-         if i < 5
-            sm = speye(size(A{i},1));
-         elseif i >= 5 && i < 8
-            sm = sam1{5};
-         elseif i >= 8 
-            sm = sam1{i};
-         end
-      else
-         sm = sam1{i};
-      end
-
-      Pfun_new = @(v) sam_apply_left(sm, P0_amg, v);
+   for j = 1:i-1
+      Pfun_new = @(v) sam_apply_left(speye(size(A{i},1)), MM{j}, v);
       t0 = tic;
-      [~, ~, ~, it_sam1(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-      t_solve_sam1(i) = toc(t0);
-      it(i,3) = (it_sam1(i,1)-1)*gmres_restart + it_sam1(i,2);
+      [~, ~, ~, it_reuse(i,:)] = gmres_RIGHT(@(v) A{i}*v, b{i}, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+      t_solve_reuse(i,j) = toc(t0);
+      itRecycle(i,j) = (it_reuse(i,1)-1)*gmres_restart + it_reuse(i,2);
+
+      Pfun_new = @(v) sam_apply_left(sam1{i,j}, MM{j}, v);
+      t0 = tic;
+      [~, ~, ~, it_sam1(i,:)] = gmres_RIGHT(@(v) A{i}*v, b{i}, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+      t_solve_sam1(i,j) = toc(t0);
+      itsam1(i,j) = (it_sam1(i,1)-1)*gmres_restart + it_sam1(i,2);
 
 
-      if strcmp("stickSlipFast",Name)
-         Pfun_new = @(v) sam_apply_left(sam2{i}, P0_amg, v);
-         t0 = tic;
-         [~, ~, ~, it_sam2(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
-         t_solve_sam2(i) = toc(t0);
-         it(i,4) = (it_sam2(i,1)-1)*gmres_restart + it_sam2(i,2);
-      end
+      Pfun_new = @(v) sam_apply_left(sam2{i,j}, MM{j}, v);
+      t0 = tic;
+      [~, ~, ~, it_sam2(i,:)] = gmres_RIGHT(@(v) A{i}*v, b{i}, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+      t_solve_sam2(i,j) = toc(t0);
+      itsam2(i,j) = (it_sam2(i,1)-1)*gmres_restart + it_sam2(i,2);
    end
 end
+
+
+%% Solve the system
+
+% for i = 1:sizeSeq
+% 
+%    uni = ones(size(A{i},1),1);
+% 
+%    if i > 1
+%       if ~lagrange
+%          [MM,time(i)] = computeAMG(A{i},TV0{i},false,0);
+%       else
+%          [MM,time(i)] = computeRACP(A{i},TV0{i},false,0);
+%       end
+%    else
+%       MM = P0_amg;
+%    end
+%    t0 = tic;
+%    [~, ~, ~, it_recomp(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, MM, []);
+%    t_solve_recomp(i) = toc(t0);
+%    it(i,1) = (it_recomp(i,1)-1)*gmres_restart + it_recomp(i,2);
+% 
+%    if contains(Name,"richards") 
+%       q = [5 8 9 10 11 12 13];
+%       if ismember(i,q)
+%          [P0_amg1,timm] = computeAMG(A{i},TV0{i},false,0);
+%       elseif i < q(1)
+%          P0_amg1 = P0_amg;
+%          timm = 0;
+%       end
+%    else
+%       P0_amg1 = P0_amg; 
+%       timm = 0;
+%    end
+% 
+%    Pfun_new = @(v) sam_apply_left(speye(size(A{i},1)), P0_amg1, v);
+%    t0 = tic;
+%    [~, ~, ~, it_reuse(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+%    t_solve_reuse(i) = toc(t0) + timm;
+%    it(i,2) = (it_reuse(i,1)-1)*gmres_restart + it_reuse(i,2);
+% 
+%    if i > 1
+%       if contains(Name,"richards") 
+%          if i < 5
+%             sm = speye(size(A{i},1));
+%          elseif i >= 5 && i < 8
+%             sm = sam1{5};
+%          elseif i >= 8 
+%             sm = sam1{i};
+%          end
+%       else
+%          sm = sam1{i};
+%       end
+% 
+%       Pfun_new = @(v) sam_apply_left(sm, P0_amg, v);
+%       t0 = tic;
+%       [~, ~, ~, it_sam1(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+%       t_solve_sam1(i) = toc(t0);
+%       it(i,3) = (it_sam1(i,1)-1)*gmres_restart + it_sam1(i,2);
+% 
+% 
+%       if strcmp("stickSlipFast",Name)
+%          Pfun_new = @(v) sam_apply_left(sam2{i}, P0_amg, v);
+%          t0 = tic;
+%          [~, ~, ~, it_sam2(i,:)] = gmres_RIGHT(@(v) A{i}*v, uni, gmres_restart, gmres_tol, gmres_maxit, Pfun_new, []);
+%          t_solve_sam2(i) = toc(t0);
+%          it(i,4) = (it_sam2(i,1)-1)*gmres_restart + it_sam2(i,2);
+%       end
+%    end
+% end
 
 
 %%
@@ -381,3 +384,8 @@ ylabel('2 \cdot ||A_1 - M_{sam} A_k||_F / (||A_1||_F + ||M_{sam} A_k||_F)');
 title('Relative SAM Operator Residual Trace Quality');
 legend('Location','best'); grid on;
 xlim([1.5, Nseq+0.5]);
+
+
+%%
+
+deltaItRec = itRecycle - [itsam2 zeros(15,1)];

@@ -1,7 +1,7 @@
 clc
 clear 
 
-load mats/moonContact2.mat
+load mats/moonContact1.mat
 
 A = Amat;
 rhs = ones(size(A,1),1);
@@ -26,7 +26,7 @@ lambda = sort(eig(full(A)));
 
 %% Shifted problem
 
-alpha = [0 2e-3 3e-3 5e-3 7e-3 2.5e-1 3e-1 4e-1];%2
+alpha = [0 2e-3 3e-3 5e-3 1e-2 5e-2 1e-1 2e-1];%2
 D = diag(diag(A));
 lagrange = true;
 
@@ -35,7 +35,7 @@ gmres_tol     = 1e-6;
 gmres_maxit   = 20;
 
 for i = 1:length(alpha)
-   A_mod = A + alpha(i)*avg(D)*ones(size(A,1,1));
+   A_mod = A + alpha(i)*D;%mean(D)*ones(size(A,1,1))
 
    lam = sort(eig(full(A_mod)));
 
@@ -47,7 +47,7 @@ for i = 1:length(alpha)
       [M,time(1)] = computeRACP(A_mod,TV0,false);
    end
 
-   normm(i) = norm(A-A_mod,'f')/norm(A,'f');
+   normm(i) = normSAM(A_mod,A);
    
    t_amg0    = time;
    P0_amg    = M;
@@ -63,7 +63,7 @@ end
 
 %% Choose shift as beta = 3e-3
 
-beta = 4e-1;
+beta = 5e-2;
 
 B = A + beta*D;
 
@@ -89,9 +89,9 @@ time_prepr = toc;
 tic
 
 tic
-sam = MEX_sam_compute_left(B,A,pre_mex);
+sam = MEX_sam_adaptive_left(B,A,8,60,1,1e-4);
 time_compute = toc;
-normmSam = 2 * norm(A-sam*B,'f')/(norm(A,'f')+norm(sam*B,'f'));
+normmSam = normSAM(sam*B,A);
 
 if ~lagrange
    [M,time(1)] = computeAMG(B,TV0,false);
@@ -101,6 +101,11 @@ end
 
 t0 = tic;
 MM = @(v) sam_apply_left(sam, M, v);
-[~, ~, relres_shift, it_recomp] = gmres_RIGHT(@(v) A*v, rhs, gmres_restart, gmres_tol, gmres_maxit, MM, []);
-t_solve_shift = toc(t0);
-it_shift = (it_recomp(1)-1)*gmres_restart + it_recomp(2);
+[~, ~, relres_shift(1), it_recomp] = gmres_RIGHT(@(v) A*v, rhs, gmres_restart, gmres_tol, gmres_maxit, MM, []);
+t_solve_shift(1) = toc(t0);
+it_shift(1) = (it_recomp(1)-1)*gmres_restart + it_recomp(2);
+
+t0 = tic;
+[~, ~, relres_shift(2), it_recomp] = gmres_RIGHT(@(v) A*v, rhs, gmres_restart, gmres_tol, gmres_maxit, M, []);
+t_solve_shift(2) = toc(t0);
+it_shift(2) = (it_recomp(1)-1)*gmres_restart + it_recomp(2);
