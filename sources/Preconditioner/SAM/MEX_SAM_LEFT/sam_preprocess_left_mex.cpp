@@ -3,37 +3,23 @@
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "MatlabDataArray.hpp"
+#include "sam_preprocess_left.h"
 
 #include <vector>
-#include <algorithm>
-#include <omp.h>
+#include <cstdint>
 
 using namespace matlab::data;
 using namespace matlab::mex;
 
-static void buildCSR(const TypedArray<double>& iat,
-                     const TypedArray<double>& ja,
-                     int n,
-                     std::vector<int>& ptr,
-                     std::vector<int>& col)
-{
-    int nnz = static_cast<int>(ja.getNumberOfElements());
-    ptr.resize(n + 1);
-    col.resize(nnz);
-    for (int i = 0; i <= n; ++i) ptr[i] = static_cast<int>(iat[i]) - 1;
-    for (int p = 0; p < nnz; ++p) col[p] = static_cast<int>(ja[p]) - 1;
-}
-
 class MexFunction : public Function {
 public:
-    void operator()(ArgumentList outputs, ArgumentList inputs) override
-    {
+    void operator()(ArgumentList outputs, ArgumentList inputs) override {
         ArrayFactory factory;
 
-        if (inputs.size() != 4) {
+        if (inputs.size() < 4 || inputs.size() > 5) {
             getEngine()->feval(u"error", 0,
                 std::vector<Array>({factory.createScalar(
-                    "sam_preprocess_left_mex: requires iatk, jak, iats, jas.")}));
+                    "sam_preprocess_left_mex: requires 4 or 5 inputs (iatk, jak, iats, jas, [num_threads]).")}));
             return;
         }
 
@@ -42,83 +28,49 @@ public:
         TypedArray<double> iats = std::move(inputs[2]);
         TypedArray<double> jas  = std::move(inputs[3]);
 
+        int num_threads = 0;
+        if (inputs.size() == 5) {
+            num_threads = static_cast<int>(inputs[4][0]);
+        }
+
         const int n = static_cast<int>(iatk.getNumberOfElements()) - 1;
+        const int nnz_a = static_cast<int>(jak.getNumberOfElements());
+        const int nnz_s = static_cast<int>(jas.getNumberOfElements());
 
-        std::vector<int> a_ptr, a_col, s_ptr, s_data;
-        buildCSR(iatk, jak, n, a_ptr, a_col);
-        buildCSR(iats, jas, n, s_ptr, s_data);
+        // Convert 1-based MATLAB double arrays into 0-based C++ int vectors
+        std::vector<int> a_ptr(n + 1);
+        std::vector<int> a_col(nnz_a);
+        std::vector<int> s_ptr(n + 1);
+        std::vector<int> s_data(nnz_s);
 
-        std::vector<int> r_ptr(n + 1, 0);
+        for (int i = 0; i <= n; ++i) a_ptr[i] = static_cast<int>(iatk[i]) - 1;
+        for (int p = 0; p < nnz_a; ++p) a_col[p] = static_cast<int>(jak[p]) - 1;
 
-        #pragma omp parallel
-        {
-            std::vector<int> marker(n, -1);
-            #pragma omp for schedule(guided)
-            for (int i = 0; i < n; ++i) {
-                int count = 0;
-                int s0 = s_ptr[i], s1 = s_ptr[i + 1];
+        for (int i = 0; i <= n; ++i) s_ptr[i] = static_cast<int>(iats[i]) - 1;
+        for (int p = 0; p < nnz_s; ++p) s_data[p] = static_cast<int>(jas[p]) - 1;
 
-                for (int ji = s0; ji < s1; ++ji) {
-                    int j = s_data[ji];
-                    int a0 = a_ptr[j], a1 = a_ptr[j + 1];
-                    for (int p = a0; p < a1; ++p) {
-                        int c = a_col[p];
-                        if (marker[c] != i) {
-                            marker[c] = i;
-                            count++;
-                        }
-                    }
-                }
-                r_ptr[i + 1] = count;
-            }
-        }
+        std::vector<int> r_ptr;
+        std::vector<int> r_data;
 
-        for (int i = 0; i < n; ++i) {
-            r_ptr[i + 1] += r_ptr[i];
-        }
-        
-        int total_r_nnz = r_ptr[n];
-        std::vector<int> r_data(total_r_nnz);
+        // Call Standalone C++ Function
+        sam_preprocess_left(n, a_ptr.data(), a_col.data(),
+                            s_ptr.data(), s_data.data(),
+                            r_ptr, r_data, num_threads);
 
-        #pragma omp parallel
-        {
-            std::vector<int> marker(n, -1);
-            #pragma omp for schedule(guided)
-            for (int i = 0; i < n; ++i) {
-                int s0 = s_ptr[i], s1 = s_ptr[i + 1];
-                int offset = r_ptr[i];
-                int count = 0;
-
-                for (int ji = s0; ji < s1; ++ji) {
-                    int j = s_data[ji];
-                    int a0 = a_ptr[j], a1 = a_ptr[j + 1];
-                    for (int p = a0; p < a1; ++p) {
-                        int c = a_col[p];
-                        if (marker[c] != i) {
-                            marker[c] = i;
-                            r_data[offset + count] = c;
-                            count++;
-                        }
-                    }
-                }
-                std::sort(r_data.begin() + offset, r_data.begin() + offset + count);
-            }
-        }
-
+        // Package outputs into MATLAB TypedArrays (int32_t)
         const size_t sz_sp = static_cast<size_t>(n + 1);
-        const size_t sz_sd = s_data.size();
+        const size_t sz_sd = static_cast<size_t>(nnz_s);
         const size_t sz_rp = static_cast<size_t>(n + 1);
-        const size_t sz_rd = static_cast<size_t>(total_r_nnz);
+        const size_t sz_rd = r_data.size();
 
-        // Type downcasting to int32_t to halve memory bandwidth
         TypedArray<int32_t> out_sptr = factory.createArray<int32_t>({sz_sp, 1});
         TypedArray<int32_t> out_sdat = factory.createArray<int32_t>({sz_sd, 1});
         TypedArray<int32_t> out_rptr = factory.createArray<int32_t>({sz_rp, 1});
         TypedArray<int32_t> out_rdat = factory.createArray<int32_t>({sz_rd, 1});
 
-        for (int i = 0; i <= n; ++i) out_sptr[i] = static_cast<int32_t>(s_ptr[i]);
+        for (size_t i = 0; i < sz_sp; ++i) out_sptr[i] = static_cast<int32_t>(s_ptr[i]);
         for (size_t i = 0; i < sz_sd; ++i) out_sdat[i] = static_cast<int32_t>(s_data[i]);
-        for (int i = 0; i <= n; ++i) out_rptr[i] = static_cast<int32_t>(r_ptr[i]);
+        for (size_t i = 0; i < sz_rp; ++i) out_rptr[i] = static_cast<int32_t>(r_ptr[i]);
         for (size_t i = 0; i < sz_rd; ++i) out_rdat[i] = static_cast<int32_t>(r_data[i]);
 
         outputs[0] = std::move(out_sptr);
