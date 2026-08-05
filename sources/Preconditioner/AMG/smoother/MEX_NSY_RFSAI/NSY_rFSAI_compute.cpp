@@ -7,16 +7,13 @@
 //   [iat_FL, ja_FL, coef_FL, iat_FU, ja_FU, coef_FU] = ...
 //       NSY_rFSAI_compute(nstep, step_size, epsilon, nn_A, iat_A, ja_A, coef_A)
 //
-// Build command (compile.m):
-//   See compile.m — ensure -R2018a is on its OWN line (see compile.m fix notes)
-//
-
 #if defined PRINT
     static constexpr bool dump = true;
 #else
     static constexpr bool dump = false;
 #endif
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "Compute_nsy_rfsai.h"
@@ -50,12 +47,6 @@ class MexFunction : public matlab::mex::Function {
 
     ArrayFactory factory;
 
-    //------------------------------------------------------------------------------------
-    // [FIX-A] mexPrintf is not declared in the pure C++ MEX API.
-    //         Route diagnostic output through MATLAB's fprintf instead.
-    // [FIX-E] createScalar<T> only accepts arithmetic types.
-    //         Use createCharArray() for std::string arguments.
-    //------------------------------------------------------------------------------------
     void mprint(const std::string& msg)
     {
         getEngine()->feval(u"fprintf", 0,
@@ -66,14 +57,12 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C] validateArguments takes non-const refs — ArgumentList
-        //         methods (size, operator[]) are not const-qualified
         validateArguments(outputs, inputs);
 
         if (dump) mprint("*** NSY_rFSAI_compute (C++ MEX API) ***\n");
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read input
         // -----------------------------------------------------------------------
         if (dump) mprint("- Get input scalars\n");
 
@@ -87,13 +76,6 @@ public:
         const double epsilon   = static_cast<double>(s2[0]);
         const int    nn_A      = static_cast<int>(s3[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B] TypedArray<T>::operator[] returns a PROXY, not a real ref.
-        //         You cannot take its address.  The correct pattern is to copy
-        //         into a std::vector<T> and hand vec.data() to the C kernel.
-        //         Cost: one allocation + memcpy per input array — unavoidable
-        //         when bridging the MATLAB Data API to a raw-pointer C kernel.
-        // -----------------------------------------------------------------------
         if (dump) mprint("- Get input arrays\n");
 
         const TypedArray<int32_t> iat_A_arr  = inputs[4];
@@ -208,10 +190,6 @@ public:
 
 private:
 
-    //------------------------------------------------------------------------------------
-    // [FIX-C] ArgumentList::size() and operator[] are NOT const-qualified in
-    //         MexIORange — parameters must be non-const references
-    //------------------------------------------------------------------------------------
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 7)
@@ -245,8 +223,6 @@ private:
                        "Input argument 7 must be a double array.");
     }
 
-    // [FIX-E] createScalar<T> is restricted to arithmetic types.
-    //         createCharArray() is the correct factory method for strings.
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

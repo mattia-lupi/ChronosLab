@@ -10,43 +10,6 @@
 //                            nt_patt,fcnode,iat_A,ja_A,coef_A,iat_Pin,ja_Pin,
 //                            coef_Pin,iat_patt,ja_patt,TV);
 //
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED (battle-tested against Clang / R2025b / macOS)
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() not declared in the pure C++ MEX API (mex.hpp does
-//         not pull in mex.h). Replaced with mprint() helper that routes
-//         through getEngine()->feval(u"fprintf", createCharArray(...)).
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy (ArrayElementTypedRef).
-//         Taking its address is ill-formed. Input arrays are copied into
-//         std::vector<T> and their .data() pointers are passed to the kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified in
-//         MexIORange. validateArguments() takes non-const ArgumentList&.
-//
-// [FIX-E] ArrayFactory::createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] Removed #include <iostream> and  using namespace std.
-//         cout/endl replaced with throwError() / mprint().
-//
-// [NEW-2] TV (double**) is malloc-allocated from the input TVbuf pointer.
-//         Wrapped in a std::unique_ptr with a custom deleter so it is
-//         freed automatically on any exit path (normal or exception).
-//         The pointed-to rows are views into TVbuf — only the pointer
-//         array itself is freed, not the individual row pointers.
-//
-// [NEW-3] info[EMIN_INFO_SZ] is a plain stack array — fine as-is.
-//         Copied into the output TypedArray<double> via std::copy.
-//         The manual pt_r[0]=info[0]; ... loop is replaced.
-//
-// [NEW-4] All size / loop-counter variables use std::size_t or mwSize;
-//         no plain int for array dimensions.
-//
-// [NEW-5] Null-pointer checks on every kernel output pointer before use.
-// -----------------------------------------------------------------------
 //----------------------------------------------------------------------------------------
 
 #if defined PRINT
@@ -55,6 +18,7 @@
     static constexpr bool dump = false;
 #endif
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "EMIN_ImpProl.h"
@@ -73,9 +37,6 @@
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
-//----------------------------------------------------------------------------------------
-// RAII guard for malloc-allocated pointers returned by the C kernel      [NEW-2]
-//----------------------------------------------------------------------------------------
 struct MallocGuard {
     void *ptr = nullptr;
     explicit MallocGuard(void *p) : ptr(p) {}
@@ -91,7 +52,6 @@ class MexFunction : public matlab::mex::Function {
 
     ArrayFactory factory;
 
-    // [FIX-A][FIX-E] Route print output through MATLAB's fprintf
     void mprint(const std::string& msg)
     {
         getEngine()->feval(u"fprintf", 0,
@@ -102,7 +62,6 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C] non-const ref required
         validateArguments(outputs, inputs);
 
         if (dump) mprint("*** EMIN_Prolong_compute (C++ MEX API) ***\n");
@@ -127,7 +86,6 @@ public:
 
         // -----------------------------------------------------------------------
         // Read input arrays
-        // [FIX-B] Copy TypedArray → std::vector to obtain a real raw pointer
         // -----------------------------------------------------------------------
         if (dump) mprint("- Get input arrays\n");
 
@@ -155,8 +113,6 @@ public:
 
         // -----------------------------------------------------------------------
         // Build the TV double** pointer array
-        // [NEW-2] The pointer array is heap-allocated; rows point into TVbuf_vec.
-        //         unique_ptr with a free-deleter ensures cleanup on any exit path.
         // -----------------------------------------------------------------------
         std::unique_ptr<double*, decltype(&free)> TV_owner(
             static_cast<double**>(malloc(static_cast<std::size_t>(nn) * sizeof(double*))),
@@ -217,7 +173,6 @@ public:
         // TV_owner destructs here — free() called on the pointer array only;
         // the rows were views into TVbuf_vec (stack-managed), not separately alloc'd.
 
-        // Guard every kernel-allocated output pointer immediately          [NEW-5]
         MallocGuard g_iat (iat_Pout_raw);
         MallocGuard g_ja  (ja_Pout_raw);
         MallocGuard g_coef(coef_Pout_raw);
@@ -225,12 +180,10 @@ public:
         // Close debug log before any possible exception throw
         DebEnv.CloseDebugLog();
 
-        // [NEW-5] Null-pointer check
         if (!iat_Pout_raw || !ja_Pout_raw || !coef_Pout_raw)
             throwError("EMIN_Prolong:nullPointer",
                        "Kernel returned a null pointer — likely an allocation failure.");
 
-        // [NEW-1] Route kernel errors through MATLAB exception machinery
         if (ierr != 0)
             throwError("EMIN_Prolong:computeError",
                        "EMIN_ImpProl returned error code: " + std::to_string(ierr));
@@ -265,7 +218,6 @@ public:
 
         // MallocGuards destruct here — iat/ja/coef_Pout_raw freed automatically
 
-        // --- info : double, length EMIN_INFO_SZ  [NEW-3] ---------------------
         TypedArray<double> info_out =
             factory.createArray<double>({1, static_cast<std::size_t>(EMIN_INFO_SZ)});
         std::copy(info, info + EMIN_INFO_SZ, info_out.begin());
@@ -283,7 +235,6 @@ public:
 
 private:
 
-    // [FIX-C] ArgumentList methods are not const — take non-const refs
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 22)
@@ -325,7 +276,6 @@ private:
                            " must be a double array.");
     }
 
-    // [FIX-E] createCharArray for string args; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

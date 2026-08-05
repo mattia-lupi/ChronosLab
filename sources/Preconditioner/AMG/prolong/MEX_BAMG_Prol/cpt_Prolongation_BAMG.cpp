@@ -10,48 +10,9 @@
 //                             nn_S, nt_S, iat_S, ja_S, coef_S,
 //                             ntv, fcnodes, TV, nn_I, nc_I, verb)
 //
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED (consistent with NSY_rFSAI_compute and EMIN_Prolong_compute)
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() / mexErrMsgIdAndTxt() not declared in the pure C++
-//         MEX API. Replaced with mprint() / throwError() helpers that route
-//         through getEngine()->feval() with factory.createCharArray().
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy — cannot take address.
-//         Input arrays copied into std::vector<T>; .data() passed to kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified.
-//         validateArguments() takes non-const ArgumentList& references.
-//
-// [FIX-E] factory.createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] Removed #include <iostream> / using namespace std / cout.
-//
-// [NEW-2] TV_2D uses a DEEP copy (each row individually malloc'd) — as in
-//         the original. All rows plus the outer pointer array are managed
-//         by TV2DGuard, a custom RAII class that frees every row then the
-//         outer array, guaranteed even if the kernel throws.
-//
-// [NEW-3] mxGetPr() is deprecated and was incorrectly used for int arrays
-//         (iat_S, ja_S, coef_S, fcnodes). Replaced with typed copies via
-//         TypedArray<int32_t> (int arrays) and TypedArray<double> (TV).
-//         coef_S is kept as int32 since the kernel signature is int*const.
-//
-// [NEW-4] Output arrays iat_I, ja_I, c_mark were stored as double in the
-//         original (comment: "Typed Data Access NOT working on RUSSEL").
-//         Preserved as double outputs for MATLAB compatibility — the int→
-//         double cast is kept explicit via static_cast<double>.
-//
-// [NEW-5] ierr check routes through throwError() — no bare return that
-//         would leave plhs[] unset.
-//
-// [NEW-6] std::size_t / mwSize used for all array sizes and loop bounds.
-// -----------------------------------------------------------------------
 //----------------------------------------------------------------------------------------
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "BAMG.h"
@@ -66,11 +27,6 @@
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
-//----------------------------------------------------------------------------------------
-// [NEW-2] RAII owner for the deep-copy TV_2D (double**) structure.
-//         Each row is independently malloc'd — all rows plus the outer
-//         pointer array are freed on destruction, in any exit path.
-//----------------------------------------------------------------------------------------
 class TV2DGuard {
 public:
     double **ptr  = nullptr;
@@ -79,7 +35,6 @@ public:
     TV2DGuard() = default;
 
     // Allocate outer array and deep-copy rows from a flat column-major buffer.
-    // Layout convention (same as original): flat[i*ntv + j] → ptr[i][j]
     bool allocate(int nn_S, int ntv, const double *flat)
     {
         rows = nn_S;
@@ -87,7 +42,7 @@ public:
                                             sizeof(double*)));
         if (!ptr) return false;
 
-        for (int i = 0; i < nn_S; ++i) ptr[i] = nullptr;   // safe for partial-alloc free
+        for (int i = 0; i < nn_S; ++i) ptr[i] = nullptr;
 
         for (int i = 0; i < nn_S; ++i) {
             ptr[i] = static_cast<double*>(malloc(static_cast<std::size_t>(ntv) *
@@ -163,7 +118,6 @@ class MexFunction : public matlab::mex::Function {
 
     ArrayFactory factory;
 
-    // [FIX-A][FIX-E]
     void mprint(const std::string& msg)
     {
         getEngine()->feval(u"fprintf", 0,
@@ -174,11 +128,10 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C]
         validateArguments(outputs, inputs);
 
         // -----------------------------------------------------------------------
-        // Read input scalars (inputs 0–11 and 18–19)
+        // Read input
         // -----------------------------------------------------------------------
         const int    level      = static_cast<int>   (TypedArray<double>(inputs[ 0])[0]);
         const int    np         = static_cast<int>   (TypedArray<double>(inputs[ 1])[0]);
@@ -198,14 +151,9 @@ public:
         const int    nc_I       = static_cast<int>   (TypedArray<double>(inputs[19])[0]);
         const int    verb       = static_cast<int>   (TypedArray<double>(inputs[20])[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B][NEW-3] Copy input arrays into std::vector for raw pointer access.
-        //   iat_S, ja_S, coef_S, fcnodes → int32 (kernel takes int*const)
-        //   TV (flat buffer)             → double
-        // -----------------------------------------------------------------------
         const TypedArray<int32_t> iat_S_arr   = inputs[12];
         const TypedArray<int32_t> ja_S_arr    = inputs[13];
-        const TypedArray<int32_t> coef_S_arr  = inputs[14];   // [NEW-3] int, not double
+        const TypedArray<int32_t> coef_S_arr  = inputs[14];
         const TypedArray<int32_t> fcnodes_arr = inputs[16];
         const TypedArray<double>  TV_arr      = inputs[17];
 
@@ -215,10 +163,6 @@ public:
         std::vector<int32_t> fcnodes_vec(fcnodes_arr.begin(), fcnodes_arr.end());
         std::vector<double>  TV_flat    (TV_arr.begin(),       TV_arr.end());
 
-        // -----------------------------------------------------------------------
-        // [NEW-2] Build deep-copy TV_2D — each row independently malloc'd.
-        //         TV2DGuard frees everything on any exit path.
-        // -----------------------------------------------------------------------
         TV2DGuard tv2d;
         if (!tv2d.allocate(nn_S, ntv, TV_flat.data()))
             throwError("BAMG_Prol:allocError",
@@ -240,7 +184,6 @@ public:
 
         // -----------------------------------------------------------------------
         // Call the computational wrapper
-        // Outputs come back as std::vector — already RAII-managed, no free() needed.
         // -----------------------------------------------------------------------
         int              nt_I = 0;
         std::vector<int>    vec_iat_I, vec_ja_I, vec_c_mark;
@@ -257,7 +200,6 @@ public:
 
         // tv2d destructs here — all TV_2D rows and outer array freed
 
-        // [NEW-5] Route error through MATLAB exception machinery
         if (ierr != 0)
             throwError("BAMG_Prol:computeError",
                        "cpt_Prolongation_BAMG returned error code: " +
@@ -265,10 +207,6 @@ public:
 
         // -----------------------------------------------------------------------
         // Pack results into MATLAB output arrays.
-        // [NEW-4] iat_I, ja_I, c_mark are stored as double — preserved for
-        //         MATLAB-side compatibility (original comment: "Typed Data
-        //         Access NOT working on RUSSEL").  int→double cast is explicit.
-        // [NEW-6] std::size_t / mwSize for all sizes
         // -----------------------------------------------------------------------
         const std::size_t sz_iat   = static_cast<std::size_t>(nn_I + 1);
         const std::size_t sz_nt    = static_cast<std::size_t>(nt_I);
@@ -318,7 +256,6 @@ public:
 
 private:
 
-    // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 21)
@@ -352,7 +289,6 @@ private:
                        "Input argument 18 (TV) must be a double array.");
     }
 
-    // [FIX-E] createCharArray for strings; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

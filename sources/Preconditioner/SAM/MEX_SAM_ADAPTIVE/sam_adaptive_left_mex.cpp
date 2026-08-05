@@ -1,7 +1,7 @@
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include <vector>
-#include <cstdint>
 #include <stdexcept>
 #include "cpt_sam_adaptive_left.h"
 
