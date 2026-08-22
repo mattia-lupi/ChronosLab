@@ -7,7 +7,7 @@ d    = zeros(nn,1);
 pnew = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
-if nargin == 7
+if nargin >= 7
    pnew = x0;
 end
 
