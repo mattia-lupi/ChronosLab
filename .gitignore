@@ -6,6 +6,7 @@
 # Ignore matlab and apple trash addings on macOS
 *.MATLABDriveTag
 *.DS_Store
+*.asv
 
 # Ignore matlab and windows trash addings on macOS
 *.vs*
@@ -13,6 +14,10 @@
 # Ignore useless file types
 *.swp
 *.a
+*.o
+*.dat
+*.dSYM
+*.trace
 examples/PorFlowMatrix/MESH/*.txt
 examples/PorFlowMatrix/MESH/*.tetra
 examples/PorFlowMatrix/MESH/*.coord

@@ -8,51 +8,9 @@
 //       FilterComp_wrap(np, tau, nn_A, iat_A, ja_A, coef_A,
 //                       nt_patt, iat_patt, ja_patt, ntv, TV)
 //
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED (identical pattern to FilterProl_wrap)
-// -----------------------------------------------------------------------
-// [FIX-A] mexErrMsgIdAndTxt() not declared in the pure C++ MEX API.
-//         Replaced with throwError() routing through
-//         getEngine()->feval(u"error", ..., createCharArray()).
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy — cannot take address.
-//         Input arrays copied into std::vector<T>; .data() passed to kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified.
-//         validateArguments() takes non-const ArgumentList& references.
-//
-// [FIX-E] factory.createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] mxGetPr() was used for integer arrays (iat_A, ja_A, iat_patt,
-//         ja_patt) — latent UB: mxGetPr returns double*, casting to int*
-//         is undefined behaviour. Replaced with TypedArray<int32_t> copies.
-//
-// [NEW-2] TV_2D uses the same contiguous single-buffer layout as the
-//         original: one flat buffer (rows contiguous), one pointer array.
-//           - tv_buffer_vec (std::vector<double>) owns the flat copy.
-//           - MallocGuard owns the double** pointer array.
-//         Both are freed automatically on any exit path.
-//
-// [NEW-3] Kernel output pointers (iat_AC, ja_AC, coef_AC) are
-//         malloc-allocated inside the kernel. Wrapped in MallocGuard
-//         immediately after return — guarantees free() on any exit path,
-//         replacing the manual free() calls at the end.
-//
-// [NEW-4] Null-pointer check on all kernel output pointers before use.
-//
-// [NEW-5] Output arrays iat_AC and ja_AC stored as double — preserved from
-//         original ("Typed Data Access NOT working on RUSSEL" workaround).
-//         int→double cast made explicit via static_cast<double>.
-//
-// [NEW-6] All commented-out debug cout code removed.
-//
-// [NEW-7] std::size_t used for all array sizes and loop bounds.
-// -----------------------------------------------------------------------
 //----------------------------------------------------------------------------------------
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "FilterComp.h"
@@ -108,11 +66,10 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C]
         validateArguments(outputs, inputs);
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read input
         // -----------------------------------------------------------------------
         const int    np      = static_cast<int>   (TypedArray<double>(inputs[ 0])[0]);
         const double tau     = static_cast<double>(TypedArray<double>(inputs[ 1])[0]);
@@ -120,11 +77,6 @@ public:
         const int    nt_patt = static_cast<int>   (TypedArray<double>(inputs[ 6])[0]);
         const int    ntv     = static_cast<int>   (TypedArray<double>(inputs[ 9])[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B][NEW-1] Copy input arrays into std::vector for raw pointer access.
-        //   iat_A, ja_A, iat_patt, ja_patt are integers — NOT double* via mxGetPr.
-        //   coef_A and TV are genuine double arrays.
-        // -----------------------------------------------------------------------
         const TypedArray<int32_t> iat_A_arr    = inputs[3];
         const TypedArray<int32_t> ja_A_arr     = inputs[4];
         const TypedArray<double>  coef_A_arr   = inputs[5];
@@ -138,11 +90,6 @@ public:
         std::vector<int32_t> iat_patt_vec(iat_patt_arr.begin(), iat_patt_arr.end());
         std::vector<int32_t> ja_patt_vec (ja_patt_arr.begin(),  ja_patt_arr.end());
 
-        // -----------------------------------------------------------------------
-        // [NEW-2] Build TV_2D — contiguous single-buffer layout (same as original).
-        //   tv_buffer_vec owns the flat data copy (no malloc/free needed).
-        //   TV_2D_raw is the pointer array — freed via MallocGuard.
-        // -----------------------------------------------------------------------
         std::vector<double> tv_buffer_vec(TV_arr.begin(), TV_arr.end());
 
         double **TV_2D_raw = static_cast<double**>(
@@ -177,26 +124,20 @@ public:
 
         // g_tv2d destructs here — TV_2D_raw freed; tv_buffer_vec auto-freed by vector
 
-        // [NEW-3] Guard kernel-allocated output pointers immediately
         MallocGuard g_iat (iat_AC_raw);
         MallocGuard g_ja  (ja_AC_raw);
         MallocGuard g_coef(coef_AC_raw);
 
-        // [NEW-4] Null-pointer check before any dereference
         if (!iat_AC_raw || !ja_AC_raw || !coef_AC_raw)
             throwError("FilterComp:nullPointer",
                        "Kernel returned a null pointer — likely an allocation failure.");
 
-        // [FIX-A] Route kernel error through MATLAB exception machinery
         if (ierr != 0)
             throwError("FilterComp:computeError",
                        "FilterComp returned error code: " + std::to_string(ierr));
 
         // -----------------------------------------------------------------------
         // Pack results into MATLAB output arrays.
-        // [NEW-5] iat_AC and ja_AC stored as double — preserved from original
-        //         ("Typed Data Access NOT working on RUSSEL"); int→double explicit.
-        // [NEW-7] std::size_t for all sizes and loop bounds
         // -----------------------------------------------------------------------
         const std::size_t sz_iat = static_cast<std::size_t>(nn_A + 1);
         const std::size_t sz_nt  = static_cast<std::size_t>(nt_AC);
@@ -225,7 +166,7 @@ public:
         TypedArray<double> out_coef_AC = factory.createArray<double>({sz_nt, 1});
         std::copy(coef_AC_raw, coef_AC_raw + sz_nt, out_coef_AC.begin());
 
-        // MallocGuards destruct here — iat/ja/coef_AC_raw freed automatically [NEW-3]
+        // MallocGuards destruct here — iat/ja/coef_AC_raw freed automatically
 
         // -----------------------------------------------------------------------
         // Return outputs to MATLAB
@@ -238,7 +179,6 @@ public:
 
 private:
 
-    // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 11)
@@ -274,7 +214,6 @@ private:
                            " must be a double array.");
     }
 
-    // [FIX-E] createCharArray for strings; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,
