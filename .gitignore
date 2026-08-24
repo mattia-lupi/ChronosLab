@@ -18,6 +18,7 @@
 *.dat
 *.dSYM
 *.trace
+*/Out_AMG
 examples/PorFlowMatrix/MESH/*.txt
 examples/PorFlowMatrix/MESH/*.tetra
 examples/PorFlowMatrix/MESH/*.coord

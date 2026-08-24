@@ -1,7 +1,7 @@
 false       % ascii_input
 unit_rhs    % rhs_build (unit_rhs, rand_rhs, unit_sol, rhs_in)
-false        % symmetric
-GMRES_CJ        % solv_method (PCG, STAT_AMG, BICGSTAB, GMRES, SQMR)
+true        % symmetric
+sqmr        % solv_method (GMRES, SQMR)
 0          % itmax_ruiz
 1e-3        % tol_ruiz
 1500        % itmax
