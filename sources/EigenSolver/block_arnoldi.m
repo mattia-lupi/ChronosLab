@@ -1,10 +1,16 @@
-function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V0, target, max_iter, tol, verbose)
+function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V0, largest_flag, max_iter, tol, verbose)
     if nargin < 3 || isempty(P), P = {[], []}; end
     if nargin < 4 || isempty(V0), V0 = randn(size(A,1), nev); end
-    if nargin < 5 || isempty(target), target = 'largest'; end
+    if nargin < 5 || isempty(largest_flag), largest_flag = true; end
     if nargin < 6 || isempty(max_iter), max_iter = 100; end
     if nargin < 7 || isempty(tol), tol = 1e-6; end
     if nargin < 8 || isempty(verbose), verbose = false; end
+    
+    if largest_flag
+       target = 'largest';
+    else
+       target = 'smallest';
+    end
     
     if ~iscell(P)
         P = {P, []};
