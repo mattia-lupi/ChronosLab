@@ -8,54 +8,9 @@
 //       FilterProl_wrap(np, perc, tol, nn_P, iat_P, ja_P, coef_P,
 //                       nr_TV, ntv, TV)
 //
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED (consistent with previous modernized MEX files)
-// -----------------------------------------------------------------------
-// [FIX-A] mexErrMsgIdAndTxt() not declared in the pure C++ MEX API.
-//         Replaced with throwError() routing through
-//         getEngine()->feval(u"error", ..., createCharArray()).
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy — cannot take address.
-//         Input arrays copied into std::vector<T>; .data() passed to kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified.
-//         validateArguments() takes non-const ArgumentList& references.
-//
-// [FIX-E] factory.createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] mxGetPr() was used for integer arrays (iat_P, ja_P) — latent UB:
-//         mxGetPr returns double*, casting to int* is undefined behaviour.
-//         Replaced with TypedArray<int32_t> copies via std::vector<int32_t>.
-//
-// [NEW-2] TV_2D uses a CONTIGUOUS single-buffer layout (unlike the BAMG
-//         per-row deep copy). The original allocates one flat buffer and
-//         one pointer array. Both are now RAII-managed:
-//           - tv_buffer_vec (std::vector<double>) owns the flat copy — no
-//             separate malloc/free needed at all for the data buffer.
-//           - TV2DPtrGuard owns only the double** pointer array (malloc'd).
-//         This matches the original semantics: rows are contiguous slices
-//         of the flat buffer; only the outer pointer array needs free().
-//
-// [NEW-3] Kernel output pointers (iat_PF, ja_PF, coef_PF) are
-//         malloc-allocated inside the kernel. Wrapped in MallocGuard
-//         immediately after return — guarantees free() on any exit path
-//         including exceptions, replacing the manual free() calls at end.
-//
-// [NEW-4] Null-pointer check on all kernel output pointers before use.
-//
-// [NEW-5] Output arrays iat_PF and ja_PF stored as double — preserved from
-//         original ("Typed Data Access NOT working on RUSSEL" workaround).
-//         int→double cast made explicit via static_cast<double>.
-//
-// [NEW-6] All commented-out debug cout/fstream code removed.
-//
-// [NEW-7] std::size_t used for all array sizes and loop bounds.
-// -----------------------------------------------------------------------
 //----------------------------------------------------------------------------------------
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "FilterProl.h"
@@ -72,10 +27,6 @@
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
-//----------------------------------------------------------------------------------------
-// [NEW-2] RAII guard for the double** pointer array only.
-//         The flat data buffer is owned by a std::vector — no separate guard needed.
-//----------------------------------------------------------------------------------------
 struct MallocGuard {
     void *ptr = nullptr;
     explicit MallocGuard(void *p) : ptr(p) {}
@@ -95,11 +46,10 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C]
         validateArguments(outputs, inputs);
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read input
         // -----------------------------------------------------------------------
         const int    np    = static_cast<int>   (TypedArray<double>(inputs[0])[0]);
         const double perc  = static_cast<double>(TypedArray<double>(inputs[1])[0]);
@@ -108,11 +58,6 @@ public:
         const int    nr_TV = static_cast<int>   (TypedArray<double>(inputs[7])[0]);
         const int    ntv   = static_cast<int>   (TypedArray<double>(inputs[8])[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B][NEW-1] Copy input arrays into std::vector for raw pointer access.
-        //   iat_P and ja_P are integer arrays — NOT double* via mxGetPr (UB).
-        //   coef_P and TV are genuine double arrays.
-        // -----------------------------------------------------------------------
         const TypedArray<int32_t> iat_P_arr = inputs[4];
         const TypedArray<int32_t> ja_P_arr  = inputs[5];
         const TypedArray<double>  coef_P_arr= inputs[6];
@@ -123,8 +68,6 @@ public:
         std::vector<double>  coef_P_vec(coef_P_arr.begin(), coef_P_arr.end());
 
         // -----------------------------------------------------------------------
-        // [NEW-2] Build TV_2D using a contiguous flat buffer.
-        //
         //   Original approach:
         //     buffer  = malloc(nr_TV * ntv * sizeof(double))   ← flat data copy
         //     TV_2D   = malloc(nr_TV * sizeof(double*))         ← pointer array
@@ -135,8 +78,6 @@ public:
         //     tv_buffer_vec  — std::vector owns the flat copy (no malloc/free)
         //     TV_2D_raw      — still malloc'd (kernel takes double**);
         //                      freed via MallocGuard on any exit path.
-        //
-        //   Semantics are identical; two fewer manual free() calls.
         // -----------------------------------------------------------------------
         const std::size_t tv_total = static_cast<std::size_t>(nr_TV) *
                                      static_cast<std::size_t>(ntv);
@@ -174,26 +115,20 @@ public:
 
         // g_tv2d destructs here — TV_2D_raw freed; tv_buffer_vec auto-freed by vector
 
-        // [NEW-3] Guard kernel-allocated output pointers immediately
         MallocGuard g_iat (iat_PF_raw);
         MallocGuard g_ja  (ja_PF_raw);
         MallocGuard g_coef(coef_PF_raw);
 
-        // [NEW-4] Null-pointer check before any dereference
         if (!iat_PF_raw || !ja_PF_raw || !coef_PF_raw)
             throwError("FilterProl:nullPointer",
                        "Kernel returned a null pointer — likely an allocation failure.");
 
-        // [FIX-A] Route kernel error through MATLAB exception machinery
         if (ierr != 0)
             throwError("FilterProl:computeError",
                        "FilterProl returned error code: " + std::to_string(ierr));
 
         // -----------------------------------------------------------------------
         // Pack results into MATLAB output arrays.
-        // [NEW-5] iat_PF and ja_PF stored as double — preserved from original
-        //         ("Typed Data Access NOT working on RUSSEL"); int→double explicit.
-        // [NEW-7] std::size_t for all sizes and loop bounds
         // -----------------------------------------------------------------------
         const std::size_t sz_iat = static_cast<std::size_t>(nn_P + 1);
         const std::size_t sz_nt  = static_cast<std::size_t>(nt_PF);
@@ -222,7 +157,7 @@ public:
         TypedArray<double> out_coef_PF = factory.createArray<double>({sz_nt, 1});
         std::copy(coef_PF_raw, coef_PF_raw + sz_nt, out_coef_PF.begin());
 
-        // MallocGuards destruct here — iat/ja/coef_PF_raw freed automatically [NEW-3]
+        // MallocGuards destruct here — iat/ja/coef_PF_raw freed automatically
 
         // -----------------------------------------------------------------------
         // Return outputs to MATLAB
@@ -235,7 +170,6 @@ public:
 
 private:
 
-    // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 10)
@@ -271,7 +205,6 @@ private:
                            " must be a double array.");
     }
 
-    // [FIX-E] createCharArray for strings; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

@@ -10,44 +10,9 @@
 //                             iat_C, ja_C, coef_C, fcnodes,
 //                             nn_I, nc_I)
 //
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED (consistent with previous modernized MEX files)
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() / mexErrMsgIdAndTxt() not declared in the pure C++
-//         MEX API. Replaced with throwError() routing through
-//         getEngine()->feval(u"error", ..., createCharArray()).
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy — cannot take address.
-//         Input arrays copied into std::vector<T>; .data() passed to kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified.
-//         validateArguments() takes non-const ArgumentList& references.
-//
-// [FIX-E] factory.createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] mxGetPr() was used for integer arrays (vecstart, iat_A, ja_A,
-//         coef_S, iat_C, ja_C, fcnodes) — this is a latent bug: mxGetPr
-//         returns double*, casting to int* is undefined behaviour.
-//         Replaced with TypedArray<int32_t> copies via std::vector<int32_t>.
-//
-// [NEW-2] Kernel output pointers (iat_I, ja_I, coef_I) are malloc-allocated
-//         inside the kernel. Wrapped in MallocGuard immediately after the
-//         kernel returns — guarantees free() on any exit path including
-//         exceptions, replacing the manual free() calls at the end.
-//
-// [NEW-3] Null-pointer check on all kernel output pointers before use.
-//
-// [NEW-4] Output arrays iat_I, ja_I stored as double (same as original —
-//         the "Typed Data Access NOT working on RUSSEL" workaround is
-//         preserved). int→double cast made explicit via static_cast<double>.
-//
-// [NEW-5] std::size_t / mwSize used for all array sizes and loop bounds.
-// -----------------------------------------------------------------------
 //----------------------------------------------------------------------------------------
 
+#include <cstdint>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "EXTI_prolongation.h"
@@ -63,9 +28,6 @@
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
-//----------------------------------------------------------------------------------------
-// [NEW-2] RAII guard for kernel-allocated raw pointers
-//----------------------------------------------------------------------------------------
 struct MallocGuard {
     void *ptr = nullptr;
     explicit MallocGuard(void *p) : ptr(p) {}
@@ -107,11 +69,10 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C]
         validateArguments(outputs, inputs);
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read inputs
         // -----------------------------------------------------------------------
         const int level  = static_cast<int>(TypedArray<double>(inputs[ 0])[0]);
         const int np     = static_cast<int>(TypedArray<double>(inputs[ 1])[0]);
@@ -120,16 +81,11 @@ public:
         const int nn_I   = static_cast<int>(TypedArray<double>(inputs[13])[0]);
         const int nc_I   = static_cast<int>(TypedArray<double>(inputs[14])[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B][NEW-1] Copy input arrays into std::vector for raw pointer access.
-        //   Integer arrays use TypedArray<int32_t> — NOT mxGetPr (which is double*).
-        //   coef_A and coef_C are genuine double arrays.
-        // -----------------------------------------------------------------------
         const TypedArray<int32_t> vecstart_arr = inputs[ 2];
         const TypedArray<int32_t> iat_A_arr    = inputs[ 5];
         const TypedArray<int32_t> ja_A_arr     = inputs[ 6];
         const TypedArray<double>  coef_A_arr   = inputs[ 7];
-        const TypedArray<int32_t> coef_S_arr   = inputs[ 8];   // [NEW-1] int, not double
+        const TypedArray<int32_t> coef_S_arr   = inputs[ 8];
         const TypedArray<int32_t> iat_C_arr    = inputs[ 9];
         const TypedArray<int32_t> ja_C_arr     = inputs[10];
         const TypedArray<double>  coef_C_arr   = inputs[11];
@@ -164,17 +120,14 @@ public:
                        nn_I, nc_I,
                        nt_I, iat_I_raw, ja_I_raw, coef_I_raw);
 
-        // [NEW-2] Guard kernel-allocated output pointers immediately
         MallocGuard g_iat (iat_I_raw);
         MallocGuard g_ja  (ja_I_raw);
         MallocGuard g_coef(coef_I_raw);
 
-        // [NEW-3] Null-pointer check before any dereference
         if (!iat_I_raw || !ja_I_raw || !coef_I_raw)
             throwError("EXTI_Prol:nullPointer",
                        "Kernel returned a null pointer — likely an allocation failure.");
 
-        // [FIX-A] Route kernel error through MATLAB exception machinery
         if (ierr != 0)
             throwError("EXTI_Prol:computeError",
                        "cpt_Prolongation_EXTI returned error code: " +
@@ -182,9 +135,6 @@ public:
 
         // -----------------------------------------------------------------------
         // Pack results into MATLAB output arrays.
-        // [NEW-4] iat_I and ja_I stored as double — preserved from original
-        //         ("Typed Data Access NOT working on RUSSEL"); int→double explicit.
-        // [NEW-5] std::size_t for all sizes and loop bounds
         // -----------------------------------------------------------------------
         const std::size_t sz_iat = static_cast<std::size_t>(nn_I + 1);
         const std::size_t sz_nt  = static_cast<std::size_t>(nt_I);
@@ -226,7 +176,6 @@ public:
 
 private:
 
-    // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 15)
@@ -263,7 +212,6 @@ private:
                            " must be a double array.");
     }
 
-    // [FIX-E] createCharArray for strings; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

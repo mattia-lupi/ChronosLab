@@ -1,13 +1,14 @@
-function [ascii_input,precond,method,neig,reslambda_check,itmax,tol] = read_eig(filename)
+function [ascii_input,precond,method,neig,reslambda_check,itmax,tol,largest_flag] = read_eig(filename)
 
 ifile = fopen(filename,'r');
 C = textscan(fgetl(ifile),'%s'); ascii_input     = C{1}{1};
 C = textscan(fgetl(ifile),'%s'); precond         = C{1}{1};
 C = textscan(fgetl(ifile),'%s'); method          = C{1}{1};
 C = textscan(fgetl(ifile),'%f'); neig            = C{1};
-C = textscan(fgetl(ifile),'%f'); reslambda_check = C{1};
+C = textscan(fgetl(ifile), '%s'); reslambda_check = strcmpi(C{1}{1}, 'true');
 C = textscan(fgetl(ifile),'%f'); itmax           = C{1};
 C = textscan(fgetl(ifile),'%f'); tol             = C{1};
+C = textscan(fgetl(ifile),'%s'); largest_flag    = C{1}{1};
 fclose(ifile);
 
 switch lower(ascii_input)
@@ -38,6 +39,8 @@ switch lower(method)
     case 'lanczos'
 
     case 'lobpcg'
+
+   case 'block_arnoldi' 
 
     otherwise
        err_msg = ['Wrong value for method in ' filename];

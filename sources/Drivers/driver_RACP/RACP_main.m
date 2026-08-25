@@ -27,14 +27,23 @@ DEBINFO.coarsen.draw_dist = false;
 
 % Read names of the input files
 fileIN = fopen('RACP.fnames','r');
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TSPACE  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_COARSEN = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_PROLONG = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_FILTER  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_GENERAL = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_BIN     = D{1};
+rawNames = textscan(fileIN, '%s', 'Delimiter', '\n');
+
+fnames = rawNames{1};
+
+% Helper to normalize slashes for the current OS (Windows '\', Unix '/')
+normalizePath = @(p) strrep(strrep(strtrim(p), '/', filesep), '\', filesep);
+
+% Assign and normalize each path
+file_AMG     = normalizePath(fnames{1});
+file_SMOOTH  = normalizePath(fnames{2});
+file_TSPACE  = normalizePath(fnames{3});
+file_COARSEN = normalizePath(fnames{4});
+file_PROLONG = normalizePath(fnames{5});
+file_FILTER  = normalizePath(fnames{6});
+file_GENERAL = normalizePath(fnames{7});
+file_BIN     = normalizePath(fnames{8});
+
 fclose(fileIN);
 
 % Read parameters for the AMG hierarchy

@@ -1,7 +1,7 @@
+#include <cstdint>   // int64_t, int32_t
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 
-#include <cstdint>   // int64_t, int32_t
 #include <string>
 #include <cassert>
 #include <algorithm>
@@ -17,61 +17,8 @@
 //       compute_local_fsai_wrap(nthread, n_step, step_size, tau, eps,
 //                               nrows, nrows_M, nterm_M,
 //                               iat_M, ja_M, coef_M)
-//
-// NOTE: Add the appropriate header include for compute_local_fsai(),
-//       copy_ja(), and copy_coef() — they are not declared in the
-//       original source and must come from a project-specific header.
-//
-// Build command:
-//   See compile.m — ensure -R2018a is on its own line
-//
-// ALL FIXES APPLIED
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() not declared in the pure C++ MEX API (mex.hpp does
-//         not pull in mex.h). Replaced with mprint() helper routing
-//         through getEngine()->feval(u"fprintf", createCharArray(...)).
-//
-// [FIX-B] TypedArray<T>::operator[] returns a proxy — cannot take address.
-//         Input arrays copied into std::vector<T>; .data() passed to kernel.
-//
-// [FIX-C] ArgumentList::size() / operator[] are NOT const-qualified.
-//         validateArguments() takes non-const ArgumentList& references.
-//
-// [FIX-E] factory.createScalar<T>() requires std::is_arithmetic<T>.
-//         All string arguments use factory.createCharArray() instead.
-//
-// [NEW-1] mxGetData() with void* cast replaced by TypedArray<T> accessors:
-//           iat_M  → TypedArray<int64_t>  (was mxINT64_CLASS / iExt*)
-//           ja_M   → TypedArray<int32_t>  (was mxINT32_CLASS / iReg*)
-//           coef_M → TypedArray<double>
-//
-// [NEW-2] Output/work arrays were created as mxArray* and written to by
-//         the kernel via raw pointers obtained from mxGetData().
-//         In the C++ API TypedArray elements are proxies — raw pointers
-//         cannot be obtained directly. Solution: use std::vector<T> as
-//         the kernel-writable buffer, then copy into TypedArray after.
-//           - nterm_G : single int64_t variable (scalar output of kernel)
-//           - iat_G   : std::vector<int64_t>, length nrows+1
-//           - ja_G    : std::vector<int32_t>, length nzmax_G (oversized work)
-//           - coef_G  : std::vector<double>,  length nzmax_G (oversized work)
-//         The mxDestroyArray(ja_W) / mxDestroyArray(coef_W) pattern
-//         (oversized alloc → copy to resized → destroy original) is
-//         replaced naturally: vectors are resized implicitly via the
-//         TypedArray constructor that takes an exact count.
-//
-// [NEW-3] iExt = long int maps to int64_t on 64-bit Linux/macOS (LP64).
-//         std::vector<iExt> is used for iat_M, iat_G so the kernel
-//         receives the exact pointer type it expects. A static_assert
-//         guards against builds where long int is not 64 bits.
-//
-// [NEW-4] Removed #include <iostream> / <iomanip> / using namespace std.
-//         All diagnostic output goes through mprint().
-//
-// [NEW-5] std::size_t used for all array sizes and loop bounds.
-// -----------------------------------------------------------------------
-//----------------------------------------------------------------------------------------
 
-// [NEW-3] Guard against LP32/ILP64 platforms where long int != 64 bits
+
 static_assert(sizeof(iExt) == sizeof(int64_t),
               "iExt (long int) must be 64 bits on this platform. "
               "Update the typedef or the TypedArray<int64_t> mapping.");
@@ -100,13 +47,11 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C]
         validateArguments(outputs, inputs);
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read input
         // -----------------------------------------------------------------------
-        // mprint("- get input scalars\n");
 
         const iReg nthread   = static_cast<iReg>(TypedArray<double>(inputs[0])[0]);
         const iReg n_step    = static_cast<iReg>(TypedArray<double>(inputs[1])[0]);
@@ -117,38 +62,13 @@ public:
         const iReg nrows_M   = static_cast<iReg>(TypedArray<double>(inputs[6])[0]);
         const iExt nterm_M   = static_cast<iExt>(TypedArray<double>(inputs[7])[0]);
 
-        // -----------------------------------------------------------------------
-        // [FIX-B][NEW-1] Copy input arrays into std::vector.
-        //   iat_M  → int64_t  (mxINT64_CLASS — was iExt* via mxGetData void* cast)
-        //   ja_M   → int32_t  (mxINT32_CLASS — was iReg* via mxGetData void* cast)
-        //   coef_M → double
-        // -----------------------------------------------------------------------
-        // mprint("- get input arrays\n");
-
         const TypedArray<int64_t> iat_M_arr  = inputs[8];
         const TypedArray<int32_t> ja_M_arr   = inputs[9];
         const TypedArray<double>  coef_M_arr = inputs[10];
 
-        // [NEW-3] Use std::vector<iExt> (= long int) so kernel receives
-        //         the exact pointer type — safe on LP64 (Linux/macOS 64-bit)
         std::vector<iExt> iat_M_vec (iat_M_arr.begin(),  iat_M_arr.end());
         std::vector<iReg> ja_M_vec  (ja_M_arr.begin(),   ja_M_arr.end());
         std::vector<rExt> coef_M_vec(coef_M_arr.begin(), coef_M_arr.end());
-
-        // -----------------------------------------------------------------------
-        // [NEW-2] Allocate kernel-writable output / work buffers as std::vector.
-        //
-        //   Original pattern:
-        //     plhs[0] = mxCreateNumericMatrix(1,1,mxINT64_CLASS,mxREAL)  ← scalar
-        //     plhs[1] = mxCreateNumericMatrix(1,nrows+1,mxINT64_CLASS,...) ← iat_G
-        //     ja_W    = mxCreateNumericMatrix(1,nzmax_G,mxINT32_CLASS,...) ← work
-        //     coef_W  = mxCreateNumericMatrix(1,nzmax_G,mxDOUBLE_CLASS,...) ← work
-        //
-        //   Modern equivalent: plain variables / vectors the kernel writes into.
-        //   After the kernel, exact-size TypedArrays are constructed for output.
-        //   No mxDestroyArray() needed — vectors self-destruct.
-        // -----------------------------------------------------------------------
-        // mprint("- allocate work arrays\n");
 
         const iExt kmax    = 1 + static_cast<iExt>(n_step) * static_cast<iExt>(step_size);
         const iExt nzmax_G = static_cast<iExt>(nrows) * kmax;
@@ -161,7 +81,6 @@ public:
         // -----------------------------------------------------------------------
         // Call the computational kernel
         // -----------------------------------------------------------------------
-        // mprint("- compute G terms\n");
 
         compute_local_fsai(nthread, n_step, step_size, tau, eps,
                            nrows, nrows_M, nterm_M,
@@ -172,17 +91,6 @@ public:
                            iat_G_vec.data(),
                            ja_G_vec.data(),
                            coef_G_vec.data());
-
-        // -----------------------------------------------------------------------
-        // [NEW-2] Pack results into exact-size MATLAB output arrays.
-        //
-        //   Original: oversized ja_W / coef_W copied to resized ja_R / coef_R
-        //             then mxDestroyArray(ja_W) / mxDestroyArray(coef_W).
-        //   Modern:   just copy the first nterm_G_val elements from the vectors
-        //             directly into fresh TypedArrays of the exact size.
-        //             The oversized vectors self-destruct at end of scope.
-        // -----------------------------------------------------------------------
-        // mprint("- resize output arrays\n");
 
         const std::size_t sz_rows1 = static_cast<std::size_t>(nrows) + 1;
         const std::size_t sz_nt    = static_cast<std::size_t>(nterm_G_val);
@@ -231,7 +139,6 @@ public:
 
 private:
 
-    // [FIX-C] non-const refs — ArgumentList methods are not const-qualified
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
         if (inputs.size() != 11)
@@ -268,7 +175,6 @@ private:
                        "Input argument 11 (coef_M) must be a double array.");
     }
 
-    // [FIX-E] createCharArray for strings; routes through MATLAB error()
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,
