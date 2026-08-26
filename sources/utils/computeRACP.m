@@ -1,4 +1,4 @@
-function [M,T_setup,A11_aug] = computeRACP(A,TV0,sym_flag,verb)
+function [M,T_setup,A11_aug] = computeRACP(A,TV0,param,verb)
 
 DEBUG = false;
 simple_flag = false;
@@ -30,11 +30,8 @@ DEBINFO.coarsen = [];
 % STAMPARE SI/NO
 DEBINFO.coarsen.draw_dist = false;
 
-% Read the parameters in the input files
-param = readDefaultParams();
-
 % Set the symmetry flag
-param.symm = sym_flag;
+sym_flag = param.symm;
 
 % Split the matrix in 4 blocks
 

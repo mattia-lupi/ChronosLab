@@ -1,10 +1,4 @@
-function [M,T_setup] = computeAMG(A,TV0,sym_flag,verb)
-
-% Read the parameters inside the input files
-param = readDefaultParams();
-
-% Set the symmetry flag
-param.symm = sym_flag;
+function [M,T_setup] = computeAMG(A,TV0,param,verb)
 
 %%%%%%%%%%%%%
 % Treat Boundary conditions 
@@ -49,7 +43,7 @@ T_setup = 0;
 
 % Compute the AMG hierarchy
 time_start = tic;
-AMG_prec = cpt_aspAMG(param,A,TV0,true);
+AMG_prec = cpt_aspAMG(param,A,TV0,verb);
 T_setup = toc(time_start);
 
 M = @(x) AMG_Vcycle(AMG_prec,A,x);
