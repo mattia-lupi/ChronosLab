@@ -4,26 +4,36 @@ clear;
 %clc;
 %close all;
 
-rand('state',0);
+% Modern random state initialization (rand('state',0) is deprecated)
+rng(0);
+
 RCM_flag = true;
 RCM_flag = false;
 
 fprintf('EXECUTION BEGIN\n\n');
 
-% Read names of the input files
+% Read all lines at once into a cell array
 fileIN = fopen('aspAMG.fnames','r');
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TSPACE  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_COARSEN = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_PROLONG = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_FILTER  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_GENERAL = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_MATRIX  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TV0     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_RHS     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_BIN     = D{1};
+rawNames = textscan(fileIN, '%s', 'Delimiter', '\n');
 fclose(fileIN);
+
+fnames = rawNames{1};
+
+% Helper to normalize slashes for the current OS (Windows '\', Unix '/')
+normalizePath = @(p) strrep(strrep(strtrim(p), '/', filesep), '\', filesep);
+
+% Assign and normalize each path
+file_AMG     = normalizePath(fnames{1});
+file_SMOOTH  = normalizePath(fnames{2});
+file_TSPACE  = normalizePath(fnames{3});
+file_COARSEN = normalizePath(fnames{4});
+file_PROLONG = normalizePath(fnames{5});
+file_FILTER  = normalizePath(fnames{6});
+file_GENERAL = normalizePath(fnames{7});
+file_MATRIX  = normalizePath(fnames{8});
+file_TV0     = normalizePath(fnames{9});
+file_RHS     = normalizePath(fnames{10});
+file_BIN     = normalizePath(fnames{11});
 
 % Read parameters for the AMG hierarchy
 param.amg = read_amg(file_AMG);

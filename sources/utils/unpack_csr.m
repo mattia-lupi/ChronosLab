@@ -1,17 +1,13 @@
-function [iat,ja,coef] = unpack_csr(matrix)
-
-   % 1. Transpose to switch from CSC (MATLAB default) to CSR ordering
-   % find() on the transpose iterates over rows of the original matrix sequentially.
-   [ja, irow, coef] = find(matrix.');
-
-   % 2. Vectorized construction of row pointers (iat)
-   nn = size(matrix, 1);
-
-   % Count non-zeros per row. accumarray handles empty rows automatically (returns 0).
-   row_counts = accumarray(irow, 1, [nn, 1]);
-
-   % Cumulative sum to generate pointers.
-   % Prepend 1 because CSR pointers are 1-based in this context.
-   iat = [1; cumsum(row_counts) + 1];
-
+function [iat, ja, coef] = unpack_csr(matrix)
+   % 1. Transpose once to convert row iteration into CSC column order
+   Mt = matrix.';
+   
+   % 2. Suppress row index output (~) to avoid allocating an NNZ-length array
+   [ja, ~, coef] = find(Mt);
+   
+   % 3. Count non-zeros per row directly from Mt's internal structure in O(M) time
+   row_counts = full(sum(Mt ~= 0, 1)).';
+   
+   % 4. Pre-pend 1 and compute cumulative sum in a single operation
+   iat = cumsum([1; row_counts]);
 end

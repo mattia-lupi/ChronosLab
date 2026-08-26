@@ -10,7 +10,7 @@ function initChronos(outputFlag)
    % Check if any of the folders is already on the MATLAB path
    needRestore = false;
    for k = 1:numel(foldList)
-     if contains(path, fullfile('Chronos_Lab',foldList(k)))
+     if contains(path, fullfile('ChronosLab',foldList(k)))
        needRestore = true;
        break;
      end

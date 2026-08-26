@@ -56,7 +56,7 @@ switch lower(method)
    case 'smoothing'  % Simple smoothing of the input V0
       % Just orthonormalize initial V0
       smooth = @(x) x - smootherOp.omega*smootherOp.right*(smootherOp.left*(A*x));
-      [V, iter, res] = simple_smoothing(V0,smooth,itmax,tol,verb);
+      [V, ~, res] = simple_smoothing(V0,smooth,itmax,tol,verb);
       [V,~] = qr(V,0);
       lambda = zeros(ntv,1);
    case 'ng-srqcg'  % Non-Generalized SRQCG
@@ -69,7 +69,7 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call SRQCG
-      [V, lambda, iter, res] = NG_SRQCG(V0, ProdMat, Prec, itmax, tol, ritz_freq, verb);
+      [V, lambda, ~, res] = NG_SRQCG(V0, ProdMat, Prec, itmax, tol, ritz_freq, verb);
       % NON DOVREBBE SERVIRE--->  % Orthonormalize
       %                     --->  [V,~] = qr(V,0);
       V = normc(V);
@@ -83,7 +83,7 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call SRQCG
-      [V, lambda, iter, res] = SRQCG(V0, ProdMat, itmax, tol, ritz_freq, verb);
+      [V, lambda, ~, res] = SRQCG(V0, ProdMat, itmax, tol, ritz_freq, verb);
       % Apply F'
       V = smootherOp.right*V;
       % Orthonormalize
@@ -96,7 +96,7 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call Lanczos
-      [V, lambda, iter, res] = Lanczos(V0, ProdMat, itmax, ntv, verb);
+      [V, lambda, ~, res] = Lanczos(V0, ProdMat, itmax, ntv, verb);
    case 'lanczos'
       % Define preconditioned matrix vector operation
       ProdMat = @(x) smootherOp.left*(A*(smootherOp.right*x));
@@ -107,9 +107,11 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call Lanczos
-      [V, lambda, iter, res] = Lanczos(V0, ProdMat, itmax, ntv, verb);
+      [~, lambda, V, resV, resS, ~] = Lanczos(...
+                                 A, V0, itmax, tol, false, verb);
       % Apply F'
-      V = smootherOp.right*V;
+
+      res = [resS(end,end:-1:1)', resV(end:-1:1)];
       % Orthonormalize
       [V,~] = qr(V,0);
    case 'arnoldi'
@@ -120,7 +122,7 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call Arnoldi
-      [V, lambda, iter, res] = Arnoldi(V0, ProdMat, itmax, ntv, dual_orth, verb);
+      [V, lambda, ~, res] = Arnoldi(V0, ProdMat, itmax, ntv, dual_orth, verb);
       % Orthonormalize
       [V,~] = qr(V,0);
 
@@ -131,12 +133,9 @@ switch lower(method)
       % Orthonormalize
       [V0,~] = qr(V0,0);
       % Call Arnoldi
-      [iter, lambda, V, res_norm_X, res_norm_D, ~] = ...
-         block_arnoldi(A, ntv, {smootherOp.left,smootherOp.right}, V0, 'smallest', itmax, tol, verb);
-      % [V, lambda] = eigs(ProdMat, size(A,1), ntv,'smallestreal','Tolerance',1e-15, ...
-      %    'MaxIterations',itmax, 'Display',1);
-      res = [res_norm_D,res_norm_X];%zeros(ntv,2);%
-      % lambda = diag(lambda);
+      [~, lambda, V, res_norm_X, res_norm_D, ~] = ...
+         block_arnoldi(A, ntv, {smootherOp.left,smootherOp.right}, V0, false, itmax, tol, verb);
+      res = [res_norm_D,res_norm_X];
       V = real(V);
    otherwise
       error('Not existing method');

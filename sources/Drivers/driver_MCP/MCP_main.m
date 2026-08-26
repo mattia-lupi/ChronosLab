@@ -3,6 +3,7 @@ clc
 
 DEBUG = false;
 simple_flag = false;
+treatBC = true;
 
 global DEBINFO;
 % PARTE GENERALE
@@ -26,14 +27,23 @@ DEBINFO.coarsen.draw_dist = false;
 
 % Read names of the input files
 fileIN = fopen('MCP.fnames','r');
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TSPACE  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_COARSEN = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_PROLONG = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_FILTER  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_GENERAL = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_BIN     = D{1};
+rawNames = textscan(fileIN, '%s', 'Delimiter', '\n');
+
+fnames = rawNames{1};
+
+% Helper to normalize slashes for the current OS (Windows '\', Unix '/')
+normalizePath = @(p) strrep(strrep(strtrim(p), '/', filesep), '\', filesep);
+
+% Assign and normalize each path
+file_AMG     = normalizePath(fnames{1});
+file_SMOOTH  = normalizePath(fnames{2});
+file_TSPACE  = normalizePath(fnames{3});
+file_COARSEN = normalizePath(fnames{4});
+file_PROLONG = normalizePath(fnames{5});
+file_FILTER  = normalizePath(fnames{6});
+file_GENERAL = normalizePath(fnames{7});
+file_BIN     = normalizePath(fnames{8});
+
 fclose(fileIN);
 
 % Read parameters for the AMG hierarchy
@@ -60,6 +70,9 @@ param.filter = read_filter(file_FILTER);
 
 % Load the system
 load(file_BIN);
+if ~exist('A','var')
+   A = Amat;
+end
 
 fprintf('END INPUT\n\n');
 
@@ -93,22 +106,40 @@ A21 = A(n11+1:end,1:n11);
 A22 = A(n11+1:end,n11+1:end);
 
 % Treat BC in A11
-tic;
-if true
+if treatBC
+   % Identify target indices
    D = sum(spones(A11));
    ind_dir_dof = find(D==1);
    ind_col_rem = find(sum(spones(A12))==1);
    [ind_dir_lag,~,~] = find(A12(:,ind_col_rem));
    ind_dir = union(ind_dir_dof,ind_dir_lag);
-   A11(:,ind_dir) = 0;
-   A11 = A11';
-   A11(:,ind_dir) = 0;
-   A21(:,ind_dir) = 0;
-   A12 = A21';
+   
+   % Native Column Zeroing 
+   A11(:, ind_dir) = 0;
+   A21(:, ind_dir) = 0;
+   
+   % A11 Row Zeroing
+   A11 = A11.';
+   A11(:, ind_dir) = 0;
+   A11 = A11.';
+   
+   % Coupling Matrix Resolution
+   if sym_flag == 1
+       % Symmetry Exploit: A21 columns are already zeroed. 
+       % Transposing it perfectly zeros the corresponding rows for A12.
+       A12 = A21.';
+   else
+       % Independent execution for non-symmetric systems
+       A12 = A12.';
+       A12(:, ind_dir) = 0;
+       A12 = A12.';
+   end
+   
+   % Diagonal Restoration
    fac = max(D);
-   D = zeros(n11,1);
-   D(ind_dir,1) = fac;
-   A11 = A11 + diag(sparse(D));
+   D_diag = zeros(n11, 1);
+   D_diag(ind_dir, 1) = fac;
+   A11 = A11 + spdiags(D_diag, 0, n11, n11);
 
    % Remove BC columns from A12 (and A21) and A22
    ind_col_retain = setdiff(1:size(A22,1),ind_col_rem)';

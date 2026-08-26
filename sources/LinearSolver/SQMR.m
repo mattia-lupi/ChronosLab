@@ -4,11 +4,12 @@ function [pnew,info,relres,niter,resvec] = SQMR(Afun,rhs,tol,itmax,lprec,rprec,x
 %% VETTORI SCRATCH
 nn   = size(rhs,1);
 d    = zeros(nn,1);
-pnew = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
-if nargin == 7
+if nargin >= 7
    pnew = x0;
+else
+   pnew = zeros(nn,1);
 end
 
 if nargin < 8
