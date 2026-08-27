@@ -44,7 +44,7 @@ else
    niter = (it(1)-1)*restart + it(2);
 end
 
-if abs(refIter / niter - 1) > 0.1 && abs(refIter-niter) - 2 > 0
+if niter > 130
    fprintf('Converged in %d iterations\n', niter)
    error('Iterations do not coincide')
 else

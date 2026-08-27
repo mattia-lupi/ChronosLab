@@ -14,6 +14,11 @@
 iReg checkCol = 80110;
 iReg checkLevel = 1;
 
+#if defined(_WIN32) || defined(_WIN64)
+   #define dormqr_ dormqr
+   #define dgeqrf_ dgeqrf
+#endif
+
 // BLAS Fortran routines declarations
 extern "C" {
    double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
@@ -48,7 +53,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
          int startCol = iatkT[i];
          lapack_int size = iatkT[i + 1] - startCol;
          if (size > local_d_col) {
-            local_d_col = size;
+            local_d_col = static_cast<iReg>(size);
          }
 
          // Compute column norms in parallel
