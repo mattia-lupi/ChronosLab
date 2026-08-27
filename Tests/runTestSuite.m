@@ -12,11 +12,11 @@ testFiles = {
 
    % Test CLA + EXTI + Aggressive coarsening (and not)  + Jacobi +
    % % SRQCG/LOBPCG/Lanczos
-   % fullfile('FlowCLAS_0.m')
-   % fullfile('FlowCLAS_AGG.m')
-   % fullfile('FlowCLAS_AGG_SRQCG.m')
-   % fullfile('FlowCLAS_AGG_LOBPCG.m')
-   % fullfile('FlowCLAS_AGG_LANCZOS.m')
+   fullfile('FlowCLAS_0.m')
+   fullfile('FlowCLAS_AGG.m')
+   fullfile('FlowCLAS_AGG_SRQCG.m')
+   fullfile('FlowCLAS_AGG_LOBPCG.m')
+   fullfile('FlowCLAS_AGG_LANCZOS.m')
 
    % Test DOM(-) + BAMG + nsyFSAI + arnoldi + filterProl/Oper
    fullfile('dpNsyFSAI_NONE.m')
@@ -26,6 +26,9 @@ testFiles = {
 
    % Test nsyRACP + nsyFsai + DOM + BAMG + SMOOTH
    fullfile('stickSlipBAMG_SMOOTH.m')
+
+   % Test Generic SAM
+   fullfile('testNsySAM.m')
 
 };
 

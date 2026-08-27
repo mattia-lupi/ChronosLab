@@ -1,6 +1,6 @@
 6             % ntv
-20            % itmax
-1.e-3         % tol
+40            % itmax
+1.e-4         % tol
 NONE          % method
 5             % Init approx (only for SRQCG and LANCZOS ): 0 --> exact, 1 --> diag inv, k --> k sweeps Jacobi
 

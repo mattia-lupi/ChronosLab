@@ -88,6 +88,23 @@ switch lower(method)
       V = smootherOp.right*V;
       % Orthonormalize
       [V,~] = qr(V,0);
+   case 'lobpcg'
+      % Define preconditioned matrix vector operation
+      ProdMat = @(x) smootherOp.left*(A*(smootherOp.right*x));
+      % Define initial test vector space applying inv(F') or its approximation
+      V0 = cpt_initApp(init_approx,smootherOp.right,V0,verb);
+      % Apply 1 step of smoother to remove Dirichlet nodes
+      V0 = V0 - ProdMat(V0);
+      % Orthonormalize
+      [V0,~] = qr(V0,0);
+      % Call LOBPCG
+      [~,lambda,V,resnorm_vec,lambda_vec,~] = lobpcg(ProdMat,[],[],[],V0,false,...
+                                                     true,itmax,tol,7,verb);
+      res = [lambda_vec(end,end:-1:1), resnorm_vec(end,end:-1:1)];
+      % Apply F'
+      V = smootherOp.right*V;
+      % Orthonormalize
+      [V,~] = qr(V,0);
    case 'ng-lanczos'
       % Define preconditioned matrix vector operation
       ProdMat = @(x) A*x;
@@ -108,7 +125,7 @@ switch lower(method)
       [V0,~] = qr(V0,0);
       % Call Lanczos
       [~, lambda, V, resV, resS, ~] = Lanczos(...
-                                 A, V0, itmax, tol, false, verb);
+                                 ProdMat, V0, itmax, tol, false, verb);
       % Apply F'
 
       res = [resS(end,end:-1:1)', resV(end:-1:1)];
