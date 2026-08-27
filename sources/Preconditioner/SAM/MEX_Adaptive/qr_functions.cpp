@@ -1,6 +1,12 @@
 #include "qr_functions.h"
 #include <iostream>
 
+#if defined(_WIN32) || defined(_WIN64)
+   #define dormqr_ dormqr
+   #define dgeqrf_ dgeqrf
+   #define dtrtrs_ dtrtrs
+#endif
+
 void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 
                     double *Rtriang, double *tau, double *work, lapack_int lwork, 
                     lapack_int &info){

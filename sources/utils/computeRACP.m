@@ -1,4 +1,4 @@
-function [M,T_setup,A11_aug] = computeRACP(A,TV0,sym_flag,verb)
+function [M,T_setup,A11_aug] = computeRACP(A,TV0,param,verb)
 
 DEBUG = false;
 simple_flag = false;
@@ -30,41 +30,8 @@ DEBINFO.coarsen = [];
 % STAMPARE SI/NO
 DEBINFO.coarsen.draw_dist = false;
 
-
-fileIN = fopen('aspAMG.fnames','r');
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TSPACE  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_COARSEN = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_PROLONG = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_FILTER  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_GENERAL = D{1};
-fclose(fileIN);
-
-% Read parameters for the AMG hierarchy
-param.amg = read_amg(file_AMG);
-
-% Read parameters for the smoother
-param.smoother = read_smoother(file_SMOOTH);
-
-% Read parameters for the testspace
-param.tspace = read_tspace(file_TSPACE);
-
-% Read parameters for the smoother
-param.coarsen = read_coarsen(file_COARSEN);
-
-% Read parameters for the prolongation
-param.prolong = read_prolong(file_PROLONG);
-
-% Read parameters for the filtering
-param.filter = read_filter(file_FILTER);
-
-% Read general parameters
-[ascii_input,rhs_build,~,solv_method,itmax,tol,restart] =...
-        read_general(file_GENERAL);
-
 % Set the symmetry flag
-param.symm = sym_flag;
+sym_flag = param.symm;
 
 % Split the matrix in 4 blocks
 

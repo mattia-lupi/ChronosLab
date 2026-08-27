@@ -6,7 +6,7 @@ nn   = size(rhs,1);
 d    = zeros(nn,1);
 %%%%%%%%%%%%%%%%%%%%%
 
-if nargin >= 7
+if nargin >= 7 && ~isempty(x0)
    pnew = x0;
 else
    pnew = zeros(nn,1);

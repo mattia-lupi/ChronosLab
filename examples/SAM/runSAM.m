@@ -41,8 +41,11 @@ end
 M_all = cell(sizeSeq, 1);
 t_AMG = zeros(sizeSeq, 1);
 
+% Read the parameters in the input files in this directory
+param = readDefaultParams();
+
 for i = 1:sizeSeq
-    [M_all{i}, t_AMG(i)] = buildPrecond(A{i}, TV0{i}, lagrange);
+    [M_all{i}, t_AMG(i)] = buildPrecond(A{i}, TV0{i}, param, lagrange);
     disp(i)
 end
 
@@ -220,13 +223,14 @@ legend(labels(start:3), 'Location', 'northwest');
 
 
 %% Helper Functions
-function [M, t_prec] = buildPrecond(A_mat, TV0_vec, lagrange)
+function [M, t_prec] = buildPrecond(A_mat, TV0_vec, param, lagrange)
     symm = (norm(A_mat-A_mat','f')/norm(A_mat,'f') < 1e-14);
+    param.symm = symm;
     t0 = tic;
     if ~lagrange
-       [M, ~] = computeAMG(A_mat, TV0_vec, symm, 1);
+       [M, ~] = computeAMG(A_mat, TV0_vec, param, 1);
     else
-       [M, ~] = computeRACP(A_mat, TV0_vec, symm, 1);
+       [M, ~] = computeRACP(A_mat, TV0_vec, param, 1);
     end
     t_prec = toc(t0);
 end

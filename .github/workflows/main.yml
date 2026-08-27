@@ -1,0 +1,74 @@
+name: ChronosLab MATLAB CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [ main ]
+
+jobs:
+  chronoslab_tests:
+    name: ${{ matrix.display_name }}
+    if: github.event.pull_request == null || github.event.pull_request.draft == false
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            display_name: Linux (Ubuntu Latest, GCC 11)
+          - os: windows-latest
+            display_name: Windows (Windows 2022, MSVC 2022)
+          - os: macos-latest
+            display_name: macOS (Apple Silicon, Apple Clang)
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenMP (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libomp
+
+      - name: Ensure GCC 11 is active on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install -y gcc-11 g++-11
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+          gcc --version
+          g++ --version
+
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v3
+
+      - name: Compile MEX and run test algorithms
+        uses: matlab-actions/run-command@v3
+        env:
+          KMP_DUPLICATE_LIB_OK: "TRUE"
+        with:
+          command: |
+            try
+                initChronos;
+                compileAll;
+
+                run('Tests/runTestSuite.m');
+            catch ME
+                disp(getReport(ME));
+                exit(1); % Mark job as failed
+            end
+
+  aggregate:
+    name: check_all_tests_passed
+    runs-on: ubuntu-latest
+    needs: [chronoslab_tests]
+    if: github.event.pull_request == null || github.event.pull_request.draft == false
+
+    steps:
+      - name: All platform tests passed
+        run: echo "All tests succeeded on all platforms"

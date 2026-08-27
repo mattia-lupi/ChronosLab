@@ -1,7 +1,7 @@
 function initChronos(outputFlag)
 
    % List of folders to check
-   foldList = ["sources"];
+   foldList = ["sources", "Tests"];
    
    if nargin == 0
      outputFlag = true;
