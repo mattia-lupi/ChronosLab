@@ -49,6 +49,8 @@ jobs:
 
       - name: Compile MEX and run test algorithms
         uses: matlab-actions/run-command@v3
+        env:
+          KMP_DUPLICATE_LIB_OK: "TRUE"
         with:
           command: |
             try
