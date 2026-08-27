@@ -55,7 +55,7 @@ jobs:
                 initChronos;
                 compileAll;
 
-                run('tests.m');
+                run('Tests/runTestSuite.m');
             catch ME
                 disp(getReport(ME));
                 exit(1); % Mark job as failed
