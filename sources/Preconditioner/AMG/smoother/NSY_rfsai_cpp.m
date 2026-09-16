@@ -1,4 +1,4 @@
-function [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A)
+function [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthreads)
 
 %-----------------------------------------------------------------------------------------
 %
@@ -10,6 +10,7 @@ function [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A)
 % step_size  : number of entries added for each step
 % epsilon    : exit tolerance from the adaptive procedure
 % A          : matrix used to compute FSAI
+% nthreads   : number of threads to be used for openmp
 %
 % Output
 %
@@ -34,7 +35,7 @@ ja_A      = int32(ja_A) - 1;
 
 % Compute NSY r-adaptive FSAI ------------------------------------------------------------
 [iat_FL,ja_FL,coef_FL,iat_FU,ja_FU,coef_FU] = ...
-      NSY_rFSAI_compute(nstep,step_size,epsilon,nn_A,iat_A,ja_A,coef_A);
+      NSY_rFSAI_compute(nstep,step_size,epsilon,nn_A,iat_A,ja_A,coef_A,nthreads);
 
 % Create a sparse matrices for FL
 nt_FL = size(ja_FL,2);

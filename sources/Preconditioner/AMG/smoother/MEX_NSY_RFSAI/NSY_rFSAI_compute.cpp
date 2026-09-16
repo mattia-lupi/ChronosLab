@@ -5,7 +5,7 @@
 //
 // MATLAB signature:
 //   [iat_FL, ja_FL, coef_FL, iat_FU, ja_FU, coef_FU] = ...
-//       NSY_rFSAI_compute(nstep, step_size, epsilon, nn_A, iat_A, ja_A, coef_A)
+//       NSY_rFSAI_compute(nstep, step_size, epsilon, nn_A, iat_A, ja_A, coef_A, num_threads)
 //
 #if defined PRINT
     static constexpr bool dump = true;
@@ -14,6 +14,7 @@
 #endif
 
 #include <cstdint>
+#include <omp.h>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "Compute_nsy_rfsai.h"
@@ -70,13 +71,21 @@ public:
         const TypedArray<double> s1 = inputs[1];
         const TypedArray<double> s2 = inputs[2];
         const TypedArray<double> s3 = inputs[3];
+        const TypedArray<double> s7 = inputs[7];
 
         const int    nstep     = static_cast<int>(s0[0]);
         const int    step_size = static_cast<int>(s1[0]);
         const double epsilon   = static_cast<double>(s2[0]);
         const int    nn_A      = static_cast<int>(s3[0]);
+        const int num_threads = std::max(1,static_cast<int>(s4[0]));
 
-        if (dump) mprint("- Get input arrays\n");
+        // Configure OpenMP runtime thread count
+        omp_set_num_threads(num_threads);
+
+        if (dump) {
+            mprint("- Threads configured: " + std::to_string(num_threads) + "\n");
+            mprint("- Get input arrays\n");
+        }
 
         const TypedArray<int32_t> iat_A_arr  = inputs[4];
         const TypedArray<int32_t> ja_A_arr   = inputs[5];
@@ -91,7 +100,7 @@ public:
         double  *coef_A = coef_A_vec.data();
 
         // -----------------------------------------------------------------------
-        // Call the C computational kernel
+        // Call the C++ computational kernel
         // -----------------------------------------------------------------------
         if (dump) mprint("- Compute FL and FU entries\n");
 
@@ -103,7 +112,8 @@ public:
                        nstep, step_size, epsilon, nn_A,
                        iat_A, ja_A, coef_A,
                        iat_FL_raw, ja_FL_raw,  coef_FL_raw,
-                       iat_FU_raw, ja_FU_raw,  coef_FU_raw);
+                       iat_FU_raw, ja_FU_raw,  coef_FU_raw,
+                       num_threads);
 
         // Guard every kernel-allocated pointer immediately
         MallocGuard g_iat_FL (iat_FL_raw);
@@ -133,7 +143,7 @@ public:
         const std::size_t nt_FL = static_cast<std::size_t>(iat_FL_raw[nn_A]);
         const std::size_t nt_FU = static_cast<std::size_t>(iat_FU_raw[nn_A]);
 
-        // --- iat_FL : int32, length nn_A+1, 0-based → 1-based ----------------
+        // --- iat_FL : int32, length nn_A+1, 0-based -> 1-based ----------------
         TypedArray<int32_t> iat_FL_out = factory.createArray<int32_t>({1, n1});
         {
             auto it = iat_FL_out.begin();
@@ -141,7 +151,7 @@ public:
                 *it = iat_FL_raw[k] + 1;
         }
 
-        // --- ja_FL : int32, length nt_FL, 0-based → 1-based ------------------
+        // --- ja_FL : int32, length nt_FL, 0-based -> 1-based ------------------
         TypedArray<int32_t> ja_FL_out = factory.createArray<int32_t>({1, nt_FL});
         {
             auto it = ja_FL_out.begin();
@@ -153,7 +163,7 @@ public:
         TypedArray<double> coef_FL_out = factory.createArray<double>({1, nt_FL});
         std::copy(coef_FL_raw, coef_FL_raw + nt_FL, coef_FL_out.begin());
 
-        // --- iat_FU : int32, length nn_A+1, 0-based → 1-based ----------------
+        // --- iat_FU : int32, length nn_A+1, 0-based -> 1-based ----------------
         TypedArray<int32_t> iat_FU_out = factory.createArray<int32_t>({1, n1});
         {
             auto it = iat_FU_out.begin();
@@ -161,7 +171,7 @@ public:
                 *it = iat_FU_raw[k] + 1;
         }
 
-        // --- ja_FU : int32, length nt_FU, 0-based → 1-based ------------------
+        // --- ja_FU : int32, length nt_FU, 0-based -> 1-based ------------------
         TypedArray<int32_t> ja_FU_out = factory.createArray<int32_t>({1, nt_FU});
         {
             auto it = ja_FU_out.begin();
@@ -192,9 +202,9 @@ private:
 
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
-        if (inputs.size() != 7)
+        if (inputs.size() != 8)
             throwError("NSY_rFSAI:badInputCount",
-                       "Expected 7 input arguments, got " +
+                       "Expected 8 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
         if (outputs.size() != 6)
@@ -221,6 +231,11 @@ private:
         if (inputs[6].getType() != ArrayType::DOUBLE)
             throwError("NSY_rFSAI:badArray",
                        "Input argument 7 must be a double array.");
+
+        if (inputs[7].getType() != ArrayType::DOUBLE ||
+            inputs[7].getNumberOfElements() != 1)
+            throwError("NSY_rFSAI:badScalar",
+                  "Input argument 8 must be a real double scalar.");
     }
 
     void throwError(const std::string& id, const std::string& msg)
