@@ -60,7 +60,7 @@ switch lower(method)
            fprintf('Non-Symmetric AFSAI is used\n');
         end
         % Set-up AFSAI_NSY (afsai for nsy systems with mex-cpp code)
-        [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A);
+        [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
         % Compute damping parameter
         FAFT = @(x) FL*(A*(FU*x));
         opts.issym = 0;

@@ -1,9 +1,22 @@
 #include "Compute_nsy_rfsai.h"
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <omp.h>
+#include "cpt_nsy_rfsai.h"
+#include "compress_nsy_fsai.h"
+#include "SymmetrizePattern.h"
+#include "extract_diag.h"
+#include "wrCSRmat.h"
+
+using namespace std;
 
 int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
                       const int nn_A, const int *iat_A, const int *ja_A,
-                      const double *coef_A, int *&iat_FL, int *&ja_FL,
-                      double *&coef_FL, int *&iat_FU, int *&ja_FU, double *&coef_FU){
+                      const double *coef_A,
+                      int *&iat_FL, int *&ja_FL, double *&coef_FL,
+                      int *&iat_FU, int *&ja_FU, double *&coef_FU,
+                      const int num_threads){
 
    // Init error code
    int ierr = 0;
@@ -23,7 +36,7 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    // --- Extract diagonal entries -------------------------------------------------------
 
    double *diag_A = nullptr;
-   extract_diag(nn_A,iat_A,ja_A,coef_A,diag_A);
+   extract_diag(nn_A,iat_A,ja_A,coef_A,diag_A,num_threads);
 
    // --- Symmetrize input matrix --------------------------------------------------------
 
@@ -40,7 +53,7 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    memcpy(coef_Asym,coef_A,nt_A*sizeof(double)); 
 
    double *coef_AT  = nullptr;
-   ierr = SymmetrizePattern(nn_A,iat_Asym,ja_Asym,coef_Asym,coef_AT);
+   ierr = SymmetrizePattern(nn_A,iat_Asym,ja_Asym,coef_Asym,coef_AT,num_threads);
    if (ierr != 0){
       cout << "Error in SymmetrizePattern" << endl;
       return 2;
@@ -69,7 +82,7 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    // --- Compute the non-symmetric FSAI -------------------------------------------------
 
    ierr = cpt_nsy_rfsai(nstep,step_size,eps,nn_A,nt_A,diag_A,iat_Asym,ja_Asym,coef_Asym,
-                        coef_AT,iat_FL,ja_FL,coef_FL,coef_FU);
+                        coef_AT,iat_FL,ja_FL,coef_FL,coef_FU,num_threads);
    if (ierr != 0){
       cout << "Error in cpt_nsy_rfsai" << endl;
       return 3;
@@ -88,7 +101,7 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
 
    int nt_FL;
    int nt_FU;
-   ierr = compress_nsy_fsai(nn_A,nt_FL,nt_FU,iat_FL,ja_FL,iat_FU,ja_FU,coef_FL,coef_FU);
+   ierr = compress_nsy_fsai(nn_A,nt_FL,nt_FU,iat_FL,ja_FL,iat_FU,ja_FU,coef_FL,coef_FU,num_threads);
    if (ierr != 0){
       cout << "Error in compress_nsy_fsai" << endl;
       return 4;
