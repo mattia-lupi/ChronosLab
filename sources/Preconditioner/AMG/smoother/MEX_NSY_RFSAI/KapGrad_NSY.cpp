@@ -16,6 +16,7 @@ int ind_WR = 0;
 // Get the degree zero entries (A pattern)
 int j = iat[irow];
 int jjcol = ja[j];
+int jend = iat[irow+1];
 while (j < jend && jjcol < jendbloc){
    // If JWN is positive add this entry to the tentative pattern
    if (JWN[jjcol] >= 0) {

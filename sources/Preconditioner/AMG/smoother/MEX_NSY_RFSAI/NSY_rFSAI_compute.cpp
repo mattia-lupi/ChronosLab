@@ -77,7 +77,7 @@ public:
         const int    step_size = static_cast<int>(s1[0]);
         const double epsilon   = static_cast<double>(s2[0]);
         const int    nn_A      = static_cast<int>(s3[0]);
-        const int num_threads = std::max(1,static_cast<int>(s4[0]));
+        const int num_threads = std::max(1,static_cast<int>(s7[0]));
 
         // Configure OpenMP runtime thread count
         omp_set_num_threads(num_threads);
