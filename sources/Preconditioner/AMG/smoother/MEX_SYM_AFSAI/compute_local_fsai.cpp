@@ -6,7 +6,7 @@
 void compute_local_fsai(iReg nthread, iReg n_step, iReg step_size, rExt tau, rExt eps,
                         iReg nrows, iReg nrows_M, iExt nterm_M, const iExt * const iat_M,
                         const iReg * const ja_M, const rExt * const coef_M, iExt *nterm_G,
-                        iExt *iat_G, iReg *ja_G, rExt *coef_G){
+                        iExt *iat_G, iReg *ja_G, rExt *coef_G, bool *is_posdef){
 
 // Set the chunk size for the parallel do (this way each thread should execute 20 loops)
 iReg chunk_size = nrows / (20*nthread); chunk_size = std::max(1,chunk_size);
@@ -31,6 +31,7 @@ for ( iReg irow = 0; irow < nrows; irow++ ){
 // Parallel computation of G
 nterm_G[0] = 0;
 iReg shift = nrows_M - nrows;
+bool local_is_posdef = true;
 
 #pragma omp parallel num_threads(nthread)
 {
@@ -41,7 +42,7 @@ iReg shift = nrows_M - nrows;
    double time_1 = omp_get_wtime();
    cpt_afsai_coef(chunk_size,n_step,step_size,tau,eps,shift,nrows,nrows_M,
                   nterm_M,loc_nt_G,iat_M,ja_M,istart_scr.data(),istop_scr.data(),
-                  ja_scr.data(),coef_M,coef_scr.data());
+                  ja_scr.data(),coef_M,coef_scr.data(),local_is_posdef);
    double time_2 = omp_get_wtime();
 
    // Set the local number of non-zeroes
@@ -51,6 +52,10 @@ iReg shift = nrows_M - nrows;
 // if (myid == 0) {cout << time_2-time_1 << endl;}
 
 } // end parallel region
+
+if (is_posdef != nullptr) {
+   *is_posdef = local_is_posdef;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //cout << "istart - istop" << endl;

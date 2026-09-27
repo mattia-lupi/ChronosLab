@@ -1,4 +1,4 @@
-function F = afsai_cpp(M,nthread,nstep,step_size,eps)
+function [F, is_posdef] = afsai_cpp(M,nthread,nstep,step_size,eps)
 
 %-----------------------------------------------------------------------------------------
 %
@@ -14,7 +14,8 @@ function F = afsai_cpp(M,nthread,nstep,step_size,eps)
 %
 % Output
 %
-% F : FSAI matrix
+% F         : FSAI matrix
+% is_posdef : boolean flag indicating if matrix was positive definite
 %
 %-----------------------------------------------------------------------------------------
 
@@ -44,17 +45,19 @@ tau = 0.;
 
 
 % Compute FSAI ---------------------------------------------------------------------------
-[nterm_G,iat_G,ja_G,coef_G] = SYM_aFSAI_compute(nthread,nstep,step_size,tau,eps,nrows, ...
-                                                 nrows_M,nterm_M,iat_M,ja_M,coef_M);
- 
-% Create a sparse matrix for the FSAI
-counts = diff(iat_G);               
-irow_G = repelem(1:nrows_M, counts);
-ja_G   = double(ja_G);
-F      = sparse(irow_G,ja_G,coef_G);
+[nterm_G,iat_G,ja_G,coef_G,is_posdef] = SYM_aFSAI_compute(nthread,nstep,step_size,tau,eps,nrows, ...
+                                                          nrows_M,nterm_M,iat_M,ja_M,coef_M);
+if is_posdef 
+   % Create a sparse matrix for the FSAI
+   counts = diff(iat_G);               
+   irow_G = repelem(1:nrows_M, counts);
+   ja_G   = double(ja_G);
+   F      = sparse(irow_G,ja_G,coef_G);
+   % end function
+   return
+else
+   F = [];
+   return
+end
 
-
-% end function
-return
-
-
+end

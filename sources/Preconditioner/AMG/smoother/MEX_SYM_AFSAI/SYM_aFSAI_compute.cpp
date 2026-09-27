@@ -78,6 +78,8 @@ public:
         std::vector<iReg> ja_G_vec (static_cast<std::size_t>(nzmax_G),   0);
         std::vector<rExt> coef_G_vec(static_cast<std::size_t>(nzmax_G),  0.0);
 
+        bool is_posdef_val = true;
+
         // -----------------------------------------------------------------------
         // Call the computational kernel
         // -----------------------------------------------------------------------
@@ -90,7 +92,8 @@ public:
                            &nterm_G_val,
                            iat_G_vec.data(),
                            ja_G_vec.data(),
-                           coef_G_vec.data());
+                           coef_G_vec.data(),
+                           &is_posdef_val);
 
         const std::size_t sz_rows1 = static_cast<std::size_t>(nrows) + 1;
         const std::size_t sz_nt    = static_cast<std::size_t>(nterm_G_val);
@@ -135,6 +138,12 @@ public:
         outputs[1] = std::move(out_iat_G);
         outputs[2] = std::move(out_ja_G);
         outputs[3] = std::move(out_coef_G);
+
+        if (outputs.size() > 4) {
+            TypedArray<bool> out_is_posdef = factory.createArray<bool>({1, 1});
+            out_is_posdef[0] = is_posdef_val;
+            outputs[4] = std::move(out_is_posdef);
+        }
     }
 
 private:
@@ -146,9 +155,9 @@ private:
                        "Expected 11 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
-        if (outputs.size() != 4)
+        if (outputs.size() != 4 && outputs.size() != 5)
             throwError("LocalFSAI:badOutputCount",
-                       "Expected 4 output arguments, got " +
+                       "Expected 4 or 5 output arguments, got " +
                        std::to_string(outputs.size()) + ".");
 
         // Scalar double inputs: nthread(0)..nterm_M(7)

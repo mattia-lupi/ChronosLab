@@ -25,40 +25,63 @@ switch lower(method)
 
     case 'afsai_sym'
         % Set-up AFSAI (afsai with mex-cpp code)
-        F = afsai_cpp(A,nthread,nstep,step_size,epsilon);
-        % Correct NaN for very ill-conditioned problems
-        irow = find(isnan(diag(F)));
-        if numel(irow) > 0
-           if verb
-              fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
-           end
+        [F, is_posdef] = afsai_cpp(A,nthread,nstep,step_size,epsilon);
+        if ~is_posdef
+            if verb
+               fprintf('WARNING: Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
+            end
+            smootherOp.is_posdef = false;
+            % Fall back to non-symmetric AFSAI
+            [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
+            FAFT = @(x) FL*(A*(FU*x));
+            opts.issym = 0;
+            opts.disp = verb;
+            opts.tol = 5.e-4;
+            lambda = eigs(FAFT,size(A,1),1,'lm',opts);
+            if verb
+               fprintf('Max Lambda: %10.4f\n',lambda);
+            end
+            omega = min(1,1.9 / lambda);
+            smootherOp.left = FL;
+            smootherOp.right = FU;
+            smootherOp.omega = omega;
+            smootherOp.lambda = lambda;
+        else
+            smootherOp.is_posdef = true;
+            % Correct NaN for very ill-conditioned problems
+            irow = find(isnan(diag(F)));
+            if numel(irow) > 0
+               if verb
+                  fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
+               end
+            end
+            for i = 1:numel(irow)
+               ii = irow(i);
+               F(ii,:) = 0;
+               F(ii,ii) = 1 / sqrt(A(ii,ii));
+            end
+            % Compute damping parameter
+            FAFT = @(x) F*(A*(F'*x));
+            opts.issym = 1;
+            opts.disp = verb;
+            opts.tol = 5.e-4;
+            lambda = eigs(FAFT,size(A,1),1,'la',opts);
+            if verb
+               fprintf('Max Lambda: %10.4f\n',lambda);
+            end
+            omega = min(1,1.9 / lambda);
+            % Append the smoother
+            smootherOp.left = F;
+            smootherOp.right = F';
+            smootherOp.omega = omega;
+            smootherOp.lambda = lambda;
         end
-        for i = 1:numel(irow)
-           ii = irow(i);
-           F(ii,:) = 0;
-           F(ii,ii) = 1 / sqrt(A(ii,ii));
-           A(ii,ii)
-        end
-        % Compute damping parameter
-        FAFT = @(x) F*(A*(F'*x));
-        opts.issym = 1;
-        opts.disp = verb;
-        opts.tol = 5.e-4;
-        lambda = eigs(FAFT,size(A,1),1,'la',opts);
-        if verb
-           fprintf('Max Lambda: %10.4f\n',lambda);
-        end
-        omega = min(1,1.9 / lambda);
-        % Append the smoother
-        smootherOp.left = F;
-        smootherOp.right = F';
-        smootherOp.omega = omega;
-        smootherOp.lambda = lambda;
 
     case 'afsai_nsy'
         if verb
            fprintf('Non-Symmetric AFSAI is used\n');
         end
+        smootherOp.is_posdef = false;
         % Set-up AFSAI_NSY (afsai for nsy systems with mex-cpp code)
         [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
         % Compute damping parameter
@@ -78,6 +101,7 @@ switch lower(method)
         smootherOp.lambda = lambda;
 
     case 'jacobi'
+        smootherOp.is_posdef = all(diag(A) > 0);
         % Compute Diagonal
         F = 1 ./ sqrt(full(diag(A)));
 	     F = diag(sparse(F));
