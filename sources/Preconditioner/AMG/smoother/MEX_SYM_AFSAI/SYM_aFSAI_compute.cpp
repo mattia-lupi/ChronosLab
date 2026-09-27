@@ -12,6 +12,7 @@
 // Modernized MEX gateway — MathWorks C++ MEX API (R2018a+)
 // Uses: mex.hpp + mexAdapter.hpp (matlab::data API)
 //
+// This function expects 1 based indices for iat and ja as in fortran
 // MATLAB signature:
 //   [nterm_G, iat_G, ja_G, coef_G] =
 //       compute_local_fsai_wrap(nthread, n_step, step_size, tau, eps,
@@ -83,7 +84,8 @@ public:
         // -----------------------------------------------------------------------
         // Call the computational kernel
         // -----------------------------------------------------------------------
-
+         
+        // This function expects 1 based indices for iat and ja as in fortran
         compute_local_fsai(nthread, n_step, step_size, tau, eps,
                            nrows, nrows_M, nterm_M,
                            iat_M_vec.data(),

@@ -33,6 +33,8 @@ coef_M = coef_M';
 
 
 % Switch from matlab type to c++ type
+% Do not switch to 0 based as in c++ as the function is expecting numbers
+% as in fortran
 iat_M = int64(iat_M);
 ja_M  = int32(ja_M);
 
