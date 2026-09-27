@@ -306,7 +306,7 @@ void cpt_afsai_coef(iReg chunk_size, iReg n_step, iReg step_size, rExt tau, rExt
                     iReg shift, iReg nrows, iReg nequ, iExt nterm, iExt &nterm_G,
                     const iExt * const iat, const iReg * const ja, iExt * const istart_G,
                     iExt * const istop_G, iReg * const ja_G, const rExt * const coef_A,
-                    rExt * const coef_G){
+                    rExt * const coef_G, bool &is_posdef){
 
 // Set parameters
 iReg mrow_min = 5;
@@ -326,6 +326,7 @@ std::vector<rExt> WR(nequ,0);
 std::vector<rExt> full_A(mmax*mmax,0);
 std::vector<rExt> rhs(mmax+1,0);
 std::vector<rExt> rhs_sav(mmax+1,0);
+int thread_is_posdef = 1;
 
 // Initialize number of entries
 nterm_G = 0;
@@ -428,17 +429,19 @@ for( iReg irow = 1; irow < nrows+1; irow++){
          gather_fullsys(nulrhs,irow_glo,mrow,irow_glo,nequ,nterm,mmax,iat,ja,IWN.data(),
                         coef_A,full_A.data(),rhs.data());
 
-         if (nulrhs == false){
+         if (nulrhs == false && mrow > 0){
 
             // If the rhs is not null
-            lapack_int info;
-            //info = LAPACKE_dpotrf(LAPACK_ROW_MAJOR,'U',mrow,full_A.data(),mmax);
-            info = LAPACKE_dpotrf(LAPACK_COL_MAJOR,'L',mrow,full_A.data(),mmax);
+            lapack_int info = LAPACKE_dpotrf(LAPACK_COL_MAJOR,'L',mrow,full_A.data(),mmax);
 
-	    // Backward and forward substitution
-	    rhs_sav = rhs;
-            //info = LAPACKE_dpotrs(LAPACK_ROW_MAJOR,'U',mrow,1,full_A.data(),mmax,rhs.data(),1);
-            info = LAPACKE_dpotrs(LAPACK_COL_MAJOR,'L',mrow,1,full_A.data(),mmax,rhs.data(),mrow);
+            if (info != 0) {
+               // Non-positive definite submatrix
+               thread_is_posdef = 0;
+            } else {
+               // Backward and forward substitution
+               rhs_sav = rhs;
+               info = LAPACKE_dpotrs(LAPACK_COL_MAJOR,'L',mrow,1,full_A.data(),mmax,rhs.data(),mrow);
+            }
 
          }
 
@@ -471,20 +474,25 @@ for( iReg irow = 1; irow < nrows+1; irow++){
    rExt scal_fac = coef_A[ind-1] - cpt_ddot(mrow,rhs_sav.data(),rhs.data());
 
    if (scal_fac < 0.){
-
-      // Recompute this row in safer way
-      bool nulrhs;
-      gather_fullsys(nulrhs,irow_glo,mrow,irow_glo,nequ,nterm,mmax,iat,ja,IWN.data(),
-                     coef_A,full_A.data(),rhs.data());
-      lapack_int info;
-      //info = LAPACKE_dpotrf(LAPACK_ROW_MAJOR,'U',mrow,full_A.data(),mmax);
-      info = LAPACKE_dpotrf(LAPACK_COL_MAJOR,'L',mrow,full_A.data(),mmax);
-      rhs_sav = rhs;
-      //info = LAPACKE_dpotrs(LAPACK_ROW_MAJOR,'U',mrow,1,full_A.data(),mmax,rhs.data(),1);
-      info = LAPACKE_dpotrs(LAPACK_COL_MAJOR,'L',mrow,1,full_A.data(),mmax,rhs.data(),mrow);
-      scal_fac = coef_A[ind-1] - cpt_ddot(mrow,rhs_sav.data(),rhs.data());
+      thread_is_posdef = 0;
+      if (mrow > 0) {
+         // Recompute this row in safer way
+         bool nulrhs;
+         gather_fullsys(nulrhs,irow_glo,mrow,irow_glo,nequ,nterm,mmax,iat,ja,IWN.data(),
+                        coef_A,full_A.data(),rhs.data());
+         lapack_int info = LAPACKE_dpotrf(LAPACK_COL_MAJOR,'L',mrow,full_A.data(),mmax);
+         if (info == 0) {
+            rhs_sav = rhs;
+            info = LAPACKE_dpotrs(LAPACK_COL_MAJOR,'L',mrow,1,full_A.data(),mmax,rhs.data(),mrow);
+            scal_fac = coef_A[ind-1] - cpt_ddot(mrow,rhs_sav.data(),rhs.data());
+         }
+      }
    }
 
+   if (scal_fac <= 0.) {
+      thread_is_posdef = 0;
+      scal_fac = 1.0;
+   }
    scal_fac = 1. / sqrt(scal_fac);
 
    // Get the beginning of G
@@ -511,6 +519,11 @@ for( iReg irow = 1; irow < nrows+1; irow++){
    nterm_G += (ind_G - ind_G0) + 1;
 
 } // end row loop
+
+if (thread_is_posdef == 0) {
+   #pragma omp atomic write
+   is_posdef = false;
+}
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // end omp for

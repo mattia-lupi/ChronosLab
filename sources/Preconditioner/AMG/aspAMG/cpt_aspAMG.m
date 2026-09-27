@@ -138,6 +138,15 @@ else
    if verb
       fprintf('END: Computing the smoother\n\n');
    end
+
+   % Check for non positive definiteness in the matrix and switch to NSY in case
+   if smootherOp.is_posdef == false && param.symm == true
+      if verb
+         fprintf('Matrix was deemed indefinite during fsai, switch to nonsymmetric treatment in the rest of amg');
+      end
+      param.symm = false;
+
+   end
    T_smoo = T_smoo + toc(time_start);
 
    %--------------------------------------------------------------------------------------
