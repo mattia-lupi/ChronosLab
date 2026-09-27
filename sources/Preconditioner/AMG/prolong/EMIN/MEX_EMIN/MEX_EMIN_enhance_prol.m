@@ -103,16 +103,8 @@ ja_patt   = int32(ja_patt) - 1;
                                nn,nn_C,ntv,nt_patt,fcnode,iat_A,ja_A,coef_A,...
                                iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV,verb);
 
-% Create a sparse matrices for Pout
-nt_Pout = size(ja_Pout,2);
-irow_Pout = zeros(nt_Pout,1);
-iend   = iat_Pout(1)-1;
-for i = 1:nn
-   istart = iend + 1;
-   iend = iat_Pout(i+1)-1;
-   irow_Pout(istart:iend) = i;
-end
-ja_Pout = double(ja_Pout);
-Pout = sparse(irow_Pout,ja_Pout,coef_Pout,nn,nn_C);
+% Create a sparse matrix for Pout (vectorized without loop)
+irow_Pout = repelem((1:nn)', diff(double(iat_Pout)));
+Pout = sparse(irow_Pout,double(ja_Pout),coef_Pout,nn,nn_C);
 
 return

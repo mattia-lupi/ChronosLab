@@ -202,11 +202,9 @@ if strcmpi(prol_emin,'SMOOTH')
    end
 end
 
-if verb
+if verb && strcmpi(prol_emin,'EMIN')
    fprintf('Computing initial energy\n');
-end
-energy = trace(P'*(A*P));
-if verb
+   energy = trace(P'*(A*P));
    fprintf('Energy before orthog: %e\n',energy);
 end
 
@@ -220,7 +218,7 @@ if strcmpi(prol_emin,'EMIN')
    % Compute a sparser Strength of connection before EMIN if needed
    coarsen2 = param.coarsen;
    coarsen2.tau = param.prolong.patt_tau;
-   coarsen2.tau = 0.01;
+   % coarsen2.tau = 0.01;
    coarsen2.SoC_type = 'DOM';
    [~,~,~,S_emin,~] = coarsen(coarsen2,A,smootherOp,TV,verb);
    if verb

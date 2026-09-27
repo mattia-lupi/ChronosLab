@@ -69,13 +69,14 @@ else
    % Use matrix A to increase connectivity
 
    % Find poorly connected nodes
-   [ii,jj,pp] = find(P_patt);
-   pp = 1;
+   [ii,~,~] = find(P_patt);
+   % pp = 1;
    nn_P = size(P_patt,1);
-   count = zeros(nn_P,1);
-   for i = 1:numel(ii)
-      count(ii(i)) = count(ii(i)) + 1;
-   end
+   count = accumarray(ii, 1, [nn_P, 1]);
+   % count = zeros(nn_P,1);
+   % for i = 1:numel(ii)
+   %    count(ii(i)) = count(ii(i)) + 1;
+   % end
    count(fcnode>0) = nnzr_min + 100;
    ind_poor = ones(size(count));
    ind_poor(count ==0) = 0;
