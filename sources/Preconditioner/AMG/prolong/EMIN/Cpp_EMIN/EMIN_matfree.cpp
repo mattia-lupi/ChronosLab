@@ -105,7 +105,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
       D_inv = (double*) malloc( nt_patt*sizeof(double) );
       double *scr = (double*) malloc( nn*sizeof(double) );
       if (D_inv == nullptr || scr == nullptr) return ierr = 3;
-      load_Jacobi(np,nn,nt_patt,ja_Tpatt,iat_A,ja_A,coef_A,scr,D_inv);
+      load_Jacobi(np,sol_type,nn,nt_patt,iat_patt,ja_Tpatt,iat_A,ja_A,coef_A,scr,D_inv);
       free(scr);
       nnz_J = nt_patt;
       end = std::chrono::system_clock::now();

@@ -37,6 +37,9 @@ void KP_spmat(const iReg nthreads, const iReg nrows_A, const iExt* iat_A,
          // Zero-out entries
          iReg nn_row = 0;
          iExt Cstop = iat_B[irow+1];
+
+         if (ind_C == Cstop) continue;
+
          for (iExt j = ind_C; j < Cstop; j++){
             iReg jcol = ja_B[j];
             coef_C[ind_C+nn_row] = ZERO;
