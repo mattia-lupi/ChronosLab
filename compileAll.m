@@ -16,6 +16,7 @@ list = { ...
 };
 
 home_dir = pwd;
+[~, base_folder] = fileparts(home_dir);
 
 % Ensures MATLAB returns to home_dir even on error or Ctrl+C
 cleanUpObj = onCleanup(@() cd(home_dir)); 
@@ -24,7 +25,8 @@ sys_arch = computer('arch');
 
 for idx = 1:length(list)
     folder = fullfile(home_dir, list{idx});
-    fprintf('Compiling MEX files in %s\n', folder);
+    display_folder = fullfile(base_folder, list{idx});
+    fprintf('Compiling MEX files in %s\n', display_folder);
     
     cd(folder);
     

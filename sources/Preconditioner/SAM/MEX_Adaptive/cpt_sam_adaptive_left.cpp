@@ -3,6 +3,7 @@
 #include <iostream>
 #include <numeric>
 #include <algorithm>
+#include "blas.h"
 #include "lapack.h"
 #include "cpt_sam_adaptive_left.h"
 #include "qr_functions.h"
@@ -14,15 +15,11 @@
 iReg checkCol = 80110;
 iReg checkLevel = 1;
 
-#if defined(_WIN32) || defined(_WIN64)
-   #define dormqr_ dormqr
-   #define dgeqrf_ dgeqrf
+#if !defined(MATLAB_MEX_FILE) && !defined(_WIN32) && !defined(_WIN64)
+   extern "C" {
+      double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
+   }
 #endif
-
-// BLAS Fortran routines declarations
-extern "C" {
-   double dnrm2_(const lapack_int* n, const double* x, const lapack_int* incx);
-}
 void print_matrix(const char* desc, iReg m, iReg n, double* mat, iReg lda);
 void print_matrix(const char* desc, iReg m, iReg n, iReg* mat, iReg lda);
 void print_vector(const char* desc, iReg n, double* vec);
@@ -58,7 +55,7 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
 
          // Compute column norms in parallel
          lapack_int one = 1;
-         double norm = dnrm2_(&size, &(coefkT[startCol]), &one);
+         double norm = dnrm2(&size, &(coefkT[startCol]), &one);
          colANorm[i] = norm * norm;
 
          // Compute column norms in parallel
@@ -107,14 +104,14 @@ void cpt_sam_adaptive_left(iExt *iatk, iReg *jak, double *coefk, double *coefkT,
    dormqr_(&side, &trans, &N, &one, &mxJ, &dummy, &N,
            &dummy, &dummy, &N, &work_query1, &lwork, &info, 1, 1);
    #else
-   dormqr_(&side, &trans, &N, &one, &mxJ, &dummy, &N,
-           &dummy, &dummy, &N, &work_query1, &lwork, &info);
+   dormqr(&side, &trans, &N, &one, &mxJ, &dummy, &N,
+          &dummy, &dummy, &N, &work_query1, &lwork, &info);
    #endif
    if (info != 0) {
       printf("Error in allocating workspace, error %d\n", static_cast<int>(info));
    }
 
-   dgeqrf_(&N, &mxJ, &dummy, &N, &dummy, &work_query, &lwork, &info);
+   dgeqrf(&N, &mxJ, &dummy, &N, &dummy, &work_query, &lwork, &info);
    if (info != 0) {
       printf("Error in allocating workspace, error %d\n", static_cast<int>(info));
    }

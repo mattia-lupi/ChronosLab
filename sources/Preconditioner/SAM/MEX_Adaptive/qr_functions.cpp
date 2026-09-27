@@ -1,17 +1,12 @@
 #include "qr_functions.h"
 #include <iostream>
 
-#if defined(_WIN32) || defined(_WIN64)
-   #define dormqr_ dormqr
-   #define dgeqrf_ dgeqrf
-   #define dtrtrs_ dtrtrs
-#endif
 
 void computeFirstQR(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *R, 
                     double *Rtriang, double *tau, double *work, lapack_int lwork, 
                     lapack_int &info){
    // Compute QR Factorization
-   dgeqrf_(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
+   dgeqrf(&sizeI, &sizeJ, Ahat, &sizeI, tau, work, &lwork, &info);
 
    if (info != 0){
       printf("Exit at first QR due to error %d\n", static_cast<int>(info));
@@ -34,8 +29,8 @@ void applyFirstQt(double *Ahat, lapack_int sizeI, lapack_int sizeJ, double *tau,
       dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
               Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info,1,1);
    #else
-      dormqr_(&side, &trans, &sizeI, &sizeJ, &sizeJ,
-              Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);
+      dormqr(&side, &trans, &sizeI, &sizeJ, &sizeJ,
+             Ahat, &sizeI, tau, a0k, &sizeI, work, &lwork, &info);
    #endif
    if (info != 0){
       printf("Exit at first Qt apply due to error %d\n", static_cast<int>(info));
@@ -55,8 +50,8 @@ void applyR(lapack_int sizeJ, double *R, double *a0k, lapack_int &info){
       dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, 
               R, &sizeJ, a0k, &sizeJ, &info,1,1,1); 
    #else
-      dtrtrs_(&uplo, &trans, &diag, &sizeJ, &nrhs, 
-              R, &sizeJ, a0k, &sizeJ, &info); 
+      dtrtrs(&uplo, &trans, &diag, &sizeJ, &nrhs, 
+             R, &sizeJ, a0k, &sizeJ, &info); 
    #endif
 
    if (info != 0) {
@@ -93,8 +88,8 @@ void applyQt(iReg t, const lapack_int* RESTRICT sizeJ,
          dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + ofA0k, 
                  &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info,1,1);
       #else
-         dormqr_(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + ofA0k, 
-                 &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
+         dormqr(&side, &trans, &nrows, &ncols, &nrefl, Ahat + qStart[i] + ofA0k, 
+                &LDA, tau + ofTau, a0k + ofA0k, &LDC, work, &lwork, &info);
       #endif
 
       if (info != 0){
@@ -135,7 +130,7 @@ void computeNewQR(iReg t, lapack_int *sizeI, lapack_int *sizeJ, lapack_int *qSta
    lapack_int startB = qStart[t];
    
    // Compute the new QR factorization
-   dgeqrf_(&rowSizeB2, &colSizeB2, Ahat + startB2, &rowSizeB,
+   dgeqrf(&rowSizeB2, &colSizeB2, Ahat + startB2, &rowSizeB,
           tau + oldSizeTau, work, &lwork, &info);
 
    if (info != 0){
