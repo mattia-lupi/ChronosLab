@@ -12,9 +12,11 @@ step_size       = param.step_size;
 epsilon         = param.epsilon;
 method          = param.method;
 
+
 % Init the outer smoother to void
 smootherOp.left_out = [];
 smootherOp.right_out = [];
+smootherOp.is_posdef = false;
 
 % Force use of non-symmetric FSAI if the problem is not symmetric
 if ~symm_flag && ~strcmpi(method,'jacobi')
@@ -28,9 +30,8 @@ switch lower(method)
         [F, is_posdef] = afsai_cpp(A,nthread,nstep,step_size,epsilon);
         if ~is_posdef
             if verb
-               fprintf('WARNING: Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
+               warning('Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
             end
-            smootherOp.is_posdef = false;
             % Fall back to non-symmetric AFSAI
             [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
             FAFT = @(x) FL*(A*(FU*x));
@@ -81,7 +82,6 @@ switch lower(method)
         if verb
            fprintf('Non-Symmetric AFSAI is used\n');
         end
-        smootherOp.is_posdef = false;
         % Set-up AFSAI_NSY (afsai for nsy systems with mex-cpp code)
         [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
         % Compute damping parameter
@@ -108,17 +108,13 @@ switch lower(method)
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
         % opts.issym = 1;
-        if true
-           lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
+        lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
                          'Tolerance',1.e-2,'Display',verb,'FailureTreatment','keep');
-           if verb
-              fprintf('Max Lambda: %10.4f\n',lambda);
-           end
-           omega = min(1,1.9 / lambda);
-        else
-           lambda = 2.0;
-           omega = 1.0;
+        if verb
+           fprintf('Max Lambda: %10.4f\n',lambda);
         end
+        omega = min(1,1.9 / lambda);
+        
         % Append the smoother
         smootherOp.left = F;
         smootherOp.right = F';
