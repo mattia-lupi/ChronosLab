@@ -61,8 +61,10 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
    if (sol_type == SPMAT){
       WNALL = (int*) malloc( (np*nn_C)*sizeof(int) );
       if (WNALL == nullptr) return ierr = 1;
-      WNALLA = (int*) malloc( (np*nn)*sizeof(int) );
-      if (WNALLA == nullptr) return ierr = 1;
+      if (prec_type == SGS){
+         WNALLA = (int*) malloc( (np*nn)*sizeof(int) );
+         if (WNALLA == nullptr) return ierr = 1;
+      }
    }
 
    // Init vec_DP to zero
@@ -142,25 +144,35 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       iter++;
 
       // Compute zvec
-      // 1 - Permute res from row-major to col-major
-      apply_perm(np,nn_K,iperm,res,vscr);
-      // 2 - Apply preconditioner to wscr: wscr <-- M_inv*vscr
-      if (prec_type == DIAG){
+      if (sol_type == SPMAT && prec_type == DIAG){
+         // In SPMAT mode, res is in row-major order. Since D_inv is loaded
+         // in row-major order, apply diagonal scaling directly without
+         // the two full-vector permutations (iperm and perm).
          #pragma omp parallel for num_threads(np)
-            for (int i = 0; i < nn_K; i++) wscr[i] = D_inv[i]*vscr[i];
-      } else if (prec_type == SGS){
-        // symmetric Gauss-Seidel U^-1 * D * L^-1 * vscr
-        // works in place
-        LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-        UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-        // TODO this can be removed ...
-        #pragma omp parallel for num_threads(np)
-          for (int i = 0; i < nn_K; i++) wscr[i] = vscr[i];
+         for (int i = 0; i < nn_K; i++) vscr[i] = D_inv[i]*res[i];
+         // Multiply by Q: zvec <-- (I - Q*QT)*vscr
+         Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
+      } else {
+         // 1 - Permute res from row-major to col-major
+         apply_perm(np,nn_K,iperm,res,vscr);
+         // 2 - Apply preconditioner to wscr: wscr <-- M_inv*vscr
+         if (prec_type == DIAG){
+            #pragma omp parallel for num_threads(np)
+               for (int i = 0; i < nn_K; i++) wscr[i] = D_inv[i]*vscr[i];
+         } else if (prec_type == SGS){
+           // symmetric Gauss-Seidel U^-1 * D * L^-1 * vscr
+           // works in place
+           LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
+           UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
+           // TODO this can be removed ...
+           #pragma omp parallel for num_threads(np)
+             for (int i = 0; i < nn_K; i++) wscr[i] = vscr[i];
+         }
+         // 3 - Permute wscr from col-major to row-major
+         apply_perm(np,nn_K,perm,wscr,vscr);
+         // 4 - Multiply by Q: zvec <-- (I - Q*QT)*vscr
+         Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
       }
-      // 3 - Permute wscr from col-major to row-major
-      apply_perm(np,nn_K,perm,wscr,vscr);
-      // 4 - Multiply by Q: zvec <-- (I - Q*QT)*vscr
-      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
 
       // Compute gamma <-- resT*zvec
       gamma = ddot_par(np,nn_K,res,zvec,ridv);
@@ -197,6 +209,12 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
 
       // Compute alpha
       alpha = ddot_par(np,nn_K,QKpvec,pvec,ridv);
+      if (alpha <= 0.0) {
+         if (verb) {
+            mexPrintf("Warning: Non-positive curvature alpha = %15.6e in DEFL_PCG_matfree, breaking.\n", alpha);
+         }
+         break;
+      }
       // Compute energy reduction
       DEk = gamma*gamma / alpha;
       alpha = gamma / alpha;
