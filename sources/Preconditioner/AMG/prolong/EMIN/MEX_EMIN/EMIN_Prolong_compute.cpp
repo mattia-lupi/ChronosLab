@@ -41,6 +41,7 @@ struct MallocGuard {
     void *ptr = nullptr;
     explicit MallocGuard(void *p) : ptr(p) {}
     ~MallocGuard() { if (ptr) free(ptr); }
+    void* release() { void* p = ptr; ptr = nullptr; return p; }
     MallocGuard(const MallocGuard&)            = delete;
     MallocGuard& operator=(const MallocGuard&) = delete;
 };
@@ -100,33 +101,34 @@ public:
         const TypedArray<int32_t> ja_patt_arr  = inputs[19];
         const TypedArray<double>  TVbuf_arr    = inputs[20];
 
-        std::vector<int32_t> fcnode_vec  (fcnode_arr.begin(),   fcnode_arr.end());
-        std::vector<int32_t> iat_A_vec   (iat_A_arr.begin(),    iat_A_arr.end());
-        std::vector<int32_t> ja_A_vec    (ja_A_arr.begin(),     ja_A_arr.end());
-        std::vector<double>  coef_A_vec  (coef_A_arr.begin(),   coef_A_arr.end());
-        std::vector<int32_t> iat_Pin_vec (iat_Pin_arr.begin(),  iat_Pin_arr.end());
-        std::vector<int32_t> ja_Pin_vec  (ja_Pin_arr.begin(),   ja_Pin_arr.end());
-        std::vector<double>  coef_Pin_vec(coef_Pin_arr.begin(), coef_Pin_arr.end());
-        std::vector<int32_t> iat_patt_vec(iat_patt_arr.begin(), iat_patt_arr.end());
-        std::vector<int32_t> ja_patt_vec (ja_patt_arr.begin(),  ja_patt_arr.end());
-        std::vector<double>  TVbuf_vec   (TVbuf_arr.begin(),    TVbuf_arr.end());
+        // Direct raw pointers to MATLAB data buffers — ZERO memory allocation and copying
+        const int32_t* fcnode_ptr   = (fcnode_arr.getNumberOfElements() > 0)   ? (&(*fcnode_arr.begin()))   : nullptr;
+        const int32_t* iat_A_ptr    = (iat_A_arr.getNumberOfElements() > 0)    ? (&(*iat_A_arr.begin()))    : nullptr;
+        const int32_t* ja_A_ptr     = (ja_A_arr.getNumberOfElements() > 0)     ? (&(*ja_A_arr.begin()))     : nullptr;
+        const double*  coef_A_ptr   = (coef_A_arr.getNumberOfElements() > 0)   ? (&(*coef_A_arr.begin()))   : nullptr;
+        const int32_t* iat_Pin_ptr  = (iat_Pin_arr.getNumberOfElements() > 0)  ? (&(*iat_Pin_arr.begin()))  : nullptr;
+        const int32_t* ja_Pin_ptr   = (ja_Pin_arr.getNumberOfElements() > 0)   ? (&(*ja_Pin_arr.begin()))   : nullptr;
+        const double*  coef_Pin_ptr = (coef_Pin_arr.getNumberOfElements() > 0) ? (&(*coef_Pin_arr.begin())) : nullptr;
+        const int32_t* iat_patt_ptr = (iat_patt_arr.getNumberOfElements() > 0) ? (&(*iat_patt_arr.begin())) : nullptr;
+        const int32_t* ja_patt_ptr  = (ja_patt_arr.getNumberOfElements() > 0)  ? (&(*ja_patt_arr.begin()))  : nullptr;
+        const double*  TVbuf_ptr    = (TVbuf_arr.getNumberOfElements() > 0)    ? (&(*TVbuf_arr.begin()))    : nullptr;
 
         // -----------------------------------------------------------------------
-        // Build the TV double** pointer array
+        // Build the TV const double** pointer array view into TVbuf
         // -----------------------------------------------------------------------
-        std::unique_ptr<double*, decltype(&free)> TV_owner(
-            static_cast<double**>(malloc(static_cast<std::size_t>(nn) * sizeof(double*))),
+        std::unique_ptr<const double*[], decltype(&free)> TV_owner(
+            static_cast<const double**>(malloc(static_cast<std::size_t>(nn) * sizeof(const double*))),
             &free);
 
         if (!TV_owner)
             throwError("EMIN_Prolong:allocError",
                        "Failed to allocate TV pointer array.");
 
-        double **TV = TV_owner.get();
+        const double **TV = TV_owner.get();
         {
             int offset = 0;
             for (int i = 0; i < nn; ++i) {
-                TV[i]   = TVbuf_vec.data() + offset;
+                TV[i]   = TVbuf_ptr + offset;
                 offset += ntv;
             }
         }
@@ -162,16 +164,15 @@ public:
 
         int ierr = EMIN_ImpProl(np, itmax, en_tol, condmax,
                                 prec, sol_type, nn, nn_C, ntv,
-                                nt_patt, fcnode_vec.data(),
-                                iat_A_vec.data(),    ja_A_vec.data(),   coef_A_vec.data(),
-                                iat_Pin_vec.data(),  ja_Pin_vec.data(), coef_Pin_vec.data(),
-                                iat_patt_vec.data(), ja_patt_vec.data(),
+                                nt_patt, fcnode_ptr,
+                                iat_A_ptr,    ja_A_ptr,   coef_A_ptr,
+                                iat_Pin_ptr,  ja_Pin_ptr, coef_Pin_ptr,
+                                iat_patt_ptr, ja_patt_ptr,
                                 TV,
                                 iat_Pout_raw, ja_Pout_raw, coef_Pout_raw,
                                 info,verb);
 
-        // TV_owner destructs here — free() called on the pointer array only;
-        // the rows were views into TVbuf_vec (stack-managed), not separately alloc'd.
+        // TV_owner destructs automatically
 
         MallocGuard g_iat (iat_Pout_raw);
         MallocGuard g_ja  (ja_Pout_raw);
@@ -189,34 +190,35 @@ public:
                        "EMIN_ImpProl returned error code: " + std::to_string(ierr));
 
         // -----------------------------------------------------------------------
-        // Pack results into MATLAB TypedArray output objects
+        // Pack results into MATLAB TypedArray output objects (zero-copy buffer transfer)
         // -----------------------------------------------------------------------
         if (dump) mprint("- Store Pout into the output arrays\n");
 
         const std::size_t n1      = static_cast<std::size_t>(nn + 1);
         const std::size_t nt_Pout = static_cast<std::size_t>(iat_Pout_raw[nn]);
 
-        // --- iat_Pout : int32, length nn+1, 0-based → 1-based ----------------
-        TypedArray<int32_t> iat_final = factory.createArray<int32_t>({1, n1});
-        {
-            auto it = iat_final.begin();
-            for (int k = 0; k <= nn; ++k, ++it)
-                *it = iat_Pout_raw[k] + 1;
-        }
+        // Convert 0-based to 1-based indexing in-place
+        #pragma omp parallel for num_threads(np)
+        for (int k = 0; k <= nn; ++k)
+            iat_Pout_raw[k] += 1;
 
-        // --- ja_Pout : int32, length nt_Pout, 0-based → 1-based --------------
-        TypedArray<int32_t> ja_final = factory.createArray<int32_t>({1, nt_Pout});
-        {
-            auto it = ja_final.begin();
-            for (std::size_t k = 0; k < nt_Pout; ++k, ++it)
-                *it = ja_Pout_raw[k] + 1;
-        }
+        #pragma omp parallel for num_threads(np)
+        for (std::size_t k = 0; k < nt_Pout; ++k)
+            ja_Pout_raw[k] += 1;
 
-        // --- coef_Pout : double, length nt_Pout ------------------------------
-        TypedArray<double> coef_final = factory.createArray<double>({1, nt_Pout});
-        std::copy(coef_Pout_raw, coef_Pout_raw + nt_Pout, coef_final.begin());
+        // Release pointers from guards and transfer ownership directly to MATLAB
+        g_iat.release();
+        g_ja.release();
+        g_coef.release();
 
-        // MallocGuards destruct here — iat/ja/coef_Pout_raw freed automatically
+        buffer_ptr_t<int32_t> iat_buf(iat_Pout_raw, [](int32_t* p) { if (p) free(p); });
+        TypedArray<int32_t> iat_final = factory.createArrayFromBuffer<int32_t>({1, n1}, std::move(iat_buf));
+
+        buffer_ptr_t<int32_t> ja_buf(ja_Pout_raw, [](int32_t* p) { if (p) free(p); });
+        TypedArray<int32_t> ja_final = factory.createArrayFromBuffer<int32_t>({1, nt_Pout}, std::move(ja_buf));
+
+        buffer_ptr_t<double> coef_buf(coef_Pout_raw, [](double* p) { if (p) free(p); });
+        TypedArray<double> coef_final = factory.createArrayFromBuffer<double>({1, nt_Pout}, std::move(coef_buf));
 
         TypedArray<double> info_out =
             factory.createArray<double>({1, static_cast<std::size_t>(EMIN_INFO_SZ)});
