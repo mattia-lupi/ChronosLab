@@ -12,12 +12,6 @@ function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V
        target = 'smallest';
     end
     
-    if ~iscell(P)
-        P = {P, []};
-    end
-    P1 = P{1};
-    P2 = P{2};
-    
     n = size(V0, 1);
     r = size(V0, 2);
     
@@ -25,34 +19,43 @@ function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V
         error('Starting block size must be >= nev.');
     end
     
+    % Setup matrix-vector operator
     if isa(A, 'function_handle')
         opA = A;
-        is_matrix_A = false;
     else
         opA = @(x) A * x;
-        is_matrix_A = true;
     end
     
-    if ~isempty(P1)
-        if isa(P1, 'function_handle')
-            opP1 = P1;
+    % Setup matrix-free preconditioner application
+    if isa(P, 'function_handle')
+        applyP = P;
+    elseif iscell(P)
+        if numel(P) >= 2 && ~isempty(P{1}) && ~isempty(P{2})
+            P1 = P{1};
+            P2 = P{2};
+            if isa(P1, 'function_handle') && isa(P2, 'function_handle')
+                applyP = @(x) P2(P1(x));
+            elseif isa(P1, 'function_handle')
+                applyP = @(x) P2 * P1(x);
+            elseif isa(P2, 'function_handle')
+                applyP = @(x) P2(P1 * x);
+            else
+                applyP = @(x) P2 * (P1 * x);
+            end
+        elseif numel(P) >= 1 && ~isempty(P{1})
+            P1 = P{1};
+            if isa(P1, 'function_handle')
+                applyP = P1;
+            else
+                applyP = @(x) P1 * x;
+            end
         else
-            dP1 = decomposition(P1);
-            opP1 = @(x) dP1 \ x;
+            applyP = @(x) x;
         end
+    elseif ~isempty(P)
+        applyP = @(x) P * x;
     else
-        opP1 = @(x) x;
-    end
-    
-    if ~isempty(P2)
-        if isa(P2, 'function_handle')
-            opP2 = P2;
-        else
-            dP2 = decomposition(P2);
-            opP2 = @(x) dP2 \ x;
-        end
-    else
-        opP2 = @(x) x;
+        applyP = @(x) x;
     end
     
     V = zeros(n, (max_iter + 1) * r);
@@ -62,29 +65,15 @@ function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V
     
     is_smallest = strcmpi(target, 'lowest') || strcmpi(target, 'smallest');
     
-    if is_smallest && is_matrix_A
-        dA = decomposition(A);
-    end
-    
     for iter = 1:max_iter
         idx = (iter-1)*r + 1 : iter*r;
         V_curr = V(:, idx);
         
-        if is_smallest
-            W = zeros(n, r);
-            if is_matrix_A
-                W = dA \ V_curr;
-            else
-                parfor col = 1:r
-                    [w_tmp, ~] = gmres(opA, V_curr(:, col), [], tol*1e-2, min(n, 100), P1, P2);
-                    W(:, col) = w_tmp;
-                end
-            end
-        else
-            W = opA(opP2(V_curr));
-            W = opP1(W);
-        end
+        % Matrix-free block Krylov step on preconditioned operator M^-1 * A
+        Av = opA(V_curr);
+        W = applyP(Av);
         
+        % Gram-Schmidt orthogonalization against previous blocks
         for i = 1:iter
             idx_i = (i-1)*r + 1 : i*r;
             Vi = V(:, idx_i);
@@ -102,17 +91,16 @@ function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V
         
         [Y, D_mat] = eig(H_curr);
         diagD = diag(D_mat);
-        [~, sort_idx] = sort(abs(diagD), 'descend');
+        if is_smallest
+            [~, sort_idx] = sort(abs(diagD), 'ascend');
+        else
+            [~, sort_idx] = sort(abs(diagD), 'descend');
+        end
         
         k = min(nev, curr_size);
         sel_idx = sort_idx(1:k);
         
-        if is_smallest
-            D = 1 ./ diagD(sel_idx);
-        else
-            D = diagD(sel_idx);
-        end
-        
+        D = diagD(sel_idx);
         Y_k = Y(:, sel_idx);
         X = V(:, 1:curr_size) * Y_k;
         
@@ -122,11 +110,7 @@ function [iter, D, X, res_norm_X, res_norm_D, flag] = block_arnoldi(A, nev, P, V
         for idx_k = 1:k
             x = X(:, idx_k);
             lam = D(idx_k);
-            if is_smallest
-                res_norm_X(idx_k) = norm(opA(x) - lam * x);
-            else
-                res_norm_X(idx_k) = norm(opP1(opA(opP2(x))) - lam * x);
-            end
+            res_norm_X(idx_k) = norm(applyP(opA(x)) - lam * x);
             y_last = Y_k(end-r+1:end, idx_k);
             res_norm_D(idx_k) = norm(H_next * y_last);
         end

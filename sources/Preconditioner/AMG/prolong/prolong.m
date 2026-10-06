@@ -192,11 +192,16 @@ if strcmpi(prol_emin,'SMOOTH')
    end
    DA = diag(diag(A))\A;
    lambda_max = eigs(DA,1,'lm','Tolerance',1.e-3,'FailureTreatment','keep');
-   omega = 1.9 / lambda_max;
-   if verb
-      fprintf('Max eigenvalue and omega: %10.2f %10.2f\n',lambda_max,omega);
+   abs_lam = abs(lambda_max);
+   if abs_lam > 0
+      omega = 1.9 / abs_lam;
+   else
+      omega = 1.0;
    end
-   P = P - omega*DA*P;
+   if verb
+      fprintf('Max eigenvalue |lambda| and omega: %10.2f %10.2f\n',abs_lam,omega);
+   end
+   P = real(P - omega*DA*P);
    if verb
       fprintf('Smoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
    end

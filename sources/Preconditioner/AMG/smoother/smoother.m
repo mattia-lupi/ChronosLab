@@ -93,10 +93,12 @@ switch lower(method)
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
         end
-        omega = min(1,1.9 / lambda);
+        omega = min(1,1.9 / abs(lambda));
         % Append the smoother
         smootherOp.left = FL;
         smootherOp.right = FU;
+        smootherOp.left_T = FL';
+        smootherOp.right_T = FU';
         smootherOp.omega = omega;
         smootherOp.lambda = lambda;
 

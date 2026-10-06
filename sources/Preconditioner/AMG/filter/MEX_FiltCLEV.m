@@ -15,7 +15,9 @@ if patt_min_flag
    end
    % Create minimal pattern
    Patt_min = P'*A0*PI;
-   Patt_min=0.5*(Patt_min+Patt_min');
+   if norm(A - A', 'fro') / max(norm(A, 'fro'), eps) < 1e-14
+      Patt_min = 0.5*(Patt_min+Patt_min');
+   end
    Patt_min(Patt_min~=0) = 1;
    Patt_min = Patt_min - speye(nc);
 else

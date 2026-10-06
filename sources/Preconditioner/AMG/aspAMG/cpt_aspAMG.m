@@ -285,7 +285,7 @@ else
    if level > 1
       AMG_hrc.A = A; clear A;
    end
-   AMG_hrc.P = P; clear P;
+   AMG_hrc.P = Pf; clear P;
    AMG_hrc.Pf = Pf; clear Pf;
    AMG_hrc.S = S; clear S;
    AMG_hrc.S_patt = S_patt; clear S_patt;
@@ -295,8 +295,17 @@ else
    AMG_hrc.Snnz = nnz(smootherOp.right) + nnz(smootherOp.left);
    AMG_hrc.nupre = param.smoother.nupre;
    AMG_hrc.nupost = param.smoother.nupost;
-   AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
-   AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
+   if param.symm
+      AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
+      AMG_hrc.Minv2 = AMG_hrc.Minv1;
+   else
+      AMG_hrc.Minv1 = @(x) smootherOp.omega*(smootherOp.right*(smootherOp.left*x));
+      if isfield(smootherOp, 'left_T') && isfield(smootherOp, 'right_T')
+         AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.left_T*(smootherOp.right_T*x));
+      else
+         AMG_hrc.Minv2 = @(x) smootherOp.omega*(smootherOp.left'*(smootherOp.right'*x));
+      end
+   end
 
    %--------------------------------------------------------------------------------------
 
