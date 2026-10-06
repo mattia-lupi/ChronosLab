@@ -1,5 +1,6 @@
 
 #include "maxVol_inner.h"
+#include <vector>
 
 //----------------------------------------------------------------------------------------
 
@@ -28,8 +29,10 @@ void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r
 
    iReg irow, jcol;
    rExt zij_max;
-   rExt vcol[n];
-   rExt vrow[r];
+   std::vector<rExt> vcol_vec(n);
+   rExt *vcol = vcol_vec.data();
+   std::vector<rExt> vrow_vec(r);
+   rExt *vrow = vrow_vec.data();
 
    // Init the number of iterations
    iReg iter = 0;

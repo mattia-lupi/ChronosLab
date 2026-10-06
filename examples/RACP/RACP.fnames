@@ -5,5 +5,5 @@ parm_COARSEN
 parm_PROLONG
 parm_FILTER
 parm_GENERAL
-racp.mat
+../matrices/racp.mat
 

@@ -5,7 +5,7 @@
 
 // Sorts an array x1 in such a way that x1(i) <= x1(i+1) 
 template <typename Tx, typename Tn>
-void heapsort(Tx* __restrict__ x1, const Tn n){
+void heapsort(Tx* x1, const Tn n){
 
    for (Tn node = 2; node < n+1; node ++){
       Tn i = node;
@@ -49,4 +49,4 @@ void heapsort(Tx* __restrict__ x1, const Tn n){
 //----------------------------------------------------------------------------------------
 
 // Instantiate template
-template void heapsort<int,int>(int* __restrict__ x1, const int n);
+template void heapsort<int,int>(int* x1, const int n);

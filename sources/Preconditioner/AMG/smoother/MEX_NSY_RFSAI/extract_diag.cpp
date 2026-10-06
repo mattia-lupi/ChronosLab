@@ -1,8 +1,10 @@
 #include <iostream>
 #include "extract_diag.h"
+#include <cstdlib>
+#include <omp.h>
 
 void extract_diag(const int nrows, const int *const iat, const int *const ja,
-                  const double *const coef, double *&diag){
+                  const double *const coef, double *&diag, const int num_threads){
 
    // Allocate output
    diag = (double*) malloc(nrows * sizeof(double));
@@ -11,25 +13,19 @@ void extract_diag(const int nrows, const int *const iat, const int *const ja,
       std::cout << "Allocation Error in extract_diag" << std::endl;
       return;
    }
-   
+
    // Loop over matrix rows
-   int iend = iat[0];
-   for ( int i = 0; i < nrows; i++ ){
-      int istart = iend;
-      iend = iat[i+1];
-      int jcol = ja[istart];
-      if (jcol == i) {
-         diag[i] = coef[istart];
-         continue;
-      }
-      diag[i] = 0.0;
-      while (istart < iend-1){
-         jcol = ja[++istart];
-         if (jcol == i) {
-            diag[i] = coef[istart];
+   #pragma omp parallel for schedule(static) num_threads(num_threads)
+   for (int i = 0; i < nrows; i++){
+      double d = 0.0;
+      int istart = iat[i];
+      int iend = iat[i+1];
+      for (int j = istart; j < iend; j++){
+         if (ja[j] == i){
+            d = coef[j];
             break;
          }
       }
+      diag[i] = d;
    }
-
 }

@@ -1,41 +1,76 @@
-void merge_row_patt(const int len_1, const int *const ja_1, const double *const coef_1,
-                    const int len_2, const int *const ja_2,  const double *const coef_2,
-                    int &len_out, int *ja_out, double *coef_out){
+#include "merge_row_patt.h"
 
-   int i = 0;
-   int j = 0;
-   int k = 0;
-   while ( (i < len_1) && (j < len_2)){
-      if (ja_1[i] < ja_2[j]){
-         ja_out[k]   = ja_1[i];
-         coef_out[k] = coef_1[i];
-         k++;
-         i++;
-      } else if (ja_1[i] == ja_2[j]){
-         ja_out[k]   = ja_1[i];
-         coef_out[k] = coef_1[i];
-         k++;
-         i++;
-         j++;
+int count_merged_row_patt(const int len_1, const int *const ja_1,
+                          const int len_2, const int *const ja_2){
+   int ind_1 = 0;
+   int ind_2 = 0;
+   int len = 0;
+
+   while (ind_1 < len_1 && ind_2 < len_2){
+      if (ja_1[ind_1] < ja_2[ind_2]){
+         len++;
+         ind_1++;
+      } else if (ja_2[ind_2] < ja_1[ind_1]){
+         len++;
+         ind_2++;
       } else {
-         ja_out[k]   = ja_2[j];
-         coef_out[k] = 0.0;
-         k++;
-         j++;
+         len++;
+         ind_1++;
+         ind_2++;
       }
    }
-   while (i < len_1){
-      ja_out[k] = ja_1[i];
-      coef_out[k] = coef_1[i];
-      k++;
-      i++;
+   while (ind_1 < len_1){
+      len++;
+      ind_1++;
    }
-   while(j < len_2){
-      ja_out[k] = ja_2[j];
-      coef_out[k] = 0.0;
-      k++;
-      j++;
+   while (ind_2 < len_2){
+      len++;
+      ind_2++;
    }
-   len_out = k;
+   return len;
+}
 
+void merge_row_patt(const int len_1, const int *const ja_1, const double *const coef_1,
+                    const int len_2, const int *const ja_2,  const double *const coef_2,
+                    int &len_3, int *const ja_3, double *const coef_3){
+   (void)coef_2;
+   int ind_1 = 0;
+   int ind_2 = 0;
+   int ind_3 = 0;
+
+   while (ind_1 < len_1 && ind_2 < len_2){
+      if (ja_1[ind_1] < ja_2[ind_2]){
+         ja_3[ind_3] = ja_1[ind_1];
+         coef_3[ind_3] = coef_1[ind_1];
+         ind_1++;
+         ind_3++;
+      } else if (ja_2[ind_2] < ja_1[ind_1]){
+         ja_3[ind_3] = ja_2[ind_2];
+         coef_3[ind_3] = 0.0;
+         ind_2++;
+         ind_3++;
+      } else {
+         ja_3[ind_3] = ja_1[ind_1];
+         coef_3[ind_3] = coef_1[ind_1];
+         ind_1++;
+         ind_2++;
+         ind_3++;
+      }
+   }
+
+   while (ind_1 < len_1){
+      ja_3[ind_3] = ja_1[ind_1];
+      coef_3[ind_3] = coef_1[ind_1];
+      ind_1++;
+      ind_3++;
+   }
+
+   while (ind_2 < len_2){
+      ja_3[ind_3] = ja_2[ind_2];
+      coef_3[ind_3] = 0.0;
+      ind_2++;
+      ind_3++;
+   }
+
+   len_3 = ind_3;
 }

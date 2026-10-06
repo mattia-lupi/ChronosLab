@@ -1,0 +1,7 @@
+20                    % nthread
+1                     % nupre
+1                     % nupost
+15                    % nstep
+1                     % step_size
+1.e-3                 % epsilon
+AFSAI_SYM             % method (JACOBI, AFSAI_SYM, AFSAI_NSY)

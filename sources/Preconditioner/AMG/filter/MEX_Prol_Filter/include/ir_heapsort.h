@@ -17,6 +17,14 @@ typedef double rExt;
 #include "swapi.h"
 #include "swapr.h"
 
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+
 /**
  * @brief Sorts an integer array x1 in such a way that x1(i) <= x1(i+1). 
  *        and a real array x2 in the same way.
@@ -24,5 +32,5 @@ typedef double rExt;
  * @param [inout] x2 array of reals to be sorted.
  * @param [in] n number of components of x1.
  */
-void ir_heapsort(iReg* __restrict__ x1, rExt* __restrict__ x2, const iReg n);
+void ir_heapsort(iReg* RESTRICT x1, rExt* RESTRICT x2, const iReg n);
 

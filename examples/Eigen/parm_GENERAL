@@ -1,0 +1,9 @@
+false       % ascii_input [true, false]
+FSAI         % Preconditioner [FSAI, AMG]
+LANCZOS      % Method [LOBPCG, SRQCG, DEFL_SRQCG, LANCZOS, BLOCK_ARNOLDI]
+6           % Number of eigenvalues
+true        % Exit tolerace checked on eigenvalues [true, false]
+500         % Max number of iterations
+1e-6        % Exit tolerance
+largest     % largest or smallest eigenvalues
+

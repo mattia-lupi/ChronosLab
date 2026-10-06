@@ -1,7 +1,8 @@
 #include "omp.h"
+#include "ddot_par.h"
 
-double ddot_par(const int np, const int nn, const double* __restrict__ x,
-                const double* __restrict__ y, double* __restrict__ reduc){
+double ddot_par(const int np, const int nn, const double* RESTRICT x,
+                const double* RESTRICT y, double* RESTRICT reduc){
 
    #pragma omp parallel num_threads(np)
    {

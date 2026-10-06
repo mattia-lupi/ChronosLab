@@ -1,0 +1,5 @@
+10                      % np   (# of threads)
+170.0                   % weight     (prolongation filter)
+0.1                     % tol        (prolongation filter)
+0.000                   % tau        (coarse operator filter)
+0                       % min_patt   (coarse operator filter)

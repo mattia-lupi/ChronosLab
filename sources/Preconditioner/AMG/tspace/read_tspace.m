@@ -13,10 +13,12 @@ switch lower(method)
    case 'none'
    case 'smoothing'
    case 'srqcg'
+   case 'lobpcg'
    case 'lanczos'
    case 'ng-srqcg'
    case 'ng-lanczos'
    case 'arnoldi'
+   case 'block_arnoldi'
    otherwise
      error('Not existing method');
 end

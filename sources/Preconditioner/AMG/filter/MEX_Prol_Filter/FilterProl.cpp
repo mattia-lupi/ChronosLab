@@ -78,7 +78,6 @@ int FilterProl(const int nthreads, const double perc, const double tol,
       // Store iat_scr, ja_scr and coef_scr in the filtered matrix
       istart_PF = ridv_i[myid];
       shift = firstrow;
-      istart_scr;
       iend_scr = iat_scr[0];
       for (int irow = 0; irow < nrows; irow++){
          iat_PF[shift+irow] = istart_PF;

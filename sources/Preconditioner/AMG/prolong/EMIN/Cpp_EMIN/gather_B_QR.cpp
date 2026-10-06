@@ -96,9 +96,9 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
          v2 = (double*) malloc(NRMAX*sizeof(double));
          v3 = (double*) malloc(NRMAX*sizeof(double));
          char filename[100];
-         sprintf(filename, "LOGGO_%02d",mythid);
+         snprintf(filename, sizeof(filename), "LOGGO_%02d", mythid);
          log = fopen(filename,"w");
-         sprintf(filename, "RANDRES_%02d",mythid);
+         snprintf(filename, sizeof(filename), "RANDRES_%02d", mythid);
          reslog = fopen(filename,"w");
       }
       //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

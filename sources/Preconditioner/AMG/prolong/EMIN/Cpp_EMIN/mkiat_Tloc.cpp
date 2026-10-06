@@ -5,7 +5,7 @@
 
 // Each thread computes the pointers to the beginning of each row of its part of the matrix
 void mkiat_Tloc (const int nrows, const int nthreads, const int firstrow,
-                 int** __restrict__ WI, int* __restrict__ iat_T, int& nnz){
+                 int** RESTRICT WI, int* RESTRICT iat_T, int& nnz){
 
    // Perform reduction
    for ( int i = 0; i < nrows; i++ ) {

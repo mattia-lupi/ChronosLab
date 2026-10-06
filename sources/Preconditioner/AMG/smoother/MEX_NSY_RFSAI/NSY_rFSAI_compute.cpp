@@ -5,44 +5,16 @@
 //
 // MATLAB signature:
 //   [iat_FL, ja_FL, coef_FL, iat_FU, ja_FU, coef_FU] = ...
-//       NSY_rFSAI_compute(nstep, step_size, epsilon, nn_A, iat_A, ja_A, coef_A)
+//       NSY_rFSAI_compute(nstep, step_size, epsilon, nn_A, iat_A, ja_A, coef_A, num_threads)
 //
-// Build command (compile.m):
-//   See compile.m — ensure -R2018a is on its OWN line (see compile.m fix notes)
-//
-// FIXES APPLIED (vs previous version — all found by Clang on R2025b/macOS)
-// -----------------------------------------------------------------------
-// [FIX-A] mexPrintf() is NOT declared when using the pure C++ MEX API
-//         (mex.hpp does not pull in mex.h).  Replaced with a helper
-//         mprint() that routes through getEngine()->feval(u"fprintf").
-//
-// [FIX-B] TypedArray<T>::operator[] returns a PROXY object
-//         (ArrayElementTypedRef<T>), NOT a real reference.  Taking its
-//         address (&arr[0]) is ill-formed.  Fixed by copying input arrays
-//         into std::vector<T> and passing vec.data() to the kernel.
-//         This is the only correct way to get a raw pointer from a
-//         TypedArray in the C++ MEX API.
-//
-// [FIX-C] ArgumentList (MexIORange) has size() and operator[] defined as
-//         NON-const member functions, so validateArguments() cannot take
-//         its arguments as  const ArgumentList&.  Changed to non-const
-//         references  (ArgumentList&).
-//
-// [FIX-D] compile.m had '-R2018a' placed AFTER '...' on the same line:
-//              '-lmwlapack', ... '-R2018a',...
-//         In MATLAB, everything after '...' on the same physical line is
-//         silently ignored — so -R2018a was never passed to mex, meaning
-//         the interleaved complex ABI was never enabled.  Fixed in
-//         compile.m (see companion file).
-// -----------------------------------------------------------------------
-//----------------------------------------------------------------------------------------
-
 #if defined PRINT
     static constexpr bool dump = true;
 #else
     static constexpr bool dump = false;
 #endif
 
+#include <cstdint>
+#include <omp.h>
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "Compute_nsy_rfsai.h"
@@ -76,12 +48,6 @@ class MexFunction : public matlab::mex::Function {
 
     ArrayFactory factory;
 
-    //------------------------------------------------------------------------------------
-    // [FIX-A] mexPrintf is not declared in the pure C++ MEX API.
-    //         Route diagnostic output through MATLAB's fprintf instead.
-    // [FIX-E] createScalar<T> only accepts arithmetic types.
-    //         Use createCharArray() for std::string arguments.
-    //------------------------------------------------------------------------------------
     void mprint(const std::string& msg)
     {
         getEngine()->feval(u"fprintf", 0,
@@ -92,14 +58,12 @@ public:
 
     void operator()(ArgumentList outputs, ArgumentList inputs) override
     {
-        // [FIX-C] validateArguments takes non-const refs — ArgumentList
-        //         methods (size, operator[]) are not const-qualified
         validateArguments(outputs, inputs);
 
         if (dump) mprint("*** NSY_rFSAI_compute (C++ MEX API) ***\n");
 
         // -----------------------------------------------------------------------
-        // Read input scalars
+        // Read input
         // -----------------------------------------------------------------------
         if (dump) mprint("- Get input scalars\n");
 
@@ -107,20 +71,21 @@ public:
         const TypedArray<double> s1 = inputs[1];
         const TypedArray<double> s2 = inputs[2];
         const TypedArray<double> s3 = inputs[3];
+        const TypedArray<double> s7 = inputs[7];
 
         const int    nstep     = static_cast<int>(s0[0]);
         const int    step_size = static_cast<int>(s1[0]);
         const double epsilon   = static_cast<double>(s2[0]);
         const int    nn_A      = static_cast<int>(s3[0]);
+        const int num_threads = std::max(1,static_cast<int>(s7[0]));
 
-        // -----------------------------------------------------------------------
-        // [FIX-B] TypedArray<T>::operator[] returns a PROXY, not a real ref.
-        //         You cannot take its address.  The correct pattern is to copy
-        //         into a std::vector<T> and hand vec.data() to the C kernel.
-        //         Cost: one allocation + memcpy per input array — unavoidable
-        //         when bridging the MATLAB Data API to a raw-pointer C kernel.
-        // -----------------------------------------------------------------------
-        if (dump) mprint("- Get input arrays\n");
+        // Configure OpenMP runtime thread count
+        omp_set_num_threads(num_threads);
+
+        if (dump) {
+            mprint("- Threads configured: " + std::to_string(num_threads) + "\n");
+            mprint("- Get input arrays\n");
+        }
 
         const TypedArray<int32_t> iat_A_arr  = inputs[4];
         const TypedArray<int32_t> ja_A_arr   = inputs[5];
@@ -135,7 +100,7 @@ public:
         double  *coef_A = coef_A_vec.data();
 
         // -----------------------------------------------------------------------
-        // Call the C computational kernel
+        // Call the C++ computational kernel
         // -----------------------------------------------------------------------
         if (dump) mprint("- Compute FL and FU entries\n");
 
@@ -147,7 +112,8 @@ public:
                        nstep, step_size, epsilon, nn_A,
                        iat_A, ja_A, coef_A,
                        iat_FL_raw, ja_FL_raw,  coef_FL_raw,
-                       iat_FU_raw, ja_FU_raw,  coef_FU_raw);
+                       iat_FU_raw, ja_FU_raw,  coef_FU_raw,
+                       num_threads);
 
         // Guard every kernel-allocated pointer immediately
         MallocGuard g_iat_FL (iat_FL_raw);
@@ -177,7 +143,7 @@ public:
         const std::size_t nt_FL = static_cast<std::size_t>(iat_FL_raw[nn_A]);
         const std::size_t nt_FU = static_cast<std::size_t>(iat_FU_raw[nn_A]);
 
-        // --- iat_FL : int32, length nn_A+1, 0-based → 1-based ----------------
+        // --- iat_FL : int32, length nn_A+1, 0-based -> 1-based ----------------
         TypedArray<int32_t> iat_FL_out = factory.createArray<int32_t>({1, n1});
         {
             auto it = iat_FL_out.begin();
@@ -185,7 +151,7 @@ public:
                 *it = iat_FL_raw[k] + 1;
         }
 
-        // --- ja_FL : int32, length nt_FL, 0-based → 1-based ------------------
+        // --- ja_FL : int32, length nt_FL, 0-based -> 1-based ------------------
         TypedArray<int32_t> ja_FL_out = factory.createArray<int32_t>({1, nt_FL});
         {
             auto it = ja_FL_out.begin();
@@ -197,7 +163,7 @@ public:
         TypedArray<double> coef_FL_out = factory.createArray<double>({1, nt_FL});
         std::copy(coef_FL_raw, coef_FL_raw + nt_FL, coef_FL_out.begin());
 
-        // --- iat_FU : int32, length nn_A+1, 0-based → 1-based ----------------
+        // --- iat_FU : int32, length nn_A+1, 0-based -> 1-based ----------------
         TypedArray<int32_t> iat_FU_out = factory.createArray<int32_t>({1, n1});
         {
             auto it = iat_FU_out.begin();
@@ -205,7 +171,7 @@ public:
                 *it = iat_FU_raw[k] + 1;
         }
 
-        // --- ja_FU : int32, length nt_FU, 0-based → 1-based ------------------
+        // --- ja_FU : int32, length nt_FU, 0-based -> 1-based ------------------
         TypedArray<int32_t> ja_FU_out = factory.createArray<int32_t>({1, nt_FU});
         {
             auto it = ja_FU_out.begin();
@@ -234,15 +200,11 @@ public:
 
 private:
 
-    //------------------------------------------------------------------------------------
-    // [FIX-C] ArgumentList::size() and operator[] are NOT const-qualified in
-    //         MexIORange — parameters must be non-const references
-    //------------------------------------------------------------------------------------
     void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
     {
-        if (inputs.size() != 7)
+        if (inputs.size() != 8)
             throwError("NSY_rFSAI:badInputCount",
-                       "Expected 7 input arguments, got " +
+                       "Expected 8 input arguments, got " +
                        std::to_string(inputs.size()) + ".");
 
         if (outputs.size() != 6)
@@ -269,10 +231,13 @@ private:
         if (inputs[6].getType() != ArrayType::DOUBLE)
             throwError("NSY_rFSAI:badArray",
                        "Input argument 7 must be a double array.");
+
+        if (inputs[7].getType() != ArrayType::DOUBLE ||
+            inputs[7].getNumberOfElements() != 1)
+            throwError("NSY_rFSAI:badScalar",
+                  "Input argument 8 must be a real double scalar.");
     }
 
-    // [FIX-E] createScalar<T> is restricted to arithmetic types.
-    //         createCharArray() is the correct factory method for strings.
     void throwError(const std::string& id, const std::string& msg)
     {
         getEngine()->feval(u"error", 0,

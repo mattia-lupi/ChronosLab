@@ -1,0 +1,16 @@
+6             % ntv
+20            % itmax
+1.e-3         % tol
+NONE          % method
+5             % Init approx (only for SRQCG and LANCZOS ): 0 --> exact, 1 --> diag inv, k --> k sweeps Jacobi
+
+
+Available Methods:
+
+NONE             % 
+SRQCG            % Simultaneous Rayleigh Quotient (A V = lambda M V)
+NG-SRQCG         % Non-Gen Simultaneous Rayleigh Quotient (A V = lambda V)
+ARNOLDI          % Arnoldi (A V = lambda V)
+LANCZOS          % Lanczos (A V = lambda V)
+NG-LANCZOS       % Non-Gen Lanczos (A V = lambda V)
+SMOOTHING        % Simple smoothing of the test space (power method on (I - M A)

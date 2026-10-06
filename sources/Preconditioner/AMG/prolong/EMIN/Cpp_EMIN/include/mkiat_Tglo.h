@@ -13,6 +13,14 @@
 
 #pragma once
 
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+
 /**
  * @brief Computes the global iat_T and update WI pointers.
  * @param [in] current thread ID.
@@ -24,5 +32,5 @@
  * @param [inout] nnz number of non-zeros for each thread.
  */
 void mkiat_Tglo (const int myid, const int nrows, const int nthreads,
-                 const int firstrow, int** __restrict__ WI,
-                 const int* __restrict__  nnz, int* __restrict__ iat_T);
+                 const int firstrow, int** RESTRICT WI,
+                 const int* RESTRICT  nnz, int* RESTRICT iat_T);

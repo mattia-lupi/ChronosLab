@@ -17,5 +17,5 @@ typedef int iReg;
 /**
  * @brief Swaps 2 integer variables.
  */
-inline void swapi(iReg & __restrict__ i1, iReg & __restrict__ i2){iReg tmp = i1; i1 = i2; i2 = tmp;}
+inline void swapi(iReg & i1, iReg & i2){iReg tmp = i1; i1 = i2; i2 = tmp;}
 

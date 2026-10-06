@@ -17,5 +17,5 @@ typedef double rExt;
 /**
  * @brief Swaps 2 real variables.
  */
-inline void swapr(rExt & __restrict__ i1, rExt & __restrict__ i2){rExt tmp = i1; i1 = i2; i2 = tmp;}
+inline void swapr(rExt & i1, rExt & i2){rExt tmp = i1; i1 = i2; i2 = tmp;}
 

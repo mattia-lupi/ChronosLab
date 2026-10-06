@@ -4,7 +4,8 @@ clear;
 %clc;
 %close all;
 
-rand('state',0);
+% Modern random state initialization (rand('state',0) is deprecated)
+rng(0);
 RCM_flag = false;
 
 fprintf('EXECUTION BEGIN\n\n');
@@ -43,10 +44,14 @@ param.prolong = read_prolong(file_PROLONG);
 param.filter = read_filter(file_FILTER);
 
 % Read general parameters
-[ascii_input,precond,method,neig,reslambda_check,itmax,tol] = read_eig(file_GENERAL);
+[ascii_input,precond,method,neig,reslambda_check,itmax,tol,largest_flag] = read_eig(file_GENERAL);
 
-% Set flag for symmetric matrices
-param.symm = true;
+% Get largest or lowest flag
+if strcmpi(largest_flag,'largest')
+   largest_flag = true;
+else
+   largest_flag = false;
+end
 
 % Input matrix, rhs and test space
 if ascii_input
@@ -64,7 +69,7 @@ if ascii_input
    % Read the initial test space
    TV0 = dlmread(file_TV0,'',1,0);
 
-   if strcmp(lower(rhs_build),'rhs_in')
+   if strcmpi(rhs_build,'rhs_in')
       rhs = load(file_RHS);
    end
 
@@ -78,11 +83,15 @@ else
    A(A==1) = lmax/10;
    %%%%%%%%%%%%%
 
-   if ~exist('rhs') && strcmp(lower(rhs_build),'rhs_in')
+   if ~exist('rhs','var') && strcmpi(rhs_build,'rhs_in')
       err_msg = 'Missing the expected right-hand side';
    end
 
 end
+
+% Set flag for symmetry
+symm_flag = (norm(A-A','fro')/norm(A,'f')<1e-14);
+param.symm = symm_flag;
 
 fprintf('END INPUT\n\n');
 
@@ -124,7 +133,7 @@ fprintf('BEGIN: Preconditioner computation\n');
 t_init = tic;
 switch lower(precond)
    case 'fsai'
-      FSAI_prec = smoother(A, param.smoother);
+      FSAI_prec = smoother(A, symm_flag, param.smoother, true);
       PREC_apply = @(x) FSAI_prec.right*(FSAI_prec.left*x);
    case 'amg'
       % Compute the AMG hierarchy
@@ -135,16 +144,15 @@ T_prec = toc(t_init);
 fprintf('END: Preconditioner computation\n\n');
 %-----------------------------------------------------------------------------------------
 
-%lmin = 5.1760e+03;
-%MAT = @(x) PREC_apply(A*x);
-%[V,D] = eigs(MAT,size(A,1),20,'sr','Display',1,'tolerance',1.e-8,'Failuretreatment','keep');
-%Minv = PREC_apply(eye(size(A)));
-%AA = Minv*(A-lmin*eye(size(A)));
-
 tic;
 fprintf('BEGIN: Eigenvalue computation\n');
 switch lower(method)
     case 'srqcg'
+      
+      if largest_flag
+         fprintf("\nThis function works only for the smallest eigenvalues\n");
+         return;
+      end
 
       fprintf('BEGIN: Eigenvalue with SRQCG\n');
       V0 = rand(size(A,1),neig);
@@ -155,6 +163,11 @@ switch lower(method)
       tot_iter = iter*neig;
 
     case 'defl_srqcg'
+
+      if largest_flag
+         fprintf("\nThis function works only for the smallest eigenvalues\n");
+         return;
+      end
 
       fprintf('BEGIN: Eigenvalue with Deflated SRQCG\n');
       V0 = rand(size(A,1),neig);
@@ -175,24 +188,27 @@ switch lower(method)
 
     case 'lanczos'
 
-      global count;
       global tot_iter;
-      count = 0;
       tot_iter = 0;
+      V0 = rand(size(A,1),neig);
+      ProdMat = @(x) A*x;
       fprintf('BEGIN: Eigenvalue with LANCZOS\n');
       % Define application of the inverse
-      Ainv = @(x) SolvePCG(A,PREC_apply,x,1000,1.e-8);
-      [eigV,eigS] = eigs(Ainv,size(A,1),neig,'lm','Display',1);
-      eigS = diag(eigS);
+      [iter, eigS, eigV, resnorm_vec, lambda_vec, resid] = ...
+                                    Lanczos(A, V0, itmax, tol, largest_flag);
       fprintf('END: Eigenvalue with LANCZOS\n\n');
-      iter = count;
+      tot_iter = iter*neig;
 
     case 'lobpcg'
 
-      largest_flag = false;
       restartControl = 7;
       prodA = @(x) A*x;
       prodB = [];
+      if largest_flag
+         prodM = @(x) x;
+      else
+         prodM = PREC_apply;
+      end
       fprintf('BEGIN: Eigenvalue with LOBPCG\n');
       if isfile('DEFL_SPACE.mat')
          load DEFL_SPACE;
@@ -204,11 +220,27 @@ switch lower(method)
 
       % Define application of the inverse
       [iter,eigS,eigV,resnorm_vec,lambda_vec,ierr] =...
-             lobpcg(prodA,prodB,PREC_apply,YY,X0,largest_flag,...
+             lobpcg(prodA,prodB,prodM,YY,X0,largest_flag,...
                     reslambda_check,itmax,tol,restartControl);
       fprintf('END: Eigenvalue with LOBPCG\n\n');
       tot_iter = iter*neig;
 
+   case 'block_arnoldi'
+
+      prodB = [];
+      if largest_flag
+         prodM = @(x) x;
+      else
+         prodM = PREC_apply;
+      end
+      fprintf('BEGIN: Eigenvalue with Block Arnoldi\n');
+      X0 = rand(size(A,1),neig);
+
+      % Define application of the inverse
+      [iter, eigS, eigV, resnorm_vec, lambda_vec, ierr] = ...
+               block_arnoldi(A, neig, prodM, X0, largest_flag, itmax, tol);
+      fprintf('END: Eigenvalue with Block Arnoldi\n\n');
+      tot_iter = iter*neig;
 end
 fprintf('END: Eigenvalue computation\n');
 T_iter = toc;
@@ -229,7 +261,7 @@ fprintf('EigenSolver time:    %10.2f\n',T_iter);
 
 fprintf('\n');
 for i = 1:neig
-    fprintf('Eigenvalue (%d): %12.6f\n', i, eigS(i,1));
+    fprintf('Eigenvalue (%d): %12.6g\n', i, eigS(i,1));
 end
 
 if(isfile('DEFL_SPACE.mat'))
@@ -277,7 +309,7 @@ for i = 1:neig
 end
 
 % Print report on EMIN
-if strcmp(upper(param.prolong.prol_emin),'MEX_EMIN');
+if strcmp(upper(param.prolong.prol_emin),'MEX_EMIN')
    prt_EMIN_Repo(AMG_prec);
 end
 

@@ -5,7 +5,7 @@
 
 // Sorts an integer array x1 in such a way that x1(i) <= x1(i+1)
 // and a real array in the same way
-void ir_heapsort(iReg* __restrict__ x1, rExt* __restrict__ x2, const iReg n){
+void ir_heapsort(iReg* RESTRICT x1, rExt* RESTRICT x2, const iReg n){
 
    for (iReg node = 2; node < n+1; node ++){
       iReg i = node;

@@ -5,7 +5,7 @@
 
 // Sorts an array x1 in such a way that x1(i) <= x1(i+1)
 template <typename Tx, typename Tn>
-void heapsort(Tx* __restrict__ x1, const Tn n){
+void heapsort(Tx* x1, const Tn n){
 
    for (Tn node = 1; node < n; node ++){
       Tn i = node;
@@ -50,14 +50,14 @@ void heapsort(Tx* __restrict__ x1, const Tn n){
 
 // Instantiate template
 #if !IREG_LONG==IEXT_LONG
-   template void heapsort<iReg,iReg>(iReg* __restrict__ x1, const iReg n);
-   template void heapsort<iExt,iReg>(iExt* __restrict__ x1, const iReg n);
-   template void heapsort<rExt,iReg>(rExt* __restrict__ x1, const iReg n);
-   template void heapsort<iReg,iExt>(iReg* __restrict__ x1, const iExt n);
+   template void heapsort<iReg,iReg>(iReg* x1, const iReg n);
+   template void heapsort<iExt,iReg>(iExt* x1, const iReg n);
+   template void heapsort<rExt,iReg>(rExt* x1, const iReg n);
+   template void heapsort<iReg,iExt>(iReg* x1, const iExt n);
 #endif
 #if IREG_LONG & IEXT_LONG & IGLO_LONG
-   template void heapsort<type_MPI_iReg,type_MPI_iReg>(type_MPI_iReg* __restrict__ x1,
+   template void heapsort<type_MPI_iReg,type_MPI_iReg>(type_MPI_iReg* x1,
                                                        const type_MPI_iReg n);
 #endif
-template void heapsort<iExt,iExt>(iExt* __restrict__ x1, const iExt n);
-template void heapsort<rExt,iExt>(rExt* __restrict__ x1, const iExt n);
+template void heapsort<iExt,iExt>(iExt* x1, const iExt n);
+template void heapsort<rExt,iExt>(rExt* x1, const iExt n);

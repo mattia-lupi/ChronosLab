@@ -1,9 +1,11 @@
-void spmatv_blk(const int np, const int nblk, const int* __restrict__ pt_blk,
-                const int* __restrict__ iat, const int* __restrict__ ja,
-                const double* __restrict__ coef, const double* __restrict__ v_in,
-                double* __restrict__ v_out){
+#include "spmatv_blk.h"
 
-   #pragma omp parallel for num_threads(np)
+void spmatv_blk(const int np, const int nblk, const int* RESTRICT pt_blk,
+                const int* RESTRICT iat, const int* RESTRICT ja,
+                const double* RESTRICT coef, const double* RESTRICT v_in,
+                double* RESTRICT v_out){
+
+   #pragma omp parallel for num_threads(np) 
    for (int i = 0; i < pt_blk[nblk]; i++) v_out[i] = 0.0;
 
    #pragma omp parallel for num_threads(np)

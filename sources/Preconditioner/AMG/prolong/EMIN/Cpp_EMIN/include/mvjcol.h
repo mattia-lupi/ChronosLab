@@ -1,3 +1,11 @@
-void mvjcol( const int firstrow, const int nrows, const int* __restrict__ iat,
-             const int* __restrict__ ja, int* __restrict__ ja_T, int* __restrict__ punt,
-             int* __restrict__ perm);
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+
+void mvjcol( const int firstrow, const int nrows, const int* RESTRICT iat,
+             const int* RESTRICT ja, int* RESTRICT ja_T, int* RESTRICT punt,
+             int* RESTRICT perm);

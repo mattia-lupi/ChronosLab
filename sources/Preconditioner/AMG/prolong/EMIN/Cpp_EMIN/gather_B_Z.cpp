@@ -7,6 +7,7 @@
 #include <stdio.h>
 //////////////////////////////////
 #include "gather_f.h"
+#include <vector>
 
 /*****************************************************************************************
  *
@@ -37,13 +38,15 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
    int ierr = 0;
 
    // Pointer to the part of Z entries belonging to each thread
-   int pt_THpart[np+1];
+   std::vector<int> THpart_vec(np+1);
+   int *pt_THpart = THpart_vec.data();
    // Pointer to the part of Z columns belonging to each thread
-   int pt_THcol[np+1];
+   std::vector<int> THcol_vec(np+1);
+   int *pt_THcol = THcol_vec.data();
 
    // Compute the number of entries in Z and max block size
    int nrmax_blk = 0;
-   #pragma omp parallel num_threads(np) reduction(max:nrmax_blk)
+   #pragma omp parallel num_threads(np)
    {
       // Get thread ID and column partition
       int mythid = omp_get_thread_num();
@@ -71,7 +74,10 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
             nc += lenc;
             nt += len*lenc;
          }
-         nrmax_blk = std::max(nrmax_blk,len);
+          #pragma omp critical
+         {
+             nrmax_blk = std::max(nrmax_blk, len);
+         }
       }
       pt_THpart[mythid+1] = nt;
       pt_THcol[mythid+1] = nc;

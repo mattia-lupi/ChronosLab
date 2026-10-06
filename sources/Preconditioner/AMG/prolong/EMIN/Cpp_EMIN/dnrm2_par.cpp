@@ -1,8 +1,9 @@
 #include <cmath>
 #include "omp.h"
+#include "dnrm2_par.h"
 
-double dnrm2_par(const int np, const int nn, const double* __restrict__ x,
-                 double* __restrict__ reduc){
+double dnrm2_par(const int np, const int nn, const double* RESTRICT x,
+                 double* RESTRICT reduc){
 
    #pragma omp parallel num_threads(np)
    {

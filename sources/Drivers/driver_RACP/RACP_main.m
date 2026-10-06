@@ -27,14 +27,23 @@ DEBINFO.coarsen.draw_dist = false;
 
 % Read names of the input files
 fileIN = fopen('RACP.fnames','r');
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_AMG     = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_SMOOTH  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_TSPACE  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_COARSEN = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_PROLONG = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_FILTER  = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_GENERAL = D{1};
-C = textscan(fgetl(fileIN),'%s'); D = C{1}; file_BIN     = D{1};
+rawNames = textscan(fileIN, '%s', 'Delimiter', '\n');
+
+fnames = rawNames{1};
+
+% Helper to normalize slashes for the current OS (Windows '\', Unix '/')
+normalizePath = @(p) strrep(strrep(strtrim(p), '/', filesep), '\', filesep);
+
+% Assign and normalize each path
+file_AMG     = normalizePath(fnames{1});
+file_SMOOTH  = normalizePath(fnames{2});
+file_TSPACE  = normalizePath(fnames{3});
+file_COARSEN = normalizePath(fnames{4});
+file_PROLONG = normalizePath(fnames{5});
+file_FILTER  = normalizePath(fnames{6});
+file_GENERAL = normalizePath(fnames{7});
+file_BIN     = normalizePath(fnames{8});
+
 fclose(fileIN);
 
 % Read parameters for the AMG hierarchy
@@ -247,7 +256,12 @@ else
    % Compute augmented 11 block
    param.symm = sym_flag;
    inv_D22 = -inv(diag(diag(A22_aug)));
-   ADD = A12_scaled*inv_D22*A21_scaled; ADD = 0.5*(ADD+ADD');
+   ADD = A12_scaled*inv_D22*A21_scaled; 
+
+   % Symmetrise strongly if the matrix is supposed to be symmetric
+   if sym_flag == 1
+      ADD = 0.5*(ADD+ADD');
+   end
    A11_aug = A11_scaled+ADD;
 
 end
@@ -262,7 +276,7 @@ switch lower(solv_method)
 
         % Solve the system by SQMR
         fprintf('BEGIN: System solution by GMRES_CJ\n');
-        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
+        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,A21_scaled,inv_D22,x);
         [sol_scaled,flag,relres,iter,resvec] = gmres_RIGHT(A_scaled,rhs_scaled,restart,tol,itmax/restart,M);
         fprintf('END: System solution by GMRES_CJ\n\n');
 
@@ -271,7 +285,7 @@ switch lower(solv_method)
         % Solve the system by SQMR
         fprintf('BEGIN: System solution by SQMR\n');
         Afun = @(x) A_scaled*x;
-        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,inv_D22,x);
+        M = @(x) apply_RevAug(AMG_prec,A11_aug,A12_scaled,A21_scaled,inv_D22,x);
         IDfun = @(x) x;
         [sol_scaled,flag,relres,iter,resvec] = SQMR(Afun,rhs_scaled,tol,itmax,M,IDfun);
         fprintf('END: System solution by SQMR\n\n');

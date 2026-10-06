@@ -1,5 +1,6 @@
 
 #include "get_cond.h"
+#include <vector>
 
 //----------------------------------------------------------------------------------------
 
@@ -9,7 +10,8 @@ void get_cond(const rExt condmax, const iReg n, const iReg m, rExt **A,
               iReg &rank, rExt &cond){
 
    iReg maxrank = std::min(n,m);
-   rExt wrot[m];
+   std::vector<rExt> wrot_vec(m);
+   rExt *wrot = wrot_vec.data();
 
    // Set the initial guess for the rank
    rank = 1;

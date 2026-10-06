@@ -7,10 +7,18 @@
 #include "ri_sortsplit_nsy.h"
 #include "heapsort.h"
 
+#if defined(_MSC_VER)
+    #define RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT
+#endif
+
 // Compute the gradient of the Kaporin Number
 void KapGrad_NSY(const int istep, const int irow, int& mrow, const int jendbloc,
-                 const int lfil, const int* __restrict__ iat, const int* __restrict__ ja,
-                 const double* __restrict__ coef, const double* __restrict__ coef_T,
-                 const double* __restrict__ sol_L, const double* __restrict__ sol_U,
-                 int* __restrict__ IWN, int* __restrict__ JWN,
-                 double* __restrict__ WR_L, double* __restrict__ WR_U);
+                 const int lfil, const int* RESTRICT iat, const int* RESTRICT ja,
+                 const double* RESTRICT coef, const double* RESTRICT coef_T,
+                 const double* RESTRICT sol_L, const double* RESTRICT sol_U,
+                 int* RESTRICT IWN, int* RESTRICT JWN,
+                 double* RESTRICT WR_L, double* RESTRICT WR_U);

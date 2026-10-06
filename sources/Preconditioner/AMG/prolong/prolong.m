@@ -71,7 +71,7 @@ if ~two_stg_prol
                fcnode(fcnode==0) = -(1:nf);
                clist = find(fcnode>0);
                % Recompute prolongation
-               [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
+               [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV,verb);
                if verb
                   fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
                end
@@ -106,7 +106,7 @@ else
    % Two stage prolongation
    switch upper(param.prolong.proltype)
       case 'BAMG'
-         [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV);
+         [P,c_mark] = cpt_ProlMEX_BAMG(level,param.prolong,nc,fcnode,S,TV,verb);
          if verb
             fprintf('Number of nodes that are not perfectly interpolated: %d\n',sum(c_mark));
          end

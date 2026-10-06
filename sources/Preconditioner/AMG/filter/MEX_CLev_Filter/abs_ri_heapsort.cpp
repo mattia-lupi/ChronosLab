@@ -5,7 +5,7 @@
 
 // Sorts an integer array x1 in such a way that x1(i) <= x1(i+1)
 // and a real array in the same way
-void abs_ri_heapsort(double* __restrict__ x1, int* __restrict__ x2, const int n){
+void abs_ri_heapsort(double* RESTRICT x1, int* RESTRICT x2, const int n){
 
    for (int node = 2; node < n+1; node ++){
       int i = node;
