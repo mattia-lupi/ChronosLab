@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include <math.h> // to use: sqrt
+#include <cmath> // to use: sqrt
 
 #include "precision.h" // to use: iReg, rExt
 

@@ -6,6 +6,7 @@
 #include "inl_blas1.h"
 #include <iostream>
 #include <stdio.h>
+#include <cmath>
 //////////////////////////////////
 
 #include "DebEnv.h"

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <vector>
+#include <cstdlib>
 
 #include "parm_EMIN.h"
 #include "mult_K_matfree.h"
@@ -109,15 +111,28 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    int const m = 50;
 
    // Krylov basis: (m+1) vectors of size nn_K
-   double *V = (double*) aligned_alloc(64, (m+1)*nn_K*sizeof(double));
+   double *V = (double*) malloc((m+1)*nn_K*sizeof(double));
    
    // Hessenberg matrix: (m+1) x m
-   double *H = (double*) aligned_alloc(64, (m+1)*m*sizeof(double));
+   double *H = (double*) malloc((m+1)*m*sizeof(double));
    
    // Givens + RHS
    double *cs = (double*) malloc(m*sizeof(double));
    double *sn = (double*) malloc(m*sizeof(double));
    double *g  = (double*) malloc((m+1)*sizeof(double));
+
+   if (V == nullptr || H == nullptr || cs == nullptr || sn == nullptr || g == nullptr) {
+      if (V) free(V);
+      if (H) free(H);
+      if (cs) free(cs);
+      if (sn) free(sn);
+      if (g) free(g);
+      free(v_ntv);
+      free(rhs); free(res); free(vscr); free(wscr);
+      free(zvec); free(pvec); free(QKpvec); free(ridv);
+      free(WNALL); free(WNALLA);
+      return ierr = 1;
+   }
    
    // Access macros
    #define VEC(j) (&V[(j)*nn_K])
@@ -131,7 +146,8 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    double beta = dnrm2_par(np,nn_K,res,ridv);
 
    init_energy = beta * beta;
-   double Eold, DE0, DEk;
+   double Eold = init_energy, DE0 = 0.0, DEk = 0.0;
+   if (beta <= 0.0) exit_test = true;
 
    #if COMP_ENRG
    if(verb){
@@ -143,10 +159,12 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    #endif
 
    // v0 = r / ||r||
-   #pragma omp parallel for num_threads(np)
-   for (int i = 0; i < nn_K; i++) {
-      VEC(0)[i] = res[i] / beta;
-   };
+   if (beta > 0.0) {
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < nn_K; i++) {
+         VEC(0)[i] = res[i] / beta;
+      }
+   }
 
    // initialize g
    for (int i = 0; i < m+1; i++) {
@@ -238,10 +256,10 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          double const resid = std::abs(g[j+1]);
 
          double const E = resid * resid;
-         DEk = E - Eold;
+         DEk = std::abs(Eold - E);
 
          if (iter == 1) {
-            DE0 = DEk;
+            DE0 = (DEk > 0.0) ? DEk : 1.0;
             if(verb){
                std::cout << std::setw(4)  << "iter"
                          << std::setw(15) << "Energy"
@@ -250,7 +268,8 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
             }
          }
 
-         double const dDE = DEk/DE0;
+         double const dDE = (DE0 > 0.0) ? (DEk/DE0) : 0.0;
+         Eold = E;
 
          if(verb){
             std::cout << std::setw(4)  << iter
@@ -260,13 +279,13 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          }
 
          // Check convergence
-         exit_test = (iter == itmax) || (dDE < energy_tol);
+         exit_test = (iter >= itmax) || (dDE < energy_tol) || (resid < 1e-15);
       }
 
       int const inner_iter = j;
 
       // Backsolve H y = g
-      double y[inner_iter];
+      std::vector<double> y(std::max(1, inner_iter), 0.0);
 
       for (int i = inner_iter-1; i >= 0; i--){
          y[i] = g[i];
@@ -311,6 +330,8 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          vec_DP[i] += wscr[i];
       }
 
+      if (exit_test) break;
+
       // restart: recompute residual + beta
       // Compute K * x
       if (sol_type == MATFREE){
@@ -331,6 +352,11 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
       }
 
       beta = dnrm2_par(np,nn_K,res,ridv);
+
+      if (beta <= 0.0) {
+         exit_test = true;
+         break;
+      }
 
       #pragma omp parallel for num_threads(np)
       for (int i = 0; i < nn_K; i++) {
