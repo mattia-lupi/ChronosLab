@@ -43,6 +43,9 @@ if verb
    fprintf('END: Initializing initial test space\n');
 end
 
+% If symmetric assume positive definite until proven otherwise
+param.isPosDef = param.symm;
+
 AMG_hrc = REC_cpt_aspAMG(level,param,A,TV,verb);
 
 GB_AMG = whos('AMG_hrc').bytes/(1024^3);
@@ -86,6 +89,7 @@ n = size(A,1);
 % Compute operator max eigenvalue
 lmax_A = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',10);
 AMG_hrc.lmax_A = lmax_A;
+AMG_hrc.isPosDef = param.isPosDef;
 
 % Print operator info
 if verb
@@ -137,6 +141,14 @@ else
    smootherOp = smoother(A, param.symm, param.smoother,verb);
    if verb
       fprintf('END: Computing the smoother\n\n');
+   end
+
+   % Check for non positive definiteness in the matrix and switch to NSY in case
+   if smootherOp.is_posdef == false && param.symm == true
+      warning('Matrix was deemed indefinite during fsai, switch to nonsymmetric treatment in the rest of amg');
+      param.symm = false;
+      param.isPosDef = false;
+      AMG_hrc.isPosDef = false;
    end
    T_smoo = T_smoo + toc(time_start);
 
