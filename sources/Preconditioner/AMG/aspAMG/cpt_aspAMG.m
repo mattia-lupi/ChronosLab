@@ -144,7 +144,7 @@ else
    end
 
    % Check for non positive definiteness in the matrix and switch to NSY in case
-   if smootherOp.is_posdef == false && param.symm == true
+   if smootherOp.is_posdef == false && param.symm == true && ~strcmpi(param.smoother.method,'jacobi')
       warning('Matrix was deemed indefinite during fsai, switch to nonsymmetric treatment in the rest of amg');
       param.symm = false;
       param.isPosDef = false;
