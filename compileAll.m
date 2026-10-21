@@ -23,6 +23,11 @@ cleanUpObj = onCleanup(@() cd(home_dir));
 
 sys_arch = computer('arch');
 
+if strcmp(sys_arch, 'maca64')
+    addpath(fullfile(home_dir, 'sources', 'utils'));
+    [omp_inc, omp_lib] = findOpenMPMacOs();
+end
+
 for idx = 1:length(list)
     folder = fullfile(home_dir, list{idx});
     display_folder = fullfile(base_folder, list{idx});
@@ -34,7 +39,7 @@ for idx = 1:length(list)
         case 'win64'
             compileWin;
         case 'maca64'
-            compileMac;
+            compileMac(omp_inc, omp_lib);
         case 'glnxa64'
             compile;
         otherwise
