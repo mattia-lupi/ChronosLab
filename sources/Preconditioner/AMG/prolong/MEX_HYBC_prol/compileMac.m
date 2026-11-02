@@ -1,16 +1,18 @@
-% Get Homebrew Paths
-[status, cmdout] = system('/opt/homebrew/bin/brew --prefix libomp');
-if status ~= 0
-    error('Error: Could not find libomp via Homebrew. Make sure it is installed.');
-end
-basePath = strtrim(cmdout);
-omp_inc = ['-I' fullfile(basePath, 'include')];
-
-% Define the STATIC Library Path
-% We link against libomp.a directly to embed it and hide it from MATLAB.
-omp_static = fullfile(basePath, 'lib', 'libomp.a');
-if ~isfile(omp_static)
-    error('Static library libomp.a not found at %s.', omp_static);
+function compileMac(omp_inc, omp_lib)
+if nargin < 2 || isempty(omp_inc) || isempty(omp_lib)
+    if exist('findOpenMPMacOs', 'file') ~= 2
+        this_dir = fileparts(mfilename('fullpath'));
+        curr = this_dir;
+        while ~isempty(curr) && ~isfile(fullfile(curr, 'compileAll.m'))
+            parent = fileparts(curr);
+            if strcmp(parent, curr), break; end
+            curr = parent;
+        end
+        if isfile(fullfile(curr, 'compileAll.m'))
+            addpath(fullfile(curr, 'sources', 'utils'));
+        end
+    end
+    [omp_inc, omp_lib] = findOpenMPMacOs();
 end
 
 % Determine host macOS deployment target
@@ -35,4 +37,5 @@ mex('-silent', ...
     'ir_heapsort.cpp', ...
     'find_bad_FS.cpp', ...
     'find_dist2CC.cpp', ...
-    omp_static);
+    omp_lib);
+end
