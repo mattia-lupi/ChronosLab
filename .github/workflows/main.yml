@@ -18,10 +18,16 @@ jobs:
         include:
           - os: ubuntu-latest
             display_name: Linux (Ubuntu Latest, GCC 11)
+            compiler: gcc
           - os: windows-latest
             display_name: Windows (Windows 2022, MSVC 2022)
+            compiler: msvc
+          - os: windows-latest
+            display_name: Windows (MinGW-w64, Latest)
+            compiler: mingw
           - os: macos-latest
             display_name: macOS (Apple Silicon, Apple Clang)
+            compiler: clang
 
     runs-on: ${{ matrix.os }}
 
@@ -44,16 +50,34 @@ jobs:
           gcc --version
           g++ --version
 
+      - name: Set up MinGW-w64 (Windows)
+        if: matrix.compiler == 'mingw'
+        uses: egor-tensin/setup-mingw@v3
+        with:
+          platform: x64
+          cc: 0
+
+      - name: Locate MinGW for MATLAB
+        if: matrix.compiler == 'mingw'
+        shell: pwsh
+        run: |
+          $compilerRoot = Split-Path (Split-Path (Get-Command g++.exe).Source)
+          "MW_MINGW64_LOC=$compilerRoot" >> $env:GITHUB_ENV
+
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v3
 
       - name: Compile MEX and run test algorithms
         uses: matlab-actions/run-command@v3
         env:
+          CHRONOS_COMPILER: ${{ matrix.compiler }}
           KMP_DUPLICATE_LIB_OK: "TRUE"
         with:
           command: |
             try
+                if strcmp(getenv('CHRONOS_COMPILER'), 'mingw')
+                    mex(['-setup:' fullfile(matlabroot, 'bin', 'win64', 'mexopts', 'mingw64_g++.xml')], 'C++');
+                end
                 initChronos;
                 compileAll;
 
