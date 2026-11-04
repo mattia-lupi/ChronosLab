@@ -43,13 +43,15 @@ function win_cfg = findCompilerWindows(silent)
     if is_mingw
         compiler_type = 'mingw';
         % For MinGW-w64 (GCC), OpenMP uses -fopenmp.
-        % Link statically against libgcc, libstdc++, and libgomp to avoid runtime
-        % DLL version conflicts with MATLAB's bundled libraries.
-        % (Do NOT use global '-static' because that prevents dynamic linking).
+        % Link statically against libgcc, libstdc++, libgomp, and libwinpthread to avoid runtime
+        % DLL dependencies (libgomp-1.dll, libstdc++-6.dll) when MinGW's bin directory is not on Windows PATH.
+        % Note: Static libraries must be passed via LINKLIBS so they appear AFTER the
+        % object files on the linker command line, ensuring undefined symbols from the object files
+        % are resolved from the static archives rather than dynamic DLLs.
         omp_cflags = '-fopenmp';
-        omp_lflags = '-fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic';
+        omp_lflags = '-static-libgcc -static-libstdc++';
         cxx14_flags = '-std=c++14 -include stdint.h';
-        extra_libs = {};
+        extra_libs = {'LINKLIBS=$LINKLIBS -Wl,-Bstatic -lstdc++ -lgomp -lpthread -Wl,-Bdynamic'};
 
         % MinGW requires the explicit path to libmwblas and libmwlapack libraries
         % to avoid "MEX cannot find library 'mwblas'" when using -l shorthand.
