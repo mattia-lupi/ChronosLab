@@ -1,5 +1,5 @@
 function win_cfg = findCompilerWindows(silent)
-% FINDCOMPILERWINDOWS Resolves C/C++ compiler and OpenMP settings for Windows.
+% FINDCOMPILERWINDOWS Resolves C/C++ compiler and OpenMP/BLAS settings for Windows.
 %
 %   win_cfg = findCompilerWindows()
 %   win_cfg = findCompilerWindows(silent)
@@ -9,6 +9,8 @@ function win_cfg = findCompilerWindows(silent)
 %   win_cfg.omp_cflags: OpenMP compiler flag
 %   win_cfg.omp_lflags: OpenMP linker flag
 %   win_cfg.cxx14_flags: C++14/standards flags
+%   win_cfg.blas_lib: full path or flag for mwblas
+%   win_cfg.lapack_lib: full path or flag for mwlapack
 %   win_cfg.extra_libs: cell array of extra libraries to link (e.g. {omp_lib} for MSVC)
 
     if nargin < 1
@@ -43,17 +45,30 @@ function win_cfg = findCompilerWindows(silent)
         % For MinGW-w64 (GCC), OpenMP uses -fopenmp.
         % Link statically against libgcc, libstdc++, and libgomp to avoid runtime
         % DLL version conflicts with MATLAB's bundled libraries.
-        % Note: Do NOT use global '-static' because that prevents linking against
-        % MATLAB's dynamic import libraries (mwblas, mwlapack, mex, mx).
-        mingw_libdir = fullfile(matlabroot, 'extern', 'lib', arch, 'mingw64');
+        % (Do NOT use global '-static' because that prevents dynamic linking).
         omp_cflags = '-fopenmp';
-        if isfolder(mingw_libdir)
-            omp_lflags = sprintf('-L"%s" -fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic', mingw_libdir);
-        else
-            omp_lflags = '-fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic';
-        end
+        omp_lflags = '-fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic';
         cxx14_flags = '-std=c++14';
         extra_libs = {};
+
+        % MinGW requires the explicit path to libmwblas and libmwlapack libraries
+        % to avoid "MEX cannot find library 'mwblas'" when using -l shorthand.
+        mingw_libdir = fullfile(matlabroot, 'extern', 'lib', arch, 'mingw64');
+        msvc_libdir  = fullfile(matlabroot, 'extern', 'lib', arch, 'microsoft');
+
+        if isfile(fullfile(mingw_libdir, 'libmwblas.lib'))
+            blas_lib = fullfile(mingw_libdir, 'libmwblas.lib');
+            lapack_lib = fullfile(mingw_libdir, 'libmwlapack.lib');
+        elseif isfile(fullfile(mingw_libdir, 'libmwblas.a'))
+            blas_lib = fullfile(mingw_libdir, 'libmwblas.a');
+            lapack_lib = fullfile(mingw_libdir, 'libmwlapack.a');
+        elseif isfile(fullfile(msvc_libdir, 'libmwblas.lib'))
+            blas_lib = fullfile(msvc_libdir, 'libmwblas.lib');
+            lapack_lib = fullfile(msvc_libdir, 'libmwlapack.lib');
+        else
+            blas_lib = '-lmwblas';
+            lapack_lib = '-lmwlapack';
+        end
     else
         % Default to MSVC
         compiler_type = 'msvc';
@@ -65,20 +80,26 @@ function win_cfg = findCompilerWindows(silent)
         omp_lflags = '/NODEFAULTLIB:libomp.lib /NODEFAULTLIB:vcomp.lib';
         cxx14_flags = '/std:c++14';
         extra_libs = {omp_lib};
+        blas_lib = '-lmwblas';
+        lapack_lib = '-lmwlapack';
     end
 
     win_cfg.compiler = compiler_type;
     win_cfg.omp_cflags = omp_cflags;
     win_cfg.omp_lflags = omp_lflags;
     win_cfg.cxx14_flags = cxx14_flags;
+    win_cfg.blas_lib = blas_lib;
+    win_cfg.lapack_lib = lapack_lib;
     win_cfg.extra_libs = extra_libs;
 
     if ~silent
         fprintf('[Windows Compiler] Detected %s (%s)\n', win_cfg.compiler, compiler_name);
         fprintf('                   omp_cflags: %s\n', win_cfg.omp_cflags);
         fprintf('                   omp_lflags: %s\n', win_cfg.omp_lflags);
+        fprintf('                   BLAS:       %s\n', win_cfg.blas_lib);
+        fprintf('                   LAPACK:     %s\n', win_cfg.lapack_lib);
         if ~isempty(win_cfg.extra_libs)
-            fprintf('                   Extra Lib: %s\n', win_cfg.extra_libs{1});
+            fprintf('                   Extra Lib:  %s\n', win_cfg.extra_libs{1});
         end
     end
 end
