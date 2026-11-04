@@ -41,11 +41,17 @@ function win_cfg = findCompilerWindows(silent)
     if is_mingw
         compiler_type = 'mingw';
         % For MinGW-w64 (GCC), OpenMP uses -fopenmp.
-        % Link statically against libgomp, libgcc, and libstdc++:
-        % -static -static-libgcc -static-libstdc++ avoids DLL runtime conflicts
-        % with MATLAB's bundled OpenMP/C++ runtimes.
+        % Link statically against libgcc, libstdc++, and libgomp to avoid runtime
+        % DLL version conflicts with MATLAB's bundled libraries.
+        % Note: Do NOT use global '-static' because that prevents linking against
+        % MATLAB's dynamic import libraries (mwblas, mwlapack, mex, mx).
+        mingw_libdir = fullfile(matlabroot, 'extern', 'lib', arch, 'mingw64');
         omp_cflags = '-fopenmp';
-        omp_lflags = '-fopenmp -static -static-libgcc -static-libstdc++';
+        if isfolder(mingw_libdir)
+            omp_lflags = sprintf('-L"%s" -fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic', mingw_libdir);
+        else
+            omp_lflags = '-fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic';
+        end
         cxx14_flags = '-std=c++14';
         extra_libs = {};
     else
