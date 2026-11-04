@@ -48,7 +48,7 @@ function win_cfg = findCompilerWindows(silent)
         % (Do NOT use global '-static' because that prevents dynamic linking).
         omp_cflags = '-fopenmp';
         omp_lflags = '-fopenmp -static-libgcc -static-libstdc++ -Wl,-Bstatic -lgomp -Wl,-Bdynamic';
-        cxx14_flags = '-std=c++14';
+        cxx14_flags = '-std=c++14 -include stdint.h';
         extra_libs = {};
 
         % MinGW requires the explicit path to libmwblas and libmwlapack libraries
