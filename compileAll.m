@@ -26,6 +26,9 @@ sys_arch = computer('arch');
 if strcmp(sys_arch, 'maca64')
     addpath(fullfile(home_dir, 'sources', 'utils'));
     [omp_inc, omp_lib] = findOpenMPMacOs();
+elseif strcmp(sys_arch, 'win64')
+    addpath(fullfile(home_dir, 'sources', 'utils'));
+    win_cfg = findCompilerWindows();
 end
 
 for idx = 1:length(list)
@@ -37,7 +40,7 @@ for idx = 1:length(list)
     
     switch sys_arch
         case 'win64'
-            compileWin;
+            compileWin(win_cfg);
         case 'maca64'
             compileMac(omp_inc, omp_lib);
         case 'glnxa64'

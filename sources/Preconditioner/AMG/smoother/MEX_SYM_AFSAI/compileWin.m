@@ -1,11 +1,35 @@
-omp_lib = fullfile(matlabroot, 'bin', computer('arch'), 'libiomp5md.lib');
+function compileWin(win_cfg)
+if nargin < 1 || isempty(win_cfg)
+    if exist('findCompilerWindows', 'file') ~= 2
+        this_dir = fileparts(mfilename('fullpath'));
+        curr = this_dir;
+        while ~isempty(curr) && ~isfile(fullfile(curr, 'compileAll.m'))
+            parent = fileparts(curr);
+            if strcmp(parent, curr), break; end
+            curr = parent;
+        end
+        if isfile(fullfile(curr, 'compileAll.m'))
+            addpath(fullfile(curr, 'sources', 'utils'));
+        end
+    end
+    win_cfg = findCompilerWindows();
+end
+
+if strcmp(win_cfg.compiler, 'mingw')
+    cflags = sprintf('CXXFLAGS="$CXXFLAGS %s %s"', win_cfg.cxx14_flags, win_cfg.omp_cflags);
+    lflags = sprintf('LDFLAGS="$LDFLAGS %s"', win_cfg.omp_lflags);
+else
+    cflags = sprintf('COMPFLAGS="$COMPFLAGS %s"', win_cfg.omp_cflags);
+    lflags = sprintf('LINKFLAGS="$LINKFLAGS %s"', win_cfg.omp_lflags);
+end
 
 mex('-R2018a', ...
-    '-lmwblas', ...
-    '-lmwlapack', ...
-    'COMPFLAGS="$COMPFLAGS /openmp:llvm"', ...
-    'LINKFLAGS="$LINKFLAGS /NODEFAULTLIB:libomp.lib /NODEFAULTLIB:vcomp.lib"', ...
+    win_cfg.blas_lib, ...
+    win_cfg.lapack_lib, ...
+    cflags, ...
+    lflags, ...
     'SYM_aFSAI_compute.cpp', ...
     'compute_local_fsai.cpp', ...
     'cpt_afsai_coef.cpp', ...
-    omp_lib);
+    win_cfg.extra_libs{:});
+end
