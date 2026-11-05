@@ -21,15 +21,36 @@ if verb
    fprintf('Computing SoC\n')
 end
 
+[nRows, nCols] = size(A);
+
+% Get off-diagonal part of A
+A_off = A - diag(diag(A));
+
 % Get the minimum value of each column
-min_col = full(min(A-diag(diag(A))))';
+min_col = full(min(A_off))';
 
-% Treat possible Dirichlet (isolated) nodes
-min_col(min_col==0) = 1;
+% Check if all column minimums are 0 (no negative off-diagonal entries)
+if all(min_col >= 0)
+   if verb
+      fprintf('All off-diagonal column minimums >= 0: falling back to absolute value SoC.\n');
+   end
 
-% Compute SoC
-[ii,jj,aa] = find(A);
-ss = aa ./ max(min_col(ii),min_col(jj));
+   % Fallback: compute SoC based on absolute value magnitudes
+   % Maximum off-diagonal magnitude per column
+   max_abs_col = full(max(abs(A_off)))';
+   max_abs_col(max_abs_col == 0) = 1; % Handle isolated/Dirichlet nodes
+
+   [ii,jj,aa] = find(A);
+   ss = abs(aa) ./ max(max_abs_col(ii), max_abs_col(jj));
+else
+   % Standard Classical M-matrix SoC:
+   % Treat possible Dirichlet (isolated) nodes
+   min_col(min_col==0) = 1;
+
+   % Compute SoC
+   [ii,jj,aa] = find(A);
+   ss = aa ./ max(min_col(ii),min_col(jj));
+end
 
 if verb
    fprintf('End Computing SoC\n')
@@ -39,11 +60,11 @@ end
 
 sf = ss;
 sf(sf <= tau) = 0;
-S = sparse(ii,jj,sf);
+S = sparse(ii,jj,sf,nRows,nCols);
 sp = ss;
 sp(ss <= tau)=-1;
 sp(ss >  tau)=1;
-S_patt = sparse(ii,jj,sp);
+S_patt = sparse(ii,jj,sp,nRows,nCols);
 if verb
    fprintf('Average NNZR after filtering: %f\n',nnz(S)/size(S,1))
    fprintf('End Filtering SoC\n')
@@ -53,7 +74,6 @@ end
 nn = size(S,1);
 S = S + speye(nn);
 S_patt = S_patt - diag(diag(S_patt)) + speye(nn);
-%save('SSS','S','S_patt');
 
 if verb
    fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
