@@ -23,6 +23,11 @@ if ~symm_flag && ~strcmpi(method,'jacobi')
    method = 'afsai_nsy';
 end
 
+% If the matrix is diagonal jacobi inverts it perfectly so no need for fsai
+if isdiag(A)
+   method = 'jacobi';
+end
+
 switch lower(method)
 
     case 'afsai_sym'

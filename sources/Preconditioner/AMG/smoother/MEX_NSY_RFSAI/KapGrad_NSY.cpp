@@ -14,20 +14,19 @@ void KapGrad_NSY(const int istep, const int irow, int& mrow, const int jendbloc,
 int ind_WR = 0;
 
 // Get the degree zero entries (A pattern)
-int j = iat[irow];
-int jjcol = ja[j];
+int jjcol;
 int jend = iat[irow+1];
-while (j < jend && jjcol < jendbloc){
+for (int j = iat[irow]; j < jend; j++){
+   jjcol = ja[j];
+   if (jjcol >= jendbloc) break;
    // If JWN is positive add this entry to the tentative pattern
    if (JWN[jjcol] >= 0) {
       ind_WR ++;
       JWN[jjcol] = ind_WR;
-      IWN[mrow+ind_WR-1] = ja[j];
+      IWN[mrow+ind_WR-1] = jjcol;
       WR_L[ind_WR-1] = coef[j];
       WR_U[ind_WR-1] = coef_T[j];
    }
-   j ++;
-   jjcol = ja[j];
 }
 
 // Get the higher degree entries
