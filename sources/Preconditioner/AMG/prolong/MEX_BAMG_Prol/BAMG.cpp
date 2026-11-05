@@ -180,7 +180,7 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
    } // end parallel region
 
    //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   if (params.verbosity >= VLEV_MEDIUM + 1){
+   if (params.verbosity >= VLEV_MEDIUM){
       iReg tot_count = 0;
       for (iReg i = 0; i <= params.dist_max+2; i++) tot_count += dist_count[i];
       rExt r_tot_count = 100.0 / static_cast<rExt>(tot_count);

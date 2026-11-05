@@ -14,9 +14,7 @@
 
 // Levels of verbosity
 #define VLEV_NONE 0
-#define VLEV_LOW 1
-#define VLEV_MEDIUM 2
-#define VLEV_HIGH 3
+#define VLEV_MEDIUM 1
 
 // Factor used to relax the condition on the max allowed row norm
 #define RELAX_FAC 1.5

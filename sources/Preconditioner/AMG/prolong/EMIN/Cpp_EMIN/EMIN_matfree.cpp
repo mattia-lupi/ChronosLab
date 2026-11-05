@@ -21,6 +21,7 @@
 #include "print_Q.h"
 #include "Prol_add_Cnodes.h"
 #include "DEFL_PCG_matfree.h"
+#include "DEFL_GMRES_matfree.h"
 
 /*****************************************************************************************
  *
@@ -67,11 +68,11 @@
 
 int EMIN_matfree(const int np, const int itmax, const double en_tol, const double condmax,
                  const int prec_type, const int sol_type, const int nn, const int nn_C,
-                 const int ntv, const int nt_patt, const int *fcnode, const int *iat_A,
-                 const int *ja_A, const double *coef_A, const int *iat_Pin, const int *ja_Pin,
-                 const double *coef_Pin, const int *iat_patt, const int *ja_patt,
-                 const double *const *TV, int *&iat_Pout, int *&ja_Pout, double *&coef_Pout,
-                 double *info, bool verb)
+                 const int ntv, const int nt_patt, const int *fcnode, const bool SPDflag,
+                 const int *iat_A, const int *ja_A, const double *coef_A, const int *iat_Pin,
+                 const int *ja_Pin, const double *coef_Pin, const int *iat_patt,
+                 const int *ja_patt, const double *const *TV, int *&iat_Pout, int *&ja_Pout,
+                 double *&coef_Pout, double *info, bool verb)
 {
 
    // Init error code
@@ -192,29 +193,38 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
    double Tr_A = 0;
    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    #if COMP_ENRG
-   // Compute Trace of A
-   Tr_A = cpt_Trace_Acc(np,nn,fcnode,iat_A,ja_A,coef_A);
+   if (SPDflag){
+      // Compute Trace of A
+      Tr_A = cpt_Trace_Acc(np,nn,fcnode,iat_A,ja_A,coef_A);
+   }
    #endif
    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
    int iter;
 
    // Compute prolongation correction with PCG
-   if (dump) std::cout << "---- DEFL_PCG_matfree ----" << std::endl << std::endl;
    start = std::chrono::system_clock::now();
    // Allocate prolongation correction
    double *DP = (double*) malloc( nt_patt*sizeof(double) );
    if (DP == nullptr) return ierr = 1;
-   ierr = DEFL_PCG_matfree(np,prec_type,sol_type,nn,nn_C,nt_patt,ntv,perm,iperm,D_inv,
-                           iat_A,ja_A,coef_A,Tr_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
-                           mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP,verb);
+   if (SPDflag) {
+      if (dump) std::cout << "---- DEFL_PCG_matfree ----" << std::endl << std::endl;
+      ierr = DEFL_PCG_matfree(np,prec_type,sol_type,nn,nn_C,nt_patt,ntv,perm,iperm,D_inv,
+                              iat_A,ja_A,coef_A,Tr_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
+                              mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP,verb);
+   } else {
+      if (dump) std::cout << "---- DEFL_GMRES_matfree ----" << std::endl << std::endl;
+      ierr = DEFL_GMRES_matfree(np,prec_type,sol_type,nn,nn_C,nt_patt,ntv,perm,iperm,D_inv,
+                                iat_A,ja_A,coef_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
+                                mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP,verb);
+   }
    if (ierr != 0) return ierr = 5;
    end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    double time_PCG = elaps_sec.count();
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
    if(verb){
-      std::cout << "PCG TIME "<< time_PCG << std::endl;
+      std::cout << "SOLVER TIME "<< time_PCG << std::endl;
    }
    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
