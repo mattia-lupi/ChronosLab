@@ -28,23 +28,24 @@
 // MAIN PROGRAM
 int main(int argc, const char* argv[]){
 
-FILE *parmFILE;
+   FILE *parmFILE;
 
-// Input variables
-bool BINREAD;
-int np;
-int itmax;
-double condmax;
-double en_tol;
-int prec_type, sol_type;
-int ierr, k, kk;
-char MAT_file[charStrLen]="";
-char PROL_file[charStrLen]="";
-char PATT_file[charStrLen]="";
-char TV_file[charStrLen]="";
-char FC_file[charStrLen]="";
+   // Input variables
+   bool BINREAD;
+   bool SDPflag;
+   int np;
+   int itmax;
+   double condmax;
+   double en_tol;
+   int prec_type, sol_type;
+   int ierr, k, kk;
+   char MAT_file[charStrLen]="";
+   char PROL_file[charStrLen]="";
+   char PATT_file[charStrLen]="";
+   char TV_file[charStrLen]="";
+   char FC_file[charStrLen]="";
 
-char line[1024];
+   char line[1024];
 
    // Check arguments
    if (argc < 2) {
@@ -59,6 +60,9 @@ char line[1024];
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &kk);
       read_err = read_err || (fget_ret == nullptr);
       BINREAD = kk != 0;
+      fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &kk);
+      read_err = read_err || (fget_ret == nullptr);
+      SDPflag = kk != 0;
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &np);
       read_err = read_err || (fget_ret == nullptr);
       fget_ret = fgets(line, sizeof line, parmFILE); sscanf(line, "%d",  &itmax);
@@ -92,6 +96,7 @@ char line[1024];
 
    // Dump input
    std::cout << "BINREAD:   " << BINREAD << std::endl;
+   std::cout << "SYMM:      " << BINREAD << std::endl;
    std::cout << "NP:        " << np << std::endl;
    std::cout << "ITMAX:     " << itmax << std::endl;
    std::cout << "EN. Toll.: " << en_tol << std::endl;
@@ -228,15 +233,15 @@ char line[1024];
    double *coef_Pnew;
    double emin_info[EMIN_INFO_SZ];
    ierr = EMIN_ImpProl(np,itmax,en_tol,condmax,prec_type,sol_type,nn_A,nn_C,ntv,
-                       nt_patt,fcnode,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,iat_patt,
-                       ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info,verb);
+                       nt_patt,fcnode,SDPflag,iat_A,ja_A,coef_A,iat_P,ja_P,coef_P,
+                       iat_patt,ja_patt,TV,iat_Pnew,ja_Pnew,coef_Pnew,emin_info,verb);
 
    //---STOP--------------------------------
    auto end = std::chrono::system_clock::now();
    elapsed_seconds = end - start;
    //---------------------------------------
 
-   std::cout << std::endl << std::endl;
+   std::cout << std::endl;
    std::cout << "Time for Enengy Minimization [sec]: " << elapsed_seconds.count() << std::endl;
    std::cout << std::endl;
 
