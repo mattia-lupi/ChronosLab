@@ -35,8 +35,10 @@ switch lower(method)
         [F, is_posdef] = afsai_cpp(A,nthread,nstep,step_size,epsilon);
         if ~is_posdef
 
-            warning('Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
-
+            if verb
+               warning('Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
+            end 
+            
             % Fall back to non-symmetric AFSAI
             [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
             FAFT = @(x) FL*(A*(FU*x));
