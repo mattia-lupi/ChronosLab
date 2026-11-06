@@ -35,8 +35,10 @@ switch lower(method)
         [F, is_posdef] = afsai_cpp(A,nthread,nstep,step_size,epsilon);
         if ~is_posdef
 
-            warning('Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
-
+            if verb
+               warning('Matrix is nonpositive definite. Falling back to afsai_nsy.\n');
+            end 
+            
             % Fall back to non-symmetric AFSAI
             [FL,FU] = NSY_rfsai_cpp(nstep,step_size,epsilon,A,nthread);
             FAFT = @(x) FL*(A*(FU*x));
@@ -94,7 +96,7 @@ switch lower(method)
         opts.issym = 0;
         opts.disp = verb;
         opts.tol = 5.e-4;
-        lambda = eigs(FAFT,size(A,1),1,'lm',opts);
+        lambda = abs(eigs(FAFT,size(A,1),1,'lm',opts));
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
         end
