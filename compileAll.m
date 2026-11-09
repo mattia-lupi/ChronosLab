@@ -1,5 +1,6 @@
+function compileAll()
+
 clc;
-clear;
 close all;
 
 list = { ...
@@ -53,3 +54,5 @@ end
 cd(home_dir)
 
 fprintf('\nAll MEX files compiled successfully.\n');
+
+end
