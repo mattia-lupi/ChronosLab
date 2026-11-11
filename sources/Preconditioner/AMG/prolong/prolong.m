@@ -218,11 +218,11 @@ if strcmpi(prol_emin,'EMIN')
    end
 
    % Compute a sparser Strength of connection before EMIN if needed
-   coarsen2 = param.coarsen;
-   coarsen2.tau = param.prolong.patt_tau;
-   coarsen2.tau = 0.01;
-   coarsen2.SoC_type = 'DOM';
-   [~,~,~,S_emin,~] = coarsen(coarsen2,A,smootherOp,TV,verb);
+   if strcmpi(param.coarsen.SoC_type, 'DOM') && param.coarsen.tau == param.prolong.patt_tau
+      S_emin = S;
+   else
+      [S_emin,~] = cpt_SoC_dom(param.prolong.patt_tau,A,verb);
+   end
    if verb
       fprintf('\nDensity of S_emin over S: %10.2f\n',nnz(S_emin)/nnz(S));
    end

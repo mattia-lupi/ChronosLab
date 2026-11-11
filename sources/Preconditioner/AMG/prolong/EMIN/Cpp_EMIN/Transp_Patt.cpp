@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <omp.h>
+#include <algorithm>
 
 #include "count_rowterms.h"
 #include "mkiat_Tloc.h"
@@ -19,28 +20,31 @@ int Transp_Patt(const int nthreads, const int nrows, const int ncols, const int 
    // Init error code
    int ierr = 0;
 
+   // Clamp number of threads to avoid zero-row partitions when ncols < nthreads or nrows < nthreads
+   int const eff_threads = std::max(1, std::min(nthreads, std::min(nrows, ncols)));
+
    // Allocate scratches
-   int size_buff = (nthreads+1) * ncols;
+   int size_buff = (eff_threads+1) * ncols;
    int *WI1_buff = (int*) malloc( size_buff*sizeof(int) );
    if (WI1_buff == nullptr) ierr = 1;
-   int **WI1 = (int**) malloc( (nthreads+1)*sizeof(int*) );
+   int **WI1 = (int**) malloc( (eff_threads+1)*sizeof(int*) );
    if (WI1 == nullptr) ierr = 1;
-   int *WI2 = (int*) malloc( nthreads*sizeof(int) );
+   int *WI2 = (int*) malloc( eff_threads*sizeof(int) );
    if (WI2 == nullptr) ierr = 1;
    if (ierr != 0) return ierr;
    int j = 0;
-   for ( int i = 0; i < nthreads+1; i++){
+   for ( int i = 0; i < eff_threads+1; i++){
       WI1[i] = &(WI1_buff[j]);
       j += ncols;
    }
 
    // Counts the number of non-zeroes assigned to each processor in each MatT row
-   #pragma omp parallel num_threads(nthreads)
+   #pragma omp parallel num_threads(eff_threads)
    {
       // Get thread ID and row partition
       int mythid = omp_get_thread_num();
-      int bsize = nrows/nthreads;
-      int resto = nrows%nthreads;
+      int bsize = nrows/eff_threads;
+      int resto = nrows%eff_threads;
       int firstrow, nrowsth, lastrow;
       if (mythid <= resto) {
          nrowsth = bsize+1;
@@ -65,8 +69,8 @@ int Transp_Patt(const int nthreads, const int nrows, const int ncols, const int 
       #pragma omp barrier
 
       // Retrieve column partition
-      bsize = ncols/nthreads;
-      resto = ncols%nthreads;
+      bsize = ncols/eff_threads;
+      resto = ncols%eff_threads;
       int firstrow_T, nrowsth_T;
       if (mythid <= resto) {
          nrowsth_T = bsize+1;
@@ -78,11 +82,11 @@ int Transp_Patt(const int nthreads, const int nrows, const int ncols, const int 
       }
 
       // Each processor compute its part of iat_T
-      mkiat_Tloc(nrowsth_T,nthreads,firstrow_T,WI1,&iat_T[firstrow_T],WI2[mythid]);
+      mkiat_Tloc(nrowsth_T,eff_threads,firstrow_T,WI1,&iat_T[firstrow_T],WI2[mythid]);
       #pragma omp barrier
 
       // Update iat_T and WI1 pointers
-      mkiat_Tglo(mythid,nrowsth_T,nthreads,firstrow_T,WI1,WI2,&iat_T[firstrow_T]);
+      mkiat_Tglo(mythid,nrowsth_T,eff_threads,firstrow_T,WI1,WI2,&iat_T[firstrow_T]);
       #pragma omp barrier
 
       // Transpose column indices

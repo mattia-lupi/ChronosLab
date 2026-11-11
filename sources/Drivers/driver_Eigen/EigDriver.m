@@ -309,7 +309,7 @@ for i = 1:neig
 end
 
 % Print report on EMIN
-if strcmp(upper(param.prolong.prol_emin),'MEX_EMIN')
+if strcmpi(param.prolong.prol_emin,'EMIN')
    prt_EMIN_Repo(AMG_prec);
 end
 

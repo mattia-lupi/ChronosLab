@@ -41,17 +41,15 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    double *QKpvec = (double*) malloc( nn_K*sizeof(double) );
    double *ridv = (double*) malloc( np*sizeof(double) );
    double *v_ntv = (double*) malloc( (np*ntv)*sizeof(double) );
-   double *tvec = (double*) malloc( nn_K*sizeof(double) );
    if (rhs == nullptr || vscr == nullptr || wscr == nullptr || res == nullptr ||
        zvec == nullptr || pvec == nullptr || QKpvec == nullptr ||
-       ridv == nullptr || v_ntv == nullptr || tvec == nullptr) return ierr = 1;
+       ridv == nullptr || v_ntv == nullptr) return ierr = 1;
 
    // Init vec_DP to zero
    #pragma omp parallel for num_threads(np)
    for (int i = 0; i < nn_K; i++)
    {
      vec_DP[i] = 0.0;
-     tvec[i] = 0.0;
    }
 
    // Compute rhs
@@ -60,11 +58,8 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    // 2 - Perform wscr <-- K*vscr
    spmatv_blk(np,nn_C,iat_Tpatt,iat_K,ja_K,coef_K,vscr,wscr);
    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   //#if COMP_ENRG
+   double DE = 0.0;
    double DE_old = 1.0;
-   // Allocate back-up vector for entire rhs
-   double *rhs_sav = (double*) malloc( nn_K*sizeof(double) );
-   if (rhs_sav == nullptr) return ierr = 1;
    double init_energy = 0;
    #if COMP_ENRG
    // Compute initial energy
@@ -81,12 +76,6 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    #pragma omp parallel for num_threads(np)
    for (int i = 0; i < nn_K; i++){
       wscr[i] -= vec_f[i];
-      //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      //#if COMP_ENRG
-      // Save a copy of the rhs in col-major format
-      rhs_sav[i] = wscr[i];
-      //#endif
-      //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    }
    // 4 - Permute wscr from col-major to row-major
    apply_perm(np,nn_K,perm,wscr,vscr);
@@ -105,7 +94,8 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    // Init PCG
    iter = 0;
    double resiter = 1.0;
-   bool exit_test = (itmax <= 0);
+   double const res_norm0 = dnrm2_par(np, nn_K, res, ridv);
+   bool exit_test = (itmax <= 0) || (res_norm0 < 1e-15);
 
    // PCG loop
    double alpha, beta, gamma, gamma_old;
@@ -162,8 +152,9 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,QKpvec);
 
       // Compute alpha
-      alpha = ddot_par(np,nn_K,QKpvec,pvec,ridv);
-      alpha = gamma / alpha;
+      double const denom = ddot_par(np,nn_K,QKpvec,pvec,ridv);
+      if (std::abs(denom) < 1e-18) break;
+      alpha = gamma / denom;
       //////////////////////////////////
       //cout << "alpha " << alpha << endl;
       //////////////////////////////////
@@ -173,37 +164,12 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       for (int i = 0; i < nn_K; i++){
          vec_DP[i] += alpha*pvec[i];
          res[i] -= alpha*QKpvec[i];
-         tvec[i] += alpha*wscr[i];
       }
 
-      ////++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      //#if COMP_ENRG
-      //   apply_perm(np,nn_K,iperm,vec_DP,vscr);
-      //   double rhs_DP = ddot_par(np,nn_K,vscr,rhs_sav,ridv);
-      //   spmatv_blk(np,nn_C,iat_Tpatt,iat_K,ja_K,coef_K,vscr,wscr);
-      //   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-      //   //double DWAffDW = ddot_par(np,nn_K,vscr,wscr,ridv);
-      //   //cout << endl << endl;
-      //   //cout << "Afc_DP  " << Afc_DP << endl;
-      //   //cout << "DWAffDW  " << DWAffDW << endl;
-      //   //cout << endl << endl;
-      //   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-      //   double DE = ddot_par(np,nn_K,vscr,wscr,ridv) - 2.0*rhs_DP;
-      //   cout << fixed << setw(6) << iter << " ";
-      //   cout << setprecision(6) << scientific;
-      //   cout << resiter << "   " << init_energy << "   " << DE << "   " <<
-      //           fabs(DE-DE_old) <<  "   " << init_energy+DE << endl;
-      //   DE_old = DE;
-      //#else
-      //   cout << setprecision(6) << scientific;
-      //   cout << iter << " " << resiter << endl;
-      //#endif
-
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      // Compute energy and energy variation
-      apply_perm(np,nn_K,iperm,vec_DP,vscr);
-      double const rhs_DP = ddot_par(np,nn_K,vscr,rhs_sav,ridv);
-      double const DE = ddot_par(np,nn_K,vscr,tvec,ridv) - 2.0*rhs_DP;
+      // Compute energy and energy variation via O(1) CG recurrence
+      double const DEk = gamma * alpha;
+      DE -= DEk;
       double const dDE = std::abs((DE-DE_old)/DE_old);
       std::cout << std::fixed << std::setw(6) << iter << " ";
       std::cout << std::setprecision(6) << std::scientific;
@@ -224,11 +190,6 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    free(v_ntv);
 
    // Deallocate scratches
-   //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   //#if COMP_ENRG
-   free(rhs_sav);
-   //#endif
-   //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    free(rhs);
    free(res);
    free(vscr);
@@ -237,7 +198,6 @@ int DEFL_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    free(pvec);
    free(QKpvec);
    free(ridv);
-   free(tvec);
 
    return ierr;
 

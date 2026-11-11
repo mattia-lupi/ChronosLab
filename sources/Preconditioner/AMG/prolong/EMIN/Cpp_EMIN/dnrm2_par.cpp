@@ -5,17 +5,12 @@
 double dnrm2_par(const int np, const int nn, const double* RESTRICT x,
                  double* RESTRICT reduc){
 
-   #pragma omp parallel num_threads(np)
-   {
-      double dnrm2 = 0.0;
-      #pragma omp for
-      for ( int i = 0; i < nn; i++ ) dnrm2 += x[i] * x[i];
-      int myid = omp_get_thread_num();
-      reduc[myid] = dnrm2;
-   }
-
+   (void)reduc;
    double dnrm2 = 0.0;
-   for ( int ip = 0; ip < np; ip++ ) dnrm2 += reduc[ip];
+   #pragma omp parallel for num_threads(np) reduction(+:dnrm2)
+   for ( int i = 0; i < nn; i++ ){
+      dnrm2 += x[i] * x[i];
+   }
 
    return std::sqrt(dnrm2);
 

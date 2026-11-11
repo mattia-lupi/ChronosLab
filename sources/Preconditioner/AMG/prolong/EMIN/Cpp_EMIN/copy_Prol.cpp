@@ -32,12 +32,13 @@ void copy_Prol(const int np, const int nn, const int *fcnode, const int *iat_in,
          iend = iat_in[irow+1];
          if (fcnode[irow] < 0){
             int jj = iat_out[irow];
+            int const jj_end = iat_out[irow+1];
             while (ii < iend){
 
                // Make sure ja_out[jj] >= ja_in[ii] (ja_out surely contains ja_in)
-               while (ja_out[jj] < ja_in[ii]) jj++;
+               while (jj < jj_end && ja_out[jj] < ja_in[ii]) jj++;
 
-               if (ja_out[jj] == ja_in[ii]){
+               if (jj < jj_end && ja_out[jj] == ja_in[ii]){
                   coef_out[jj] = coef_in[ii];
                   jj++;
                }

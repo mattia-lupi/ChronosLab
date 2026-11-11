@@ -233,7 +233,7 @@ else
    T_prol = T_prol + prol_tot_time;
 
    % Store EMIN detailed information
-   if ( param.symm && strcmpi(param.prolong.prol_emin,'EMIN') )
+   if ( strcmpi(param.prolong.prol_emin,'EMIN') )
       emin_info.time_prolTot  = prol_tot_time;
    end
    AMG_hrc.emin_info = emin_info;

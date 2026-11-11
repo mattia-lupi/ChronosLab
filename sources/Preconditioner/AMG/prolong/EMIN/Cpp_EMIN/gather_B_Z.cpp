@@ -64,6 +64,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
       lastcol = firstcol + ncolth;
       int nt = 0;
       int nc = 0;
+      int local_max = 0;
       int iend = iat_patt[firstcol];
       for (int i = firstcol; i < lastcol; i++){
          int istart = iend;
@@ -74,10 +75,11 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
             nc += lenc;
             nt += len*lenc;
          }
-          #pragma omp critical
-         {
-             nrmax_blk = std::max(nrmax_blk, len);
-         }
+         local_max = std::max(local_max, len);
+      }
+      #pragma omp critical
+      {
+         nrmax_blk = std::max(nrmax_blk, local_max);
       }
       pt_THpart[mythid+1] = nt;
       pt_THcol[mythid+1] = nc;
@@ -157,7 +159,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
 
       // Allocate private workspace
       BB_scr = (double*) malloc( (nrmax_blk*nrmax_blk)*sizeof(double) );
-      tau = (double*) malloc( (ncolth*ntv)*sizeof(double) );
+      tau = (double*) malloc( ntv*sizeof(double) );
       work = (double*) malloc( lwork*sizeof(double) );
       if (BB_scr == nullptr || tau == nullptr || work == nullptr){
          #pragma omp atomic write
@@ -173,9 +175,7 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
       }
 
       // Loop over the current chunk of columns
-      int ind_g, ind_tau;
-      ind_g = 0;
-      ind_tau = 0;
+      int ind_g = 0;
       int istart_patt, iend_patt;
       iend_patt = iat_patt[firstcol];
       for (int icol = firstcol; icol < lastcol; icol++){
@@ -223,14 +223,14 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
                l_nn = static_cast<lapack_int>(nr_BB_loc);
                lapack_int l_ll = l_nn;
                lapack_int i_lpk_1, i_lpk_2, i_lpk_3;
-               dgeqrf(&l_nn,&l_mm,BB_scr,&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_1);
+               dgeqrf(&l_nn,&l_mm,BB_scr,&l_ll,tau,work,&lwork,&i_lpk_1);
 
                // Solve transposed triangular system
                char const *chu = "U";
                dtrtrs(chu,cht,chn,&l_mm,&oneint,BB_scr,&l_ll,&(g_scr[ind_g]),&l_mm,&i_lpk_2);
 
                // Transform QQ from Householder rotation to standard form
-               dorgqr(&l_nn,&l_nn,&l_kk,BB_scr,&l_ll,&(tau[ind_tau]),work,&lwork,&i_lpk_3);
+               dorgqr(&l_nn,&l_nn,&l_kk,BB_scr,&l_ll,tau,work,&lwork,&i_lpk_3);
                if (i_lpk_1 || i_lpk_2 || i_lpk_3){
                   #pragma omp atomic write
                   ierr = 4;
@@ -245,11 +245,10 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
                int nt_blk_Z = nr_BB_loc*(nr_BB_loc-ntv);
                memcpy(&(mat_Z[ind_Z]),&(BB_scr[nr_BB_loc*ntv]),nt_blk_Z*sizeof(double));
 
-               // Update pointers in Z, g and tau
+               // Update pointers in Z and g
                ind_Z += nt_blk_Z;
                ind_col_Z += nr_BB_loc-ntv;
                ind_g += ntv;
-               ind_tau += ntv;
             }
 
          }
