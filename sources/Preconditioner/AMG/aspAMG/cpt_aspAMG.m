@@ -87,7 +87,7 @@ end
 % Get the current size
 n = size(A,1);
 % Compute operator max eigenvalue
-lmax_A = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',10);
+[~,lmax_A,~] = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',10);
 AMG_hrc.lmax_A = lmax_A;
 AMG_hrc.isPosDef = param.isPosDef;
 

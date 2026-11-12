@@ -89,7 +89,7 @@ while NRM_res > tol && iter < itmax
       % Search on Ritz space
       A_ritz = Zk'*ProdMat(Zk);
       M_ritz = Zk'*Zk;
-      [V_r,~] = eigs(A_ritz,M_ritz,mm,'SM');
+      [V_r,~,~] = eigs(A_ritz,M_ritz,mm,'SM');
       Zk = Zk*V_r;
       for i = 1:mm
           Zk(:,i) = Zk(:,i)/norm(Zk(:,i));

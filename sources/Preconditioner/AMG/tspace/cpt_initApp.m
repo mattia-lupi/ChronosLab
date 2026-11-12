@@ -31,7 +31,7 @@ end
 % Compute diagonal preconditioner
 D_inv = 1 ./ diag(FT);
 D_inv = diag(sparse(D_inv));
-lmax = eigs(D_inv*FT,1,'lm','Display',verb,'Tolerance',1.e-3);
+[~,lmax,~] = eigs(D_inv*FT,1,'lm','Display',verb,'Tolerance',1.e-3);
 omega = min(1.0,1.9 / abs(lmax));
 TV_out = omega*D_inv*TV_in;
 for i = 2:k_type
