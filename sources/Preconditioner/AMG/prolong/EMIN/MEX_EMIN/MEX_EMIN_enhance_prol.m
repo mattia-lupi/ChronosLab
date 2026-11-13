@@ -59,16 +59,6 @@ if PRINT_DEBUG
    fclose(fid);
 end
 
-% Switch from column to row
-iat_A     = iat_A';
-ja_A      = ja_A';
-coef_A    = coef_A';
-iat_Pin   = iat_Pin';
-ja_Pin    = ja_Pin';
-coef_Pin  = coef_Pin';
-iat_patt  = iat_patt';
-ja_patt   = ja_patt';
-
 % Convert TV in proper 1-D array
 ntv = size(TV,2);
 TV = TV';
@@ -107,15 +97,9 @@ SPDflag   = double(SPDflag);
                                iat_Pin,ja_Pin,coef_Pin,iat_patt,ja_patt,TV,verb);
 
 % Create a sparse matrices for Pout
-nt_Pout = size(ja_Pout,2);
-irow_Pout = zeros(nt_Pout,1);
-iend   = iat_Pout(1)-1;
-for i = 1:nn
-   istart = iend + 1;
-   iend = iat_Pout(i+1)-1;
-   irow_Pout(istart:iend) = i;
-end
-ja_Pout = double(ja_Pout);
+irow_Pout = repelem((1:nn)', double(diff(iat_Pout(:))));
+ja_Pout = double(ja_Pout(:));
+coef_Pout = coef_Pout(:);
 Pout = sparse(irow_Pout,ja_Pout,coef_Pout,nn,nn_C);
 
 return

@@ -17,6 +17,7 @@ else
    resvec(1) = 0;
 end
 res = rhs;
+resvec = zeros(itmax, 1);
 
 % Stationary iteration loop
 while iter < itmax && relres > tol
@@ -35,6 +36,8 @@ while iter < itmax && relres > tol
    resvec(iter) = relres;
 
 end
+
+resvec = resvec(1:iter);
 
 % Check convergence
 if relres <= tol

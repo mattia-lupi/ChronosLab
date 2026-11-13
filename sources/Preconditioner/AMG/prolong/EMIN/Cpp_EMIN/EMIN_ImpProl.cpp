@@ -83,7 +83,7 @@
 
 int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const double condmax,
                  const int prec_type, const int sol_type, const int nn, const int nn_C,
-                 const int ntv, const int nt_patt, const int *fcnode, const bool SDPflag,
+                 const int ntv, const int nt_patt, const int *fcnode, const bool SPDflag,
                  const int *iat_A, const int *ja_A, const double *coef_A, const int *iat_Pin,
                  const int *ja_Pin, const double *coef_Pin, const int *iat_patt,
                  const int *ja_patt, const double *const *TV, int *&iat_Pout, int *&ja_Pout,
@@ -115,7 +115,7 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
       //**********************************
 
       ierr = EMIN_matfree(np,itmax,en_tol,condmax,prec_type,sol_type,nn,nn_C,ntv,
-                          nt_patt,fcnode,SDPflag,iat_A,ja_A,coef_A,iat_Pin,ja_Pin,coef_Pin,
+                          nt_patt,fcnode,SPDflag,iat_A,ja_A,coef_A,iat_Pin,ja_Pin,coef_Pin,
                           iat_patt,ja_patt,TV,iat_Pout,ja_Pout,coef_Pout,info,verb);
 
    } else {
@@ -231,17 +231,47 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
             int k = fcnode[i];
             if (k >= 0) c2glo[k] = i;
          }
+
+         int *iat_At = nullptr;
+         int *ja_At = nullptr;
+         double *coef_At = nullptr;
+         if (!SPDflag) {
+            int const nnz_A = iat_A[nn];
+            iat_At = (int*) malloc((nn + 1) * sizeof(int));
+            ja_At  = (int*) malloc(nnz_A * sizeof(int));
+            int *perm_A  = (int*) malloc(nnz_A * sizeof(int));
+            int *iperm_A = (int*) malloc(nnz_A * sizeof(int));
+            coef_At = (double*) malloc(nnz_A * sizeof(double));
+            if (iat_At && ja_At && perm_A && iperm_A && coef_At) {
+               Transp_Patt(np, nn, nn, nnz_A, iat_A, ja_A, iat_At, ja_At, perm_A, iperm_A);
+               #pragma omp parallel for num_threads(np)
+               for (int i = 0; i < nnz_A; i++) {
+                  coef_At[perm_A[i]] = coef_A[i];
+               }
+            }
+            free(perm_A);
+            free(iperm_A);
+         }
+
+         int const *src_iat_A  = (!SPDflag && iat_At) ? iat_At : iat_A;
+         int const *src_ja_A   = (!SPDflag && ja_At)  ? ja_At  : ja_A;
+         double const *src_coef_A = (!SPDflag && coef_At) ? coef_At : coef_A;
+
          // Gather vec_f
          #pragma omp parallel for num_threads(np)
          for (int icol = 0; icol < nn_C; icol++){
              int istart = iat_Tpatt[icol];
              int iend = iat_Tpatt[icol+1];
              int irow = c2glo[icol];
-             int istart_A = iat_A[irow];
-             int iend_A = iat_A[irow+1];
-             gather_f(iend-istart,&(ja_Tpatt[istart]),iend_A-istart_A,&(ja_A[istart_A]),
-                      &(coef_A[istart_A]),&(vec_f[istart]));
+             int istart_A = src_iat_A[irow];
+             int iend_A = src_iat_A[irow+1];
+             gather_f(iend-istart,&(ja_Tpatt[istart]),iend_A-istart_A,&(src_ja_A[istart_A]),
+                      &(src_coef_A[istart_A]),&(vec_f[istart]));
          }
+
+         if (iat_At)  free(iat_At);
+         if (ja_At)   free(ja_At);
+         if (coef_At) free(coef_At);
       } else if (sol_type == NULL_SPACE){
          ierr = gather_B_Z(np,nn,nn_C,ntv,fcnode,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
                            iat_A,ja_A,coef_A,TV,pt_Z,pt_col_Z,mat_Z,vec_f,coef_P0);
@@ -366,8 +396,9 @@ int EMIN_ImpProl(const int np, const int itmax, const double en_tol, const doubl
    //---GLOBAL END---------------------------------------------------------------
    glob_end = std::chrono::system_clock::now();
    elaps_sec = glob_end - glob_start;
-   double time_glob =  elaps_sec.count();
-   double time_overhead = time_glob-time_gath_K-time_prec_K-time_gath_B-time_PCG;
+   double time_glob = elaps_sec.count();
+   double const time_kernels = info[0] + info[1] + info[2] + info[3];
+   double const time_overhead = std::max(0.0, time_glob - time_kernels);
    //----------------------------------------------------------------------------
 
    // Store info

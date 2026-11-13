@@ -48,22 +48,23 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    double *wscr = (double*) malloc( nn_K*sizeof(double) );
    double *res = (double*) malloc( nn_K*sizeof(double) );
    double *zvec = (double*) malloc( nn_K*sizeof(double) );
-   double *pvec = (double*) malloc( nn_K*sizeof(double) );
-   double *QKpvec = (double*) malloc( nn_K*sizeof(double) );
    double *ridv = (double*) malloc( np*sizeof(double) );
    double *v_ntv = (double*) malloc( (np*ntv)*sizeof(double) );
-   //double *tvec = (double*) malloc( nn_K*sizeof(double) );
    if (rhs == nullptr || vscr == nullptr || wscr == nullptr || res == nullptr ||
-       zvec == nullptr || pvec == nullptr || QKpvec == nullptr ||
-       ridv == nullptr || v_ntv == nullptr) return ierr = 1;
-       //ridv == nullptr || v_ntv == nullptr || tvec == nullptr) return ierr = 1;
+       zvec == nullptr || ridv == nullptr || v_ntv == nullptr) return ierr = 1;
    int *WNALL = nullptr;
    int *WNALLA = nullptr;
    if (sol_type == SPMAT){
       WNALL = (int*) malloc( (np*nn_C)*sizeof(int) );
       if (WNALL == nullptr) return ierr = 1;
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < np*nn_C; i++) WNALL[i] = -1;
+   }
+   if (prec_type == SGS){
       WNALLA = (int*) malloc( (np*nn)*sizeof(int) );
-      if (WNALLA == nullptr) return ierr = 1;
+      if (WNALLA == nullptr) { free(WNALL); return ierr = 1; }
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < np*nn; i++) WNALLA[i] = -1;
    }
 
    // Init vec_DP to zero
@@ -108,7 +109,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    }
 
    // Restart size
-   int const m = 50;
+   int const m = std::min(50, std::max(1, itmax));
 
    // Krylov basis: (m+1) vectors of size nn_K
    double *V = (double*) malloc((m+1)*nn_K*sizeof(double));
@@ -129,7 +130,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
       if (g) free(g);
       free(v_ntv);
       free(rhs); free(res); free(vscr); free(wscr);
-      free(zvec); free(pvec); free(QKpvec); free(ridv);
+      free(zvec); free(ridv);
       free(WNALL); free(WNALLA);
       return ierr = 1;
    }
@@ -147,12 +148,11 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
 
    init_energy = beta * beta;
    double Eold = init_energy, DE0 = 0.0, DEk = 0.0;
+   double const beta0 = beta;
    if (beta <= 0.0) exit_test = true;
 
    #if COMP_ENRG
    if(verb){
-      Orth_Q(np,nn,ntv,iat_patt,mat_Q,vec_f,v_ntv,vscr);
-      double const E0 = dnrm2_par(np,nn_K,vscr,ridv);
       std::cout << std::setprecision(6) << std::scientific;
       std::cout << "Initial Energy:  " << init_energy << std::endl;
    }
@@ -166,11 +166,12 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
       }
    }
 
-   // initialize g
+   // initialize g and preallocate y
    for (int i = 0; i < m+1; i++) {
       g[i] = 0.0;
    }
    g[0] = beta;
+   std::vector<double> y(m, 0.0);
 
    while (!exit_test){
 
@@ -179,24 +180,18 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          iter++;
 
          // z = (I - Q Q^t) M^-1 v_j
-         apply_perm(np,nn_K,iperm,VEC(j),vscr);
-
          if (prec_type == DIAG){
+            const double* RESTRICT vj = VEC(j);
             #pragma omp parallel for num_threads(np)
             for (int i = 0; i < nn_K; i++) {
-               wscr[i] = D_inv[i]*vscr[i];
+               vscr[i] = D_inv[i]*vj[i];
             }
          } else if (prec_type == SGS){
-            LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-            UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-
-            #pragma omp parallel for num_threads(np)
-            for (int i = 0; i < nn_K; i++) {
-               wscr[i] = vscr[i];
-            }
+            apply_perm(np,nn_K,iperm,VEC(j),wscr);
+            LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
+            UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
+            apply_perm(np,nn_K,perm,wscr,vscr);
          }
-
-         apply_perm(np,nn_K,perm,wscr,vscr);
 
          Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
 
@@ -226,10 +221,17 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          double const hnext = dnrm2_par(np,nn_K,wscr,ridv);
          HESS(j+1,j) = hnext;
 
-         // v_{j+1}
-         #pragma omp parallel for num_threads(np)
-         for (int k = 0; k < nn_K; k++) {
-            VEC(j+1)[k] = wscr[k] / hnext;
+         // Happy breakdown guard
+         if (hnext > 1e-15) {
+            #pragma omp parallel for num_threads(np)
+            for (int k = 0; k < nn_K; k++) {
+               VEC(j+1)[k] = wscr[k] / hnext;
+            }
+         } else {
+            #pragma omp parallel for num_threads(np)
+            for (int k = 0; k < nn_K; k++) {
+               VEC(j+1)[k] = 0.0;
+            }
          }
 
          // Apply previous Givens
@@ -268,25 +270,22 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
             }
          }
 
-         double const dDE = (DE0 > 0.0) ? (DEk/DE0) : 0.0;
-         Eold = E;
+         double const rel_res = (beta0 > 0.0) ? (resid / beta0) : 0.0;
 
          if(verb){
             std::cout << std::setw(4)  << iter
                       << std::setw(15) << std::scientific << std::setprecision(6) << E
-                      << std::setw(15) << std::scientific << std::setprecision(6) << dDE
+                      << std::setw(15) << std::scientific << std::setprecision(6) << rel_res
                       << std::endl;
          }
 
-         // Check convergence
-         exit_test = (iter >= itmax) || (dDE < energy_tol) || (resid < 1e-15);
+         // Check convergence on relative residual reduction or absolute tolerance
+         exit_test = (iter >= itmax) || (rel_res < energy_tol) || (resid < 1e-15);
       }
 
       int const inner_iter = j;
 
       // Backsolve H y = g
-      std::vector<double> y(std::max(1, inner_iter), 0.0);
-
       for (int i = inner_iter-1; i >= 0; i--){
          y[i] = g[i];
          for (int k = i+1; k < inner_iter; k++) {
@@ -295,33 +294,29 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          y[i] /= HESS(i,i);
       }
 
-      // Update solution
+      // Update solution: vscr = sum_{j=0}^{inner_iter-1} y[j] * VEC(j)
       #pragma omp parallel for num_threads(np)
       for (int i = 0; i < nn_K; i++) {
-         vscr[i] = 0.0;
-      }
-
-      for (int j = 0; j < inner_iter; j++){
-         #pragma omp parallel for num_threads(np)
-         for (int i = 0; i < nn_K; i++) {
-            vscr[i] += y[j] * VEC(j)[i];
+         double sum = 0.0;
+         for (int k = 0; k < inner_iter; k++) {
+            sum += y[k] * VEC(k)[i];
          }
+         vscr[i] = sum;
       }
 
-      // z = (I - Q Q^t) M^-1 v_j
-      apply_perm(np,nn_K,iperm,vscr,wscr);
-
+      // z = (I - Q Q^t) M^-1 vscr
       if (prec_type == DIAG){
          #pragma omp parallel for num_threads(np)
          for (int i = 0; i < nn_K; i++) {
-            wscr[i] = D_inv[i]*wscr[i];
+            wscr[i] = D_inv[i]*vscr[i];
          }
+         std::swap(vscr, wscr);
       } else if (prec_type == SGS){
+         apply_perm(np,nn_K,iperm,vscr,wscr);
          LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
          UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
+         apply_perm(np,nn_K,perm,wscr,vscr);
       }
-
-      apply_perm(np,nn_K,perm,wscr,vscr);
 
       Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,wscr);
 
@@ -392,8 +387,6 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    free(vscr);
    free(wscr);
    free(zvec);
-   free(pvec);
-   free(QKpvec);
    free(ridv);
    free(WNALL);
    free(WNALLA);

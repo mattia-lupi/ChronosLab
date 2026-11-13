@@ -71,9 +71,11 @@ while true
    curr_AMG_hrc = curr_AMG_hrc.next;
 
 end
-grid_comp = grid_comp / size(A,1);
-oper_comp = oper_comp / nnz(A);
-AMG_info(1).grid_comp = grid_comp;
-AMG_info(1).oper_comp = oper_comp;
+if nargin == 2 && size(A,1) > 0 && nnz(A) > 0
+   grid_comp = grid_comp / size(A,1);
+   oper_comp = oper_comp / nnz(A);
+   AMG_info(1).grid_comp = grid_comp;
+   AMG_info(1).oper_comp = oper_comp;
+end
 
 return

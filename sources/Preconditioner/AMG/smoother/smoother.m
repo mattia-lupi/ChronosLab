@@ -58,15 +58,15 @@ switch lower(method)
             smootherOp.is_posdef = true;
             % Correct NaN for very ill-conditioned problems
             irow = find(isnan(diag(F)));
-            if numel(irow) > 0
+            if ~isempty(irow)
                if verb
                   fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
                end
-            end
-            for i = 1:numel(irow)
-               ii = irow(i);
-               F(ii,:) = 0;
-               F(ii,ii) = 1 / sqrt(A(ii,ii));
+               mask = true(size(F, 1), 1);
+               mask(irow) = false;
+               diag_corr = zeros(size(F, 1), 1);
+               diag_corr(irow) = 1 ./ sqrt(diag(A(irow, irow)));
+               F = spdiags(double(mask), 0, size(F, 1), size(F, 1)) * F + spdiags(diag_corr, 0, size(F, 1), size(F, 1));
             end
             % Compute damping parameter
             FAFT = @(x) F*(A*(F'*x));
@@ -111,8 +111,8 @@ switch lower(method)
     case 'jacobi'
         smootherOp.is_posdef = all(diag(A) > 0);
         % Compute Diagonal
-        F = 1 ./ sqrt(full(diag(A)));
-	     F = diag(sparse(F));
+        nA = size(A, 1);
+        F = spdiags(1 ./ sqrt(full(diag(A))), 0, nA, nA);
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
         % opts.issym = 1;

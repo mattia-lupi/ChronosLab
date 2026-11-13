@@ -60,8 +60,14 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
    if (sol_type == SPMAT){
       WNALL = (int*) malloc( (np*nn_C)*sizeof(int) );
       if (WNALL == nullptr) return ierr = 1;
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < np*nn_C; i++) WNALL[i] = -1;
+   }
+   if (prec_type == SGS){
       WNALLA = (int*) malloc( (np*nn)*sizeof(int) );
-      if (WNALLA == nullptr) return ierr = 1;
+      if (WNALLA == nullptr) { free(WNALL); return ierr = 1; }
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < np*nn; i++) WNALLA[i] = -1;
    }
 
    // Init vec_DP to zero
@@ -116,10 +122,17 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       #endif
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       // 3 - Subtract vec_f to vscr: vscr <-- vscr - vec_f
+      #if COMP_ENRG
       #pragma omp parallel for num_threads(np)
       for (int i = 0; i < nn_K; i++){
-         vscr[i] -= vec_f[perm[i]];//CHECK
+         vscr[i] -= wscr[i];
       }
+      #else
+      #pragma omp parallel for num_threads(np)
+      for (int i = 0; i < nn_K; i++){
+         vscr[i] -= vec_f[perm[i]];
+      }
+      #endif
       // 4 - No need for permutation
    }
    // 5 - Multiply by Q: rhs <-- (I - Q*Q')*vscr
@@ -131,7 +144,8 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
 
    // Init PCG
    iter = 0;
-   bool exit_test = (itmax <= 0);
+   double const res_norm0 = dnrm2_par(np, nn_K, res, ridv);
+   bool exit_test = (itmax <= 0) || (res_norm0 < 1e-15);
 
    // PCG loop
    double alpha, beta, gamma, gamma_old;
@@ -141,24 +155,17 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       iter++;
 
       // Compute zvec
-      // 1 - Permute res from row-major to col-major
-      apply_perm(np,nn_K,iperm,res,vscr);
-      // 2 - Apply preconditioner to wscr: wscr <-- M_inv*vscr
       if (prec_type == DIAG){
          #pragma omp parallel for num_threads(np)
-            for (int i = 0; i < nn_K; i++) wscr[i] = D_inv[i]*vscr[i];
+         for (int i = 0; i < nn_K; i++) vscr[i] = D_inv[i]*res[i];
       } else if (prec_type == SGS){
-        // symmetric Gauss-Seidel U^-1 * D * L^-1 * vscr
-        // works in place
-        LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-        UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,vscr,nn,iat_A,ja_A,coef_A,WNALLA);
-        // TODO this can be removed ...
-        #pragma omp parallel for num_threads(np)
-          for (int i = 0; i < nn_K; i++) wscr[i] = vscr[i];
+         // symmetric Gauss-Seidel U^-1 * D * L^-1 * wscr
+         apply_perm(np,nn_K,iperm,res,wscr);
+         LinvP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
+         UinvDP_spmat(np,nn_C,iat_Tpatt,ja_Tpatt,wscr,nn,iat_A,ja_A,coef_A,WNALLA);
+         apply_perm(np,nn_K,perm,wscr,vscr);
       }
-      // 3 - Permute wscr from col-major to row-major
-      apply_perm(np,nn_K,perm,wscr,vscr);
-      // 4 - Multiply by Q: zvec <-- (I - Q*QT)*vscr
+      // Multiply by Q: zvec <-- (I - Q*QT)*vscr
       Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,zvec);
 
       // Compute gamma <-- resT*zvec
@@ -195,10 +202,11 @@ int DEFL_PCG_matfree(const int np, const int prec_type, const int sol_type, cons
       Orth_Q(np,nn,ntv,iat_patt,mat_Q,vscr,v_ntv,QKpvec);
 
       // Compute alpha
-      alpha = ddot_par(np,nn_K,QKpvec,pvec,ridv);
+      double const denom = ddot_par(np,nn_K,QKpvec,pvec,ridv);
+      if (std::abs(denom) < 1e-18) break;
       // Compute energy reduction
-      DEk = gamma*gamma / alpha;
-      alpha = gamma / alpha;
+      DEk = gamma*gamma / denom;
+      alpha = gamma / denom;
 
       // Update Prolongation and residual
       #pragma omp parallel for num_threads(np)

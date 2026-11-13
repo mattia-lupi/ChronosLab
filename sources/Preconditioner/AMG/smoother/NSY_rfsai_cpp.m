@@ -38,28 +38,14 @@ ja_A      = int32(ja_A) - 1;
       NSY_rFSAI_compute(nstep,step_size,epsilon,nn_A,iat_A,ja_A,coef_A,nthreads);
 
 % Create a sparse matrices for FL
-nt_FL = size(ja_FL,2);
-irow_FL = zeros(nt_FL,1);
-iend   = iat_FL(1)-1;
-for i = 1:nn_A
-   istart = iend + 1;
-   iend = iat_FL(i+1)-1;
-   irow_FL(istart:iend) = i;
-end
+irow_FL = repelem((1:nn_A)', diff(iat_FL));
 ja_FL = double(ja_FL);
-FL = sparse(irow_FL,ja_FL,coef_FL);
+FL = sparse(irow_FL, ja_FL, coef_FL, nn_A, nn_A);
 
 % Create a sparse matrices for FU
-nt_FU = size(ja_FU,2);
-irow_FU = zeros(nt_FU,1);
-iend   = iat_FU(1)-1;
-for i = 1:nn_A
-   istart = iend + 1;
-   iend = iat_FU(i+1)-1;
-   irow_FU(istart:iend) = i;
-end
+irow_FU = repelem((1:nn_A)', diff(iat_FU));
 ja_FU = double(ja_FU);
-FU = sparse(irow_FU,ja_FU,coef_FU);
+FU = sparse(irow_FU, ja_FU, coef_FU, nn_A, nn_A);
 
 % end function
 return

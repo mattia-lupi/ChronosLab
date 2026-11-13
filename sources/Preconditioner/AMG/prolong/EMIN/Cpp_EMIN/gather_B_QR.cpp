@@ -245,7 +245,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
 
                bool FAIL_QR = false;
                lapack_int i_lpk_1, i_lpk_2, i_lpk_3;
-               if (nr_BB_loc >= ntv){
+               if (nr_BB_loc > ntv){
 
                   // Perform QR on BB
                   l_nn = static_cast<lapack_int>(nr_BB_loc);
@@ -351,7 +351,7 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                // Perform least square solution if necessary |
                //--------------------------------------------+
 
-               if ( (nr_BB_loc < ntv) || FAIL_QR){
+               if ( (nr_BB_loc <= ntv) || FAIL_QR){
 
                   if ( PRINT_LOC_INFO )
                      std::cout << icol << " Solution for RANK deficient system " << std::endl;
@@ -376,12 +376,15 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   }
 
                   // Compute the rank of BB using SIGMA
-                  int rank_BB = 1;
-                  if (nr_BB_loc > 1){
-                     while (SIGMA[0] < condmax * std::abs(SIGMA[rank_BB])){
-                        rank_BB++;
-                        if (rank_BB == std::min(ntv,nr_BB_loc)){
-                           break;
+                  int rank_BB = 0;
+                  if (SIGMA[0] > 1e-15) {
+                     rank_BB = 1;
+                     if (nr_BB_loc > 1){
+                        while (SIGMA[0] < condmax * std::abs(SIGMA[rank_BB])){
+                           rank_BB++;
+                           if (rank_BB == std::min(ntv,nr_BB_loc)){
+                              break;
+                           }
                         }
                      }
                   }
@@ -412,21 +415,23 @@ int gather_B_QR(const int np, const double condmax, const int nn, const int nn_C
                   }
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-                  // Compute w = V^T * g, store w temporarily in work
-                  b_m = static_cast<lapack_int>( rank_BB );
-                  b_n = static_cast<lapack_int>( ntv );
-                  dgemv(chn, &b_m, &b_n, &one, VT, &b_n,
-                        g_scr, &oneint, &zero, work, &oneint);
+                  if (rank_BB > 0) {
+                     // Compute w = V^T * g, store w temporarily in work
+                     b_m = static_cast<lapack_int>( rank_BB );
+                     b_n = static_cast<lapack_int>( ntv );
+                     dgemv(chn, &b_m, &b_n, &one, VT, &b_n,
+                           g_scr, &oneint, &zero, work, &oneint);
 
-                  // Scale w with the inverse of singular values
-                  for (int i = 0; i < rank_BB; i++) work[i] /= SIGMA[i];
+                     // Scale w with the inverse of singular values
+                     for (int i = 0; i < rank_BB; i++) work[i] /= SIGMA[i];
 
-                  // Compute coef_P0 += V * w
-                  //XXXXX METTERE UN CONTROLLO CHE COEF_P0 NON DIVENTI TROPPO GRANDE
-                  b_m = static_cast<lapack_int>( nr_BB_loc );
-                  b_n = static_cast<lapack_int>( rank_BB );
-                  dgemv(chn, &b_m, &b_n, &one, &(BB_scr[ind_BB]), &b_m,
-                        work, &oneint, &one, &(coef_P0[istart_patt]), &oneint);
+                     // Compute coef_P0 += V * w
+                     //XXXXX METTERE UN CONTROLLO CHE COEF_P0 NON DIVENTI TROPPO GRANDE
+                     b_m = static_cast<lapack_int>( nr_BB_loc );
+                     b_n = static_cast<lapack_int>( rank_BB );
+                     dgemv(chn, &b_m, &b_n, &one, &(BB_scr[ind_BB]), &b_m,
+                           work, &oneint, &one, &(coef_P0[istart_patt]), &oneint);
+                  }
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                   if (DEBUG){
                      fprintf(DebEnv.t_logfile[mythid],"\nDP:\n");

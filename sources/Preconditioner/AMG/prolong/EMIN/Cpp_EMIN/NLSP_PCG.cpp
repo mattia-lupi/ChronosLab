@@ -92,10 +92,11 @@ int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
    // Init PCG
    iter = 0;
    double resiter = 1.0;
-   bool exit_test = (itmax <= 0);
+   bool exit_test = (itmax <= 0) || (bnorm < 1e-15);
 
    // PCG loop
    double alpha, beta, ptKp;
+   double DE = 0.0;
    while (!exit_test){
 
       // Increase iter count
@@ -140,7 +141,9 @@ int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
 
       // Compute alpha
       ptKp = ddot_par(np,nequ,pvec,Kxp,ridv);
-      alpha = ddot_par(np,nequ,pvec,res,ridv) / ptKp;
+      if (std::abs(ptKp) < 1e-18) break;
+      double const pr = ddot_par(np,nequ,pvec,res,ridv);
+      alpha = pr / ptKp;
 
       // Update solution and residual
       #pragma omp parallel for num_threads(np)
@@ -154,23 +157,7 @@ int NLSP_PCG(const int np, const int prec_type, const int nn, const int nn_C,
       exit_test = (resiter < EMIN_CGTOL) || (iter == itmax);
       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       #if COMP_ENRG
-         Z_mult(np,nn,ntv,iat_patt,pt_Z,pt_col_Z,mat_Z,sol,vscr);
-         apply_perm(np,nn_K,iperm,vscr,wscr);
-         spmatv_blk(np,nn_C,iat_Tpatt,iat_K,ja_K,coef_K,wscr,vscr);
-         apply_perm(np,nn_K,perm,vscr,wscr);
-         ZT_mult(np,nn,ntv,iat_patt,pt_Z,pt_col_Z,mat_Z,wscr,vscr);
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         std::cout << std::endl << std::endl;
-         std::cout << "P Aff P " << ddot_par(np,nequ,vscr,sol,ridv) << std::endl;
-         std::cout << "P rhs " << ddot_par(np,nequ,rhs,sol,ridv) << std::endl;
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         #pragma omp parallel for num_threads(np)
-         for (int i = 0; i < nequ; i++)
-            vscr[i] -= 2.0*rhs[i];
-         double DE = ddot_par(np,nequ,vscr,sol,ridv);
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
-         std::cout << "DE   " << DE << std::endl << std::endl;
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
+         DE -= alpha * pr;
          std::cout << std::fixed << std::setw(6) << iter << " ";
          std::cout << std::setprecision(6) << std::scientific;
          std::cout << resiter << "   " << init_energy << "   " << DE << "   " << init_energy+DE << std::endl;

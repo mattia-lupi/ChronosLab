@@ -90,27 +90,27 @@ public:
         // -----------------------------------------------------------------------
         if (dump) mprint("- Get input arrays\n");
 
-        const TypedArray<int32_t> fcnode_arr   = inputs[12];
-        const TypedArray<int32_t> iat_A_arr    = inputs[13];
-        const TypedArray<int32_t> ja_A_arr     = inputs[14];
-        const TypedArray<double>  coef_A_arr   = inputs[15];
-        const TypedArray<int32_t> iat_Pin_arr  = inputs[16];
-        const TypedArray<int32_t> ja_Pin_arr   = inputs[17];
-        const TypedArray<double>  coef_Pin_arr = inputs[18];
-        const TypedArray<int32_t> iat_patt_arr = inputs[19];
-        const TypedArray<int32_t> ja_patt_arr  = inputs[20];
-        const TypedArray<double>  TVbuf_arr    = inputs[21];
+        TypedArray<int32_t> fcnode_arr   = std::move(inputs[12]);
+        TypedArray<int32_t> iat_A_arr    = std::move(inputs[13]);
+        TypedArray<int32_t> ja_A_arr     = std::move(inputs[14]);
+        TypedArray<double>  coef_A_arr   = std::move(inputs[15]);
+        TypedArray<int32_t> iat_Pin_arr  = std::move(inputs[16]);
+        TypedArray<int32_t> ja_Pin_arr   = std::move(inputs[17]);
+        TypedArray<double>  coef_Pin_arr = std::move(inputs[18]);
+        TypedArray<int32_t> iat_patt_arr = std::move(inputs[19]);
+        TypedArray<int32_t> ja_patt_arr  = std::move(inputs[20]);
+        TypedArray<double>  TVbuf_arr    = std::move(inputs[21]);
 
-        std::vector<int32_t> fcnode_vec  (fcnode_arr.begin(),   fcnode_arr.end());
-        std::vector<int32_t> iat_A_vec   (iat_A_arr.begin(),    iat_A_arr.end());
-        std::vector<int32_t> ja_A_vec    (ja_A_arr.begin(),     ja_A_arr.end());
-        std::vector<double>  coef_A_vec  (coef_A_arr.begin(),   coef_A_arr.end());
-        std::vector<int32_t> iat_Pin_vec (iat_Pin_arr.begin(),  iat_Pin_arr.end());
-        std::vector<int32_t> ja_Pin_vec  (ja_Pin_arr.begin(),   ja_Pin_arr.end());
-        std::vector<double>  coef_Pin_vec(coef_Pin_arr.begin(), coef_Pin_arr.end());
-        std::vector<int32_t> iat_patt_vec(iat_patt_arr.begin(), iat_patt_arr.end());
-        std::vector<int32_t> ja_patt_vec (ja_patt_arr.begin(),  ja_patt_arr.end());
-        std::vector<double>  TVbuf_vec   (TVbuf_arr.begin(),    TVbuf_arr.end());
+        auto fcnode_buf   = fcnode_arr.release();
+        auto iat_A_buf    = iat_A_arr.release();
+        auto ja_A_buf     = ja_A_arr.release();
+        auto coef_A_buf   = coef_A_arr.release();
+        auto iat_Pin_buf  = iat_Pin_arr.release();
+        auto ja_Pin_buf   = ja_Pin_arr.release();
+        auto coef_Pin_buf = coef_Pin_arr.release();
+        auto iat_patt_buf = iat_patt_arr.release();
+        auto ja_patt_buf  = ja_patt_arr.release();
+        auto TVbuf_buf    = TVbuf_arr.release();
 
         // -----------------------------------------------------------------------
         // Build the TV double** pointer array
@@ -124,10 +124,11 @@ public:
                        "Failed to allocate TV pointer array.");
 
         double **TV = TV_owner.get();
+        double *TVbuf_ptr = TVbuf_buf.get();
         {
-            int offset = 0;
+            std::ptrdiff_t offset = 0;
             for (int i = 0; i < nn; ++i) {
-                TV[i]   = TVbuf_vec.data() + offset;
+                TV[i]   = TVbuf_ptr + offset;
                 offset += ntv;
             }
         }
@@ -163,16 +164,16 @@ public:
 
         int ierr = EMIN_ImpProl(np, itmax, en_tol, condmax,
                                 prec, sol_type, nn, nn_C, ntv,
-                                nt_patt, fcnode_vec.data(), SPDflag,
-                                iat_A_vec.data(),    ja_A_vec.data(),   coef_A_vec.data(),
-                                iat_Pin_vec.data(),  ja_Pin_vec.data(), coef_Pin_vec.data(),
-                                iat_patt_vec.data(), ja_patt_vec.data(),
+                                nt_patt, fcnode_buf.get(), SPDflag,
+                                iat_A_buf.get(),    ja_A_buf.get(),   coef_A_buf.get(),
+                                iat_Pin_buf.get(),  ja_Pin_buf.get(), coef_Pin_buf.get(),
+                                iat_patt_buf.get(), ja_patt_buf.get(),
                                 TV,
                                 iat_Pout_raw, ja_Pout_raw, coef_Pout_raw,
                                 info,verb);
 
         // TV_owner destructs here — free() called on the pointer array only;
-        // the rows were views into TVbuf_vec (stack-managed), not separately alloc'd.
+        // the rows were views into TVbuf_buf, not separately alloc'd.
 
         MallocGuard g_iat (iat_Pout_raw);
         MallocGuard g_ja  (ja_Pout_raw);
@@ -197,25 +198,25 @@ public:
         const std::size_t n1      = static_cast<std::size_t>(nn + 1);
         const std::size_t nt_Pout = static_cast<std::size_t>(iat_Pout_raw[nn]);
 
-        // --- iat_Pout : int32, length nn+1, 0-based → 1-based ----------------
-        TypedArray<int32_t> iat_final = factory.createArray<int32_t>({1, n1});
-        {
-            auto it = iat_final.begin();
-            for (int k = 0; k <= nn; ++k, ++it)
-                *it = iat_Pout_raw[k] + 1;
+        auto iat_buf  = factory.createBuffer<int32_t>(n1);
+        auto ja_buf   = factory.createBuffer<int32_t>(nt_Pout);
+        auto coef_buf = factory.createBuffer<double>(nt_Pout);
+
+        int32_t *iat_dst  = iat_buf.get();
+        int32_t *ja_dst   = ja_buf.get();
+        double  *coef_dst = coef_buf.get();
+
+        for (int k = 0; k <= nn; ++k)
+            iat_dst[k] = iat_Pout_raw[k] + 1;
+
+        for (std::size_t k = 0; k < nt_Pout; ++k) {
+            ja_dst[k]   = ja_Pout_raw[k] + 1;
+            coef_dst[k] = coef_Pout_raw[k];
         }
 
-        // --- ja_Pout : int32, length nt_Pout, 0-based → 1-based --------------
-        TypedArray<int32_t> ja_final = factory.createArray<int32_t>({1, nt_Pout});
-        {
-            auto it = ja_final.begin();
-            for (std::size_t k = 0; k < nt_Pout; ++k, ++it)
-                *it = ja_Pout_raw[k] + 1;
-        }
-
-        // --- coef_Pout : double, length nt_Pout ------------------------------
-        TypedArray<double> coef_final = factory.createArray<double>({1, nt_Pout});
-        std::copy(coef_Pout_raw, coef_Pout_raw + nt_Pout, coef_final.begin());
+        TypedArray<int32_t> iat_final  = factory.createArrayFromBuffer<int32_t>({1, n1}, std::move(iat_buf));
+        TypedArray<int32_t> ja_final   = factory.createArrayFromBuffer<int32_t>({1, nt_Pout}, std::move(ja_buf));
+        TypedArray<double>  coef_final = factory.createArrayFromBuffer<double>({1, nt_Pout}, std::move(coef_buf));
 
         // MallocGuards destruct here — iat/ja/coef_Pout_raw freed automatically
 

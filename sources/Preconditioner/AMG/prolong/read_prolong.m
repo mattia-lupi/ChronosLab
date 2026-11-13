@@ -41,14 +41,14 @@ if strcmpi(prol_emin,'EMIN')
 
    % Check preconditioner choice is correct
    if (prec_emin < 1 || prec_emin > 3)
-      error('Wrong prec_emin: %d\n',prol_emin);
+      error('Wrong prec_emin: %d\n',prec_emin);
    end
 
    % Check EMIN parameters are ok
    if (solv_emin >= 1 && solv_emin <= 3)
       % SGS is not supported
       if (prec_emin == 3)
-         error('SGS (prol_emin: %d) is not supported for solv_emin: %d\n',...
+         error('SGS (prec_emin: %d) is not supported for solv_emin: %d\n',...
                 prec_emin,solv_emin);
       end
    elseif (solv_emin < 1 || solv_emin > 4)

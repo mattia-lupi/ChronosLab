@@ -40,7 +40,7 @@ else
    end
    if (n2 < ntv)
       V0 = [V0_input, rand(n, ntv-n2)];
-   elseif (n1 > ntv)
+   elseif (n2 > ntv)
       V0 = V0_input(:, 1:ntv);
    else
       V0 = V0_input;

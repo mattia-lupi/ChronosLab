@@ -130,13 +130,16 @@ int gather_K(const int np, const int nn, const int nn_C,
             istart++;
          }
             
-          #pragma omp critical
-         {
-             if (max_nnzr > max_nrows_blk) max_nrows_blk = max_nnzr;
-             if (ind_scr - ind_scr_old > max_nterm_blk) max_nterm_blk = ind_scr - ind_scr_old;
-         }
+         if (max_nnzr > local_max_nrows) local_max_nrows = max_nnzr;
+         if (ind_scr - ind_scr_old > local_max_nterm) local_max_nterm = ind_scr - ind_scr_old;
       }
       exit_loop_icol: ;
+
+      #pragma omp critical
+      {
+         if (local_max_nrows > max_nrows_blk) max_nrows_blk = local_max_nrows;
+         if (local_max_nterm > max_nterm_blk) max_nterm_blk = local_max_nterm;
+      }
 
       // Store the number of rows and entries of this stripe
       myrows = k_scr;

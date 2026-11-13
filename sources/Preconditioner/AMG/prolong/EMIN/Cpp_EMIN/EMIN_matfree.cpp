@@ -106,7 +106,7 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
       D_inv = (double*) malloc( nt_patt*sizeof(double) );
       double *scr = (double*) malloc( nn*sizeof(double) );
       if (D_inv == nullptr || scr == nullptr) return ierr = 3;
-      load_Jacobi(np,nn,nt_patt,ja_Tpatt,iat_A,ja_A,coef_A,scr,D_inv);
+      load_Jacobi(np,nn,iat_patt,iat_A,ja_A,coef_A,scr,D_inv);
       free(scr);
       nnz_J = nt_patt;
       end = std::chrono::system_clock::now();
@@ -162,17 +162,47 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
       int k = fcnode[i];
       if (k >= 0) c2glo[k] = i;
    }
+
+   int *iat_At = nullptr;
+   int *ja_At = nullptr;
+   double *coef_At = nullptr;
+   if (!SPDflag) {
+      int const nnz_A = iat_A[nn];
+      iat_At = (int*) malloc((nn + 1) * sizeof(int));
+      ja_At  = (int*) malloc(nnz_A * sizeof(int));
+      int *perm_A  = (int*) malloc(nnz_A * sizeof(int));
+      int *iperm_A = (int*) malloc(nnz_A * sizeof(int));
+      coef_At = (double*) malloc(nnz_A * sizeof(double));
+      if (iat_At && ja_At && perm_A && iperm_A && coef_At) {
+         Transp_Patt(np, nn, nn, nnz_A, iat_A, ja_A, iat_At, ja_At, perm_A, iperm_A);
+         #pragma omp parallel for num_threads(np)
+         for (int i = 0; i < nnz_A; i++) {
+            coef_At[perm_A[i]] = coef_A[i];
+         }
+      }
+      free(perm_A);
+      free(iperm_A);
+   }
+
+   int const *src_iat_A  = (!SPDflag && iat_At) ? iat_At : iat_A;
+   int const *src_ja_A   = (!SPDflag && ja_At)  ? ja_At  : ja_A;
+   double const *src_coef_A = (!SPDflag && coef_At) ? coef_At : coef_A;
+
    // Gather vec_f
    #pragma omp parallel for num_threads(np)
    for (int icol = 0; icol < nn_C; icol++){
        int istart = iat_Tpatt[icol];
        int iend = iat_Tpatt[icol+1];
        int irow = c2glo[icol];
-       int istart_A = iat_A[irow];
-       int iend_A = iat_A[irow+1];
-       gather_f(iend-istart,&(ja_Tpatt[istart]),iend_A-istart_A,&(ja_A[istart_A]),
-                &(coef_A[istart_A]),&(vec_f[istart]));
+       int istart_A = src_iat_A[irow];
+       int iend_A = src_iat_A[irow+1];
+       gather_f(iend-istart,&(ja_Tpatt[istart]),iend_A-istart_A,&(src_ja_A[istart_A]),
+                &(src_coef_A[istart_A]),&(vec_f[istart]));
    }
+
+   if (iat_At)  free(iat_At);
+   if (ja_At)   free(ja_At);
+   if (coef_At) free(coef_At);
    end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    free(c2glo);
@@ -218,7 +248,18 @@ int EMIN_matfree(const int np, const int itmax, const double en_tol, const doubl
                                 iat_A,ja_A,coef_A,iat_patt,ja_patt,iat_Tpatt,ja_Tpatt,
                                 mat_Q,coef_P0,vec_f,itmax,en_tol,iter,DP,verb);
    }
-   if (ierr != 0) return ierr = 5;
+   if (ierr != 0) {
+      free(vec_f);
+      free(mat_Q);
+      free(D_inv);
+      free(perm);
+      free(iperm);
+      free(iat_Tpatt);
+      free(ja_Tpatt);
+      free(coef_P0);
+      free(DP);
+      return ierr = 5;
+   }
    end = std::chrono::system_clock::now();
    elaps_sec = end - start;
    double time_PCG = elaps_sec.count();

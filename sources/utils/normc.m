@@ -1,7 +1,7 @@
 function V = normc(V)
 
-for i = 1:size(V,2)
-   V(:,i) = V(:,i) / norm(V(:,i));
-end
+nrm = vecnorm(V, 2, 1);
+nrm(nrm == 0) = 1;
+V = V ./ nrm;
 
 return
