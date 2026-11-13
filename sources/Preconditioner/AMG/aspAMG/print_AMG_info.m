@@ -67,9 +67,9 @@ else
    fprintf(ofile,'-----------------------------------------------------\n');
    fprintf(ofile,' %5s %10s %10s %13s %10s\n','level','nn','nnz','avg nnz/row','omega');
    for i = 1:n_lev-1
-      fprintf(ofile,' %5d %10d %10d %13.2f %10.4f\n',i,info(i).nn,info(i).nt_S,info(i).nt_S/info(i).nn,info(i).omega);;
+      fprintf(ofile,' %5d %10d %10d %13.2f %10.4f\n',i,info(i).nn,info(i).nt_S,info(i).nt_S/info(i).nn,info(i).omega);
    end
-   fprintf(ofile,' %5d %10d %10s %13s %10s\n',n_lev,info(n_lev).nn,'----','----','----');;
+   fprintf(ofile,' %5d %10d %10s %13s %10s\n',n_lev,info(n_lev).nn,'----','----','----');
    fprintf(ofile,'-----------------------------------------------------\n');
 
    % Print Prolongation information

@@ -34,8 +34,13 @@ n = size(A,1);
 ntv = param.tspace.ntv;
 ntv0 = size(TV0,2);
 TV = zeros(n,ntv);
-TV(:,1:ntv0) = TV0;
-TV(:,ntv0+1:ntv) = rand(n,ntv-ntv0);
+if ntv0 > 0
+   ncol = min(ntv0, ntv);
+   TV(:,1:ncol) = TV0(:,1:ncol);
+end
+if ntv > ntv0
+   TV(:,ntv0+1:ntv) = rand(n,ntv-ntv0);
+end
 
 % Orthonormalize the test space
 [TV,~] = qr(TV,0);
@@ -66,13 +71,8 @@ global AMG_Total_Mem;
 global AMG_Peak_Mem;
 global DEBINFO;
 % Remove some DEBUG file
-if DEBINFO.flag
-   if level == 1
-      ! rm Logfile.*
-      ! rm IBDEBUG
-      ! rm ROWDEBUG
-      ! rm LOG_CORRECT
-   end
+if DEBINFO.flag && level == 1
+   delete('Logfile.*', 'IBDEBUG', 'ROWDEBUG', 'LOG_CORRECT');
 end
 
 amg_times

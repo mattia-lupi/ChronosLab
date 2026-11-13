@@ -29,13 +29,25 @@ elseif k_type < 0
 end
 
 % Compute diagonal preconditioner
-D_inv = 1 ./ diag(FT);
-D_inv = diag(sparse(D_inv));
-lmax = eigs(D_inv*FT,1,'lm','Display',verb,'Tolerance',1.e-3);
-omega = min(1.0,1.9 / abs(lmax));
-TV_out = omega*D_inv*TV_in;
+d_inv = 1 ./ diag(FT);
+
+% If FT is triangular or diagonal (e.g. FSAI factor transpose or Jacobi),
+% the eigenvalues of D_inv * FT are identically 1.0 on the diagonal, so lmax = 1.0.
+% Otherwise compute lmax using an operator function without forming D_inv * FT.
+if istriu(FT) || istril(FT) || isdiag(FT)
+   omega = 1.0;
+else
+   D_inv_op = @(x) d_inv .* (FT * x);
+   opts.disp = verb;
+   opts.tol = 1.e-3;
+   lmax = eigs(D_inv_op, size(FT, 1), 1, 'lm', opts);
+   omega = min(1.0, 1.9 / abs(lmax));
+end
+
+scale = omega .* d_inv;
+TV_out = scale .* TV_in;
 for i = 2:k_type
-   TV_out = TV_out + omega*(D_inv*(TV_in - FT*TV_out));
+   TV_out = TV_out + scale .* (TV_in - FT*TV_out);
 end
 
 
