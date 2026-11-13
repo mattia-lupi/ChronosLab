@@ -61,7 +61,7 @@ if verb
    fprintf('NNZR of original matrix:     %10.2f\n',nnz(A)/size(A,1)-1);
 end
 Stmp = S;
-Stmp = Stmp - diag(diag(Stmp));
+Stmp = Stmp - spdiags(diag(Stmp), 0, size(Stmp,1), size(Stmp,2));
 if verb
    fprintf('NNZR of filtered SoC matrix: %10.2f\n',nnz(Stmp)/size(Stmp,1));
 end

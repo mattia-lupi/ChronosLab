@@ -41,7 +41,7 @@ CFc_Ff_node = zeros(size(A,1),1);
 switch upper(SoC_type)
    case 'AFF'
       % Compute strength of connections (use the pattern of A to evaluate affinities)
-      [S,S_patt] = cpt_SoC_aff(SoC_perc,A,A,TV,verb);
+      [S,S_patt] = cpt_SoC_aff(tau,A,A,TV,verb);
    case 'CLA'
       % Compute classicla strength of connections
       [S,S_patt] = cpt_SoC_cla(tau,A,verb);
@@ -62,7 +62,7 @@ if verb
    fprintf('NNZR of original matrix:     %10.2f\n',nnz(A)/size(A,1)-1);
 end
 Stmp = S;
-Stmp = Stmp - diag(diag(Stmp));
+Stmp = Stmp - spdiags(diag(Stmp), 0, size(Stmp,1), size(Stmp,2));
 if verb
    fprintf('NNZR of filtered SoC matrix: %10.2f\n',nnz(Stmp)/size(Stmp,1));
 end

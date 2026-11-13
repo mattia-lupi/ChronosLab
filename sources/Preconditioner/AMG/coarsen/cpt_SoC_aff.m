@@ -23,25 +23,17 @@ global DEBINFO
 
 S_patt = tril(S_patt,-1);
 nn = size(S_patt,1);
-nt = nnz(S_patt);
-TV = TV';
-% Compute row affinity
-[ii,jj,aa] = find(S_patt);
-ss = zeros(nt,1);
-for ind = 1:nt
+[ii,jj] = find(S_patt);
 
-   if mod(ind,floor(nt/10)) == 0
-      if verb
-         fprintf('Processed %9i entries out of %9i\n',ind,nt)
-      end
-   end
+% Compute row affinity (vectorized upfront row normalization)
+row_norms = vecnorm(TV, 2, 2);
+valid = (row_norms >= 1.e-10);
+inv_norms = zeros(size(row_norms));
+inv_norms(valid) = 1 ./ row_norms(valid);
+TV_norm = TV .* inv_norms;
 
-   v = TV(:,ii(ind));
-   w = TV(:,jj(ind));
-   %ss(ind) = cpt_sign_aff(v,w);
-   ss(ind) = cpt_aff(v,w);
-
-end
+% Compute inner product across all edges vectorized
+ss = abs(sum(TV_norm(ii, :) .* TV_norm(jj, :), 2));
 S = sparse(ii,jj,ss,nn,nn);
 
 % Complete the matrix with a unitary diagonal

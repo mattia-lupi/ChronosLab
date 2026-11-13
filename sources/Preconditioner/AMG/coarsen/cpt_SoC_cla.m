@@ -24,7 +24,7 @@ end
 [nRows, nCols] = size(A);
 
 % Get off-diagonal part of A
-A_off = A - diag(diag(A));
+A_off = A - spdiags(diag(A), 0, nRows, nCols);
 
 % Get the minimum value of each column
 min_col = full(min(A_off))';
@@ -73,7 +73,7 @@ end
 % Complete the matrix with a unitary diagonal
 nn = size(S,1);
 S = S + speye(nn);
-S_patt = S_patt - diag(diag(S_patt)) + speye(nn);
+S_patt = S_patt - spdiags(diag(S_patt), 0, nn, nn) + speye(nn);
 
 if verb
    fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);
