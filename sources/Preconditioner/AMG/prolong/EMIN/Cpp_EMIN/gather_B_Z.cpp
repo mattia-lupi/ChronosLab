@@ -175,7 +175,8 @@ int gather_B_Z(const int np, const int nn, const int nn_C, const int ntv,
       }
 
       // Loop over the current chunk of columns
-      int ind_g = 0;
+      int ind_g;
+      ind_g = 0;
       int istart_patt, iend_patt;
       iend_patt = iat_patt[firstcol];
       for (int icol = firstcol; icol < lastcol; icol++){
