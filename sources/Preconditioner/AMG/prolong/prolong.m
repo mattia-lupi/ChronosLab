@@ -191,7 +191,7 @@ if strcmpi(prol_emin,'SMOOTH')
       fprintf('Unsmoothed prolongation non-zeroes per row: %10.2f\n',(nnz(P)-nc)/(nn-nc));
    end
    DA = diag(diag(A))\A;
-   lambda_max = eigs(DA,1,'lm','Tolerance',1.e-3,'FailureTreatment','keep');
+   [~,lambda_max,~] = eigs(DA,1,'lm','Tolerance',1.e-3,'FailureTreatment','keep');
    omega = 1.9 / lambda_max;
    if verb
       fprintf('Max eigenvalue and omega: %10.2f %10.2f\n',lambda_max,omega);

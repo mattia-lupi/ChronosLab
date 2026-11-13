@@ -45,7 +45,7 @@ switch lower(method)
             opts.issym = 0;
             opts.disp = verb;
             opts.tol = 5.e-4;
-            lambda = eigs(FAFT,size(A,1),1,'lm',opts);
+            [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm',opts);
             if verb
                fprintf('Max Lambda: %10.4f\n',lambda);
             end
@@ -73,7 +73,7 @@ switch lower(method)
             opts.issym = 1;
             opts.disp = verb;
             opts.tol = 5.e-4;
-            lambda = eigs(FAFT,size(A,1),1,'la',opts);
+            [~,lambda,~] = eigs(FAFT,size(A,1),1,'la',opts);
             if verb
                fprintf('Max Lambda: %10.4f\n',lambda);
             end
@@ -96,7 +96,8 @@ switch lower(method)
         opts.issym = 0;
         opts.disp = verb;
         opts.tol = 5.e-4;
-        lambda = abs(eigs(FAFT,size(A,1),1,'lm',opts));
+        [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm',opts);
+        lambda = abs(lambda);
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
         end
@@ -115,7 +116,7 @@ switch lower(method)
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
         % opts.issym = 1;
-        lambda = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
+        [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
                          'Tolerance',1.e-2,'Display',verb,'FailureTreatment','keep');
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);

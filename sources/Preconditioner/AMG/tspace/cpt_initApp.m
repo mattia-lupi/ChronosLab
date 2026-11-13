@@ -40,7 +40,7 @@ else
    D_inv_op = @(x) d_inv .* (FT * x);
    opts.disp = verb;
    opts.tol = 1.e-3;
-   lmax = eigs(D_inv_op, size(FT, 1), 1, 'lm', opts);
+   [~,lmax,~] = eigs(D_inv_op, size(FT, 1), 1, 'lm', opts);
    omega = min(1.0, 1.9 / abs(lmax));
 end
 

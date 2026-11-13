@@ -87,7 +87,7 @@ end
 % Get the current size
 n = size(A,1);
 % Compute operator max eigenvalue
-lmax_A = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',10);
+[~,lmax_A,~] = eigs(A,1,'lm','FailureTreatment','keep','Display',0,'Tolerance',0.001,'MaxIterations',10);
 AMG_hrc.lmax_A = lmax_A;
 AMG_hrc.isPosDef = param.isPosDef;
 
@@ -155,7 +155,7 @@ else
    %--------------------------------------------------------------------------------------
 
    % Compute the test space
-   tic;
+   time_tspa = tic;
    if verb
       fprintf('BEGIN: Computing the test space\n');
    end
@@ -177,7 +177,7 @@ else
    if verb
       fprintf('END: Computing the test space\n\n');
    end
-   T_tspa = T_tspa + toc;
+   T_tspa = T_tspa + toc(time_tspa);
 
    %--------------------------------------------------------------------------------------
 
@@ -185,7 +185,7 @@ else
    use_aggressive = level <= param.coarsen.nl_agg;
 
    % Compute coarsening
-   tic;
+   time_coar = tic;
    if verb
       fprintf('BEGIN: Computing the coarse nodes\n');
    end
@@ -203,7 +203,7 @@ else
    if verb
       fprintf('END: Computing the coarse nodes\n\n');
    end
-   T_coar = T_coar + toc;
+   T_coar = T_coar + toc(time_coar);
    if verb
       fprintf('Number of FINE nodes:   %10d\n',num_f);
       fprintf('Number of COARSE nodes: %10d\n',num_c);
@@ -245,7 +245,7 @@ else
    %--------------------------------------------------------------------------------------
 
    % Filter prolongation
-   tic;
+   time_filP = tic;
    np   = param.filter.np;
    wgt  = param.filter.filt_wgt;
    tol  = param.filter.filt_tol;
@@ -259,7 +259,7 @@ else
    else
       Pf = P;
    end
-   T_FilProl = T_FilProl + toc;
+   T_FilProl = T_FilProl + toc(time_filP);
    [nn,~] = size(P);
    if verb
       fprintf('Filtered prolongation non-zeroes per row: %10.2f\n',(nnz(Pf)-nc)/(nn-nc));
@@ -304,7 +304,7 @@ else
    %--------------------------------------------------------------------------------------
 
    % Filter the next level operator
-   tic;
+   time_filC = tic;
    tau = param.filter.filt_tau;
    np = param.filter.np;
    patt_min_flag = param.filter.min_patt;
@@ -328,7 +328,7 @@ else
    if verb
       fprintf('Avg nnzr Anext after filtering: %f\n',nnz(Anext)/size(Anext,1));
    end
-   T_FilCLev = T_FilCLev + toc;
+   T_FilCLev = T_FilCLev + toc(time_filC);
 
    %--------------------------------------------------------------------------------------
    GB_used = GetWhosMemory;
