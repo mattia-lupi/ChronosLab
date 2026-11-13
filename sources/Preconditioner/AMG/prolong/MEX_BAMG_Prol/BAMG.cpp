@@ -27,18 +27,18 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
    std::vector<iExt> vec_ridv_i;
    try {
       vec_ridv_i.resize(nthreads+1);
-   } catch (linsol_error) {
-      linsol_error ("BAMG","allocationg ridv_i");
-      return 1; //@@@@@@@@@@@@@@@@@@@@@
+   } catch (const std::exception &) {
+      linsol_error ("BAMG","allocating ridv_i");
+      return 1;
    }
    iExt* ridv_i = vec_ridv_i.data();
 
    // Allocate marker for nodes to "promote"
    try {
       vec_c_mark.assign(nn_C,0);
-   } catch (linsol_error) {
+   } catch (const std::exception &) {
       linsol_error ("BAMG","allocating c_mark");
-      return 1; //@@@@@@@@@@@@@@@@@@@@@
+      return 1;
    }
    iReg* c_mark = vec_c_mark.data();
 
@@ -97,32 +97,39 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
       std::vector<iExt> vec_iat_scr;
       std::vector<iReg> vec_ja_scr;
       std::vector<rExt> vec_coef_scr;
+      std::vector<iReg> dist_count_local;
+      if (params.verbosity >= VLEV_MEDIUM){
+         dist_count_local.assign(len_count,0);
+      }
+
       try {
          vec_iat_scr.resize(nn_loc+1);
          vec_ja_scr.resize(nt_Imax);
          vec_coef_scr.resize(nt_Imax);
-      } catch (linsol_error) {
+      } catch (const std::exception &) {
          linsol_error ("BAMG","allocating local scratches");
          ierr_L = 1;
-         goto exit_omp;
       }
       iat_scr  = vec_iat_scr.data();
       ja_scr   = vec_ja_scr.data();
       coef_scr = vec_coef_scr.data();
 
       // Compute the local stripe of the prolongation
-      try {
-         ProlStripe_BAMG(params,firstrow_0,firstrow,lastrow,nn_S,ntv,iat_S,ja_S,
-                         fcnodes,TV,nt_I_loc,iat_scr,ja_scr,coef_scr,c_mark,
-                         dist_count.data());
-      } catch (linsol_error) {
-         linsol_error ("BAMG","in computing the local stripe of BAMG");
-         ierr_L = 2;
-         goto exit_omp;
+      if (ierr_L == 0) {
+         try {
+            ProlStripe_BAMG(params,firstrow_0,firstrow,lastrow,nn_S,ntv,iat_S,ja_S,
+                            fcnodes,TV,nt_I_loc,iat_scr,ja_scr,coef_scr,c_mark,
+                            dist_count_local.data());
+         } catch (const std::exception &) {
+            linsol_error ("BAMG","in computing the local stripe of BAMG");
+            ierr_L = 2;
+         }
+      } else {
+         nt_I_loc = 0;
       }
 
       // Store local number of entries
-      ridv_i[myid+1] = nt_I_loc;
+      ridv_i[myid+1] = (ierr_L == 0) ? nt_I_loc : 0;
       #pragma omp barrier
 
       // Allocate the prolongation matrix
@@ -133,47 +140,59 @@ int BAMG ( const BAMG_params &params, const iReg nthreads, iReg nn_L, iReg nn_C,
              ridv_i[ip+1] = ridv_i[ip] + ridv_i[ip+1];
          }
          nt_I   = ridv_i[nthreads];
-         try {
-            vec_iat_I.resize(nn_S+1);
-            vec_ja_I.resize(nt_I);
-            vec_coef_I.resize(nt_I);
-         } catch (linsol_error) {
-            linsol_error ("BAMG","allocating prolongation matrix");
-            ierr = 1;
-         }
-      }
-      if (ierr != 0) goto exit_omp;
-      iat_I  = vec_iat_I.data();
-      ja_I   = vec_ja_I.data();
-      coef_I = vec_coef_I.data();
-
-      // Store iat_scr, ja_scr and coef_scr in the prolongation matrix
-      istart_I = ridv_i[myid];
-      shift = firstrow;
-      iend_scr = iat_scr[0];
-      for (iReg irow = 0; irow < nn_loc; irow++){
-         iat_I[shift+irow] = istart_I;
-         istart_scr = iend_scr;
-         iend_scr = iat_scr[irow+1];
-         iReg len_I = iend_scr - istart_scr;
-         for (iReg k = 0; k < len_I; k++){
-            ja_I[istart_I+k] = ja_scr[istart_scr+k];
-            coef_I[istart_I+k] = coef_scr[istart_scr+k];
-         }
-         istart_I += len_I;
-      }
-
-      // set empty rows
-      if ( myid == nthreads-1 ) {
-         for (iReg i = 0; i < nn_L; i++){
-            iat_I[0] = 0;
-         }
-         for (iReg i = nn_L+nn_C; i <= nn_S; i++){
-            iat_I[i] = ridv_i[nthreads];
+         if (ierr == 0) {
+            try {
+               vec_iat_I.resize(nn_S+1);
+               vec_ja_I.resize(nt_I);
+               vec_coef_I.resize(nt_I);
+            } catch (const std::exception &) {
+               linsol_error ("BAMG","allocating prolongation matrix");
+               ierr = 1;
+            }
          }
       }
 
-      exit_omp: ;
+      if (ierr == 0 && ierr_L == 0) {
+         iat_I  = vec_iat_I.data();
+         ja_I   = vec_ja_I.data();
+         coef_I = vec_coef_I.data();
+
+         // Store iat_scr, ja_scr and coef_scr in the prolongation matrix
+         istart_I = ridv_i[myid];
+         shift = firstrow;
+         iend_scr = iat_scr[0];
+         for (iReg irow = 0; irow < nn_loc; irow++){
+            iat_I[shift+irow] = istart_I;
+            istart_scr = iend_scr;
+            iend_scr = iat_scr[irow+1];
+            iReg len_I = iend_scr - istart_scr;
+            for (iReg k = 0; k < len_I; k++){
+               ja_I[istart_I+k] = ja_scr[istart_scr+k];
+               coef_I[istart_I+k] = coef_scr[istart_scr+k];
+            }
+            istart_I += len_I;
+         }
+
+         // set empty rows
+         if ( myid == nthreads-1 ) {
+            for (iReg i = 0; i < nn_L; i++){
+               iat_I[i] = 0;
+            }
+            for (iReg i = nn_L+nn_C; i <= nn_S; i++){
+               iat_I[i] = ridv_i[nthreads];
+            }
+         }
+      }
+
+      if (params.verbosity >= VLEV_MEDIUM) {
+         #pragma omp critical (dist_count_reduce)
+         {
+            for (iReg i = 0; i < len_count; ++i) {
+               dist_count[i] += dist_count_local[i];
+            }
+         }
+      }
+
       #pragma omp atomic update
       ierr += ierr_L;
 

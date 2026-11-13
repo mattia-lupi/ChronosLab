@@ -63,18 +63,27 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
    std::vector<iReg> vec_neigh;
    std::vector<iReg> vec_WI;
    std::vector<rExt> vec_WR;
+   std::vector<rExt> vec_wrot;
+   std::vector<rExt> vec_vcol;
+   std::vector<rExt> vec_vrow;
    try {
       vec_int_list.resize(nn_S);
       vec_neigh.resize(nn_S);
       vec_WI.resize(nn_S);
       vec_WR.resize(optimal_lwork);
-   } catch (linsol_error) {
+      vec_wrot.resize(ntvecs);
+      vec_vcol.resize(nn_S);
+      vec_vrow.resize(ntvecs);
+   } catch (const std::exception &) {
       throw linsol_error ("ProlStripe_BAMG","allocating scratches");
    }
    iReg *int_list = vec_int_list.data();
    iReg *neigh = vec_neigh.data();
    iReg *WI = vec_WI.data();
    rExt *WR = vec_WR.data();
+   rExt *wrot_buf = vec_wrot.data();
+   rExt *vcol_buf = vec_vcol.data();
+   rExt *vrow_buf = vec_vrow.data();
 
    // Allocate temporary space for "compressed" test space (restricted to neighbours only)
    std::vector<rExt*> vec_TVcomp;
@@ -82,7 +91,7 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
    try {
       vec_TVcomp.resize(nn_S+1);
       vec_TVbuf.resize(ntvecs*(nn_S+1));
-   } catch (linsol_error) {
+   } catch (const std::exception &) {
       throw linsol_error ("ProlStripe_BAMG","allocating compressed TV");
    }
    rExt **TVcomp = vec_TVcomp.data();
@@ -199,7 +208,8 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
             if (n_int > 0){
 
                // Select the best basis using maxVol
-               maxVol(mmax,maxcond,itmax_vol,tol_vol,n_int,ntvecs,TVcomp,row_rank,int_list);
+               maxVol(mmax,maxcond,itmax_vol,tol_vol,n_int,ntvecs,TVcomp,row_rank,int_list,
+                      wrot_buf,vcol_buf,vrow_buf);
 
                // Sort the list
                heapsort(int_list,row_rank);
@@ -278,8 +288,7 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                }
                if (VERB_FLAG){
                   // Increase count of nodes interpolated at a given distance
-                  #pragma omp atomic update
-                  dist_count[distance-1]++;
+                  if (distance > 0) dist_count[distance-1]++;
                }
                //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -290,13 +299,15 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                   distance++;
                   try {
                      add_new_neighs(iat_S,ja_S,istart_neigh,iend_neigh,nn_S,n_neigh,neigh,WI);
-                  } catch (linsol_error) {
+                  } catch (const std::exception &) {
                      throw linsol_error ("ProlStripe_BAMG","try to increase distance if possible");
                   }
                   if (n_neigh == iend_neigh){
                      // No new neighs have been added ==> break
                      UPD_WEIGHTS = false;
                      if (n_int == 0){
+                        // Mark the node as one to be promoted
+                        c_mark[inod] = 1;
                         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                         if (DEBUG && BAMG_DEBUG){
                            type_OMP_iReg myid = omp_get_thread_num();
@@ -305,7 +316,6 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                         }
                         if (VERB_FLAG){
                            // Increase the count of fine nodes without neighbours
-                           #pragma omp atomic update
                            dist_count[dist_max+2]++;
                         }
                         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -316,13 +326,17 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                            Reduce_IntSet(RELAX_FAC*maxrownrm,itmax_vol,tol_vol,maxcond,
                                          optimal_lwork,inod,n_neigh,ntvecs,row_rank,
                                          fcnodes,int_list,neigh,TV,TVcomp,WR,
-                                         &(coef_P[ind_P]),row_nrm);
+                                         &(coef_P[ind_P]),row_nrm,
+                                         wrot_buf,vcol_buf,vrow_buf);
                         }
-                        res_row = inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
+                        if (row_rank == 0) {
+                           res_row = bnorm;
+                        } else {
+                           res_row = inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
+                        }
                         if (res_row < res_ass){
                            if (VERB_FLAG){
                               // Increase the count of fine nodes with large norm
-                              #pragma omp atomic update
                               dist_count[dist_max+1]++;
                            }
                         } else {
@@ -330,7 +344,6 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                            c_mark[inod] = 1;
                            if (VERB_FLAG){
                               // Increase the count of fine nodes with large error
-                              #pragma omp atomic update
                               dist_count[dist_max]++;
                            }
                         }
@@ -357,9 +370,14 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                   if (row_nrm > RELAX_FAC*maxrownrm)
                      Reduce_IntSet(RELAX_FAC*maxrownrm,itmax_vol,tol_vol,maxcond,
                                    optimal_lwork,inod,n_neigh,ntvecs,row_rank,fcnodes,
-                                   int_list,neigh,TV,TVcomp,WR,&(coef_P[ind_P]),row_nrm);
+                                   int_list,neigh,TV,TVcomp,WR,&(coef_P[ind_P]),row_nrm,
+                                   wrot_buf,vcol_buf,vrow_buf);
                   // Compute residual
-                  res_row = inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
+                  if (row_rank == 0) {
+                     res_row = bnorm;
+                  } else {
+                     res_row = inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
+                  }
                   // Mark the node as one to be promoted to coarse
                   if (res_row > res_ass) c_mark[inod] = 1;
 
@@ -368,7 +386,7 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                      iReg inod0 = inod-firstrow_0;
                      if (inod0 == 6){
                         type_OMP_iReg myid = omp_get_thread_num();
-                        rExt res_row = inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
+                        rExt res_row = (row_rank == 0) ? bnorm : inl_dnrm2(ntvecs-row_rank,&(coef_P[ind_P+row_rank]),1);
                         fprintf(DebEnv.t_logfile[myid],"\nres_row %e row_nrm %e row_rank %d\n",
                                 res_row,row_nrm,row_rank);
                      }
@@ -409,11 +427,9 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
                   if (VERB_FLAG){
                      if (res_row > res_ass){
                         // Increase count of nodes with high error
-                        #pragma omp atomic update
                         dist_count[dist_max]++;
                      } else {
                         // Increase count of nodes with large norm
-                        #pragma omp atomic update
                         dist_count[dist_max+1]++;
                      }
                   }
@@ -426,7 +442,6 @@ void ProlStripe_BAMG(const BAMG_params& params, iReg firstrow_0, iReg firstrow, 
          } // end UPD_WEIGHTS Loop
          if (VERB_FLAG){
             if (row_rank < ntvecs){
-               #pragma omp atomic update
                dist_count[dist_max+3]++;
             }
          }

@@ -12,8 +12,9 @@
 
 #pragma once
 
-#include<string>
-#include<iostream>
+#include <string>
+#include <iostream>
+#include <stdexcept>
 
 #define kB 1024L
 #define MB 1024L*kB
@@ -36,7 +37,7 @@
  * @brief This class is used to print error messages.
  *
  */
-class linsol_error{
+class linsol_error : public std::runtime_error {
 
    public:
 

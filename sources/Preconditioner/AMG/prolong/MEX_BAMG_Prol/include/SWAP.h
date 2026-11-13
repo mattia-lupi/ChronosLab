@@ -21,7 +21,7 @@ template <typename TYPE>
 inline void SWAP(TYPE & i1, TYPE & i2){TYPE tmp = i1; i1 = i2; i2 = tmp;}
 
 // Instantiate template
-#if !IREG_LONG==IEXT_LONG
+#if !(IREG_LONG==IEXT_LONG)
 template void SWAP<iReg>(iReg & , iReg & );
 #endif
 template void SWAP<iExt>(iExt & , iExt & );

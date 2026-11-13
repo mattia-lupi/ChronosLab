@@ -29,37 +29,39 @@ using matlab::mex::ArgumentList;
 
 class TV2DGuard {
 public:
-    double **ptr  = nullptr;
-    int      rows = 0;
+    double **ptr      = nullptr;
+    double  *flat_buf = nullptr;
+    int      rows     = 0;
 
     TV2DGuard() = default;
 
-    // Allocate outer array and deep-copy rows from a flat column-major buffer.
-    bool allocate(int nn_S, int ntv, const double *flat)
+    // Allocate contiguous buffer and row pointers, copying directly from flat buffer iterator
+    template <typename Iter>
+    bool allocate(int nn_S, int ntv, Iter flat_it)
     {
         rows = nn_S;
-        ptr  = static_cast<double**>(malloc(static_cast<std::size_t>(nn_S) *
-                                            sizeof(double*)));
-        if (!ptr) return false;
+        const std::size_t total_elems = static_cast<std::size_t>(nn_S) * static_cast<std::size_t>(ntv);
+        flat_buf = static_cast<double*>(malloc(total_elems * sizeof(double)));
+        if (!flat_buf) return false;
 
-        for (int i = 0; i < nn_S; ++i) ptr[i] = nullptr;
+        ptr = static_cast<double**>(malloc(static_cast<std::size_t>(nn_S) * sizeof(double*)));
+        if (!ptr) {
+            free(flat_buf);
+            flat_buf = nullptr;
+            return false;
+        }
 
+        std::copy_n(flat_it, total_elems, flat_buf);
         for (int i = 0; i < nn_S; ++i) {
-            ptr[i] = static_cast<double*>(malloc(static_cast<std::size_t>(ntv) *
-                                                 sizeof(double)));
-            if (!ptr[i]) return false;
-            for (int j = 0; j < ntv; ++j)
-                ptr[i][j] = flat[static_cast<std::size_t>(i) * ntv + j];
+            ptr[i] = flat_buf + static_cast<std::size_t>(i) * static_cast<std::size_t>(ntv);
         }
         return true;
     }
 
     ~TV2DGuard()
     {
-        if (ptr) {
-            for (int i = 0; i < rows; ++i) free(ptr[i]);
-            free(ptr);
-        }
+        if (ptr) free(ptr);
+        if (flat_buf) free(flat_buf);
     }
 
     TV2DGuard(const TV2DGuard&)            = delete;
@@ -153,18 +155,16 @@ public:
 
         const TypedArray<int32_t> iat_S_arr   = inputs[12];
         const TypedArray<int32_t> ja_S_arr    = inputs[13];
-        const TypedArray<int32_t> coef_S_arr  = inputs[14];
+        // input 14: coef_S is not copied because BAMG only uses graph adjacency (iat_S, ja_S)
         const TypedArray<int32_t> fcnodes_arr = inputs[16];
         const TypedArray<double>  TV_arr      = inputs[17];
 
         std::vector<int32_t> iat_S_vec  (iat_S_arr.begin(),   iat_S_arr.end());
         std::vector<int32_t> ja_S_vec   (ja_S_arr.begin(),    ja_S_arr.end());
-        std::vector<int32_t> coef_S_vec (coef_S_arr.begin(),  coef_S_arr.end());
         std::vector<int32_t> fcnodes_vec(fcnodes_arr.begin(), fcnodes_arr.end());
-        std::vector<double>  TV_flat    (TV_arr.begin(),       TV_arr.end());
 
         TV2DGuard tv2d;
-        if (!tv2d.allocate(nn_S, ntv, TV_flat.data()))
+        if (!tv2d.allocate(nn_S, ntv, TV_arr.begin()))
             throwError("BAMG_Prol:allocError",
                        "Failed to allocate TV_2D — out of memory.");
 
@@ -192,7 +192,7 @@ public:
         int ierr = cpt_Prolongation_BAMG_wrapper(
                        level, params, np,
                        nn_S, nt_S,
-                       iat_S_vec.data(), ja_S_vec.data(), coef_S_vec.data(),
+                       iat_S_vec.data(), ja_S_vec.data(), nullptr,
                        ntv, fcnodes_vec.data(),
                        const_cast<const double* const*>(tv2d.ptr),
                        nc_I, nt_I,

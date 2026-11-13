@@ -15,7 +15,7 @@ void add_new_neighs(const iExt *const iat_S, const iReg *const ja_S,
       iExt istart = iat_S[jnod];
       iExt iend   = iat_S[jnod+1];
       // Check storage
-      if ( n_neigh + istart-iend > nmax) {
+      if ( n_neigh + (iend - istart) > nmax) {
          throw linsol_error ("add_new_neighs","storage problem");
       }
       for (iExt i = istart; i < iend; i++){

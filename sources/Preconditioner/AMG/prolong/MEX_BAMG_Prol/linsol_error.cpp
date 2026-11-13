@@ -10,7 +10,8 @@
  * @brief Print error message.
  */
 linsol_error::linsol_error(const std::string & function_name,
-                           const std::string & error_message) {
+                           const std::string & error_message)
+   : std::runtime_error("FUNCTION: " + function_name + " - ERROR: " + error_message) {
 
    std::cout << "FUNCTION: " << function_name << " - ERROR: " << error_message << std::endl;
 
@@ -23,7 +24,8 @@ linsol_error::linsol_error(const std::string & function_name,
  */
 linsol_error::linsol_error(const std::string & function_name,
                            const std::string & error_message,
-                           unsigned long int nbytes_requested) {
+                           unsigned long int nbytes_requested)
+   : std::runtime_error("FUNCTION: " + function_name + " - ERROR: " + error_message) {
 
    #pragma omp critical (error_print)
    {

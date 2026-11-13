@@ -7,12 +7,17 @@
 // Applies the max volume algorithm to retrieve the best possible basis among the
 // rows of the input matrix A[n,m].
 void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt delta,
-            const iReg n, const iReg m, rExt **A, iReg &rank, iReg *list){
+            const iReg n, const iReg m, rExt **A, iReg &rank, iReg *list,
+            rExt *wrot_in, rExt *vcol_in, rExt *vrow_in){
 
    iReg maxrank = std::min(n,m);
    maxrank = std::min(maxrank,mmax);
-   std::vector<rExt> wrot_vec(m);
-   rExt *wrot = wrot_vec.data();
+   std::vector<rExt> wrot_vec;
+   rExt *wrot = wrot_in;
+   if (!wrot) {
+      wrot_vec.resize(m);
+      wrot = wrot_vec.data();
+   }
 
    // Set the initial guess for the rank
    rank = 1;
@@ -47,7 +52,8 @@ void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt de
       SWAP(list[rank-1],list[irow+rank-1]);
 
       // Check conditioning
-      rExt cond_new = max_sv_est / abs(norm);
+      rExt norm_abs = std::abs(norm);
+      rExt cond_new = (norm_abs > 1e-15) ? (max_sv_est / norm_abs) : (condmax + 1.0);
       if (cond_new > condmax){
          rank -= 1;
          break;
@@ -71,8 +77,8 @@ void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt de
 
    // Permute row in order to find the best basis
    try {
-      maxVol_inner(itmax,delta,n-rank,rank,list,&(A[rank]));
-   } catch (linsol_error) {
+      maxVol_inner(itmax,delta,n-rank,rank,list,&(A[rank]),vcol_in,vrow_in);
+   } catch (const std::exception &) {
       throw linsol_error ("maxVol","permuting row in order to find the best basis");
    }
 

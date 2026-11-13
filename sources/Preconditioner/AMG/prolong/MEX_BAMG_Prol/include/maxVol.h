@@ -44,6 +44,7 @@
  * @param [out] list list of the rows representing the best basis
  */
 void maxVol(const iReg mmax, const rExt condmax, const iReg itmax, const rExt delta,
-            const iReg n, const iReg m, rExt **A, iReg &rank, iReg *list);
+            const iReg n, const iReg m, rExt **A, iReg &rank, iReg *list,
+            rExt *wrot = nullptr, rExt *vcol = nullptr, rExt *vrow = nullptr);
 
 

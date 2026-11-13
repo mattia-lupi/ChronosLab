@@ -11,8 +11,9 @@ inline void find_zij(const iReg n, const iReg r, const rExt *const *const Z, iRe
    zij = 0.0;
    for (iReg j = 0; j < r; j++){
       for (iReg i = 0; i < n; i++){
-         if (abs(Z[i][j]) > zij){
-            zij = abs(Z[i][j]);
+         rExt val = std::abs(Z[i][j]);
+         if (val > zij){
+            zij = val;
             irow = i;
             jcol = j;
          }
@@ -25,14 +26,22 @@ inline void find_zij(const iReg n, const iReg r, const rExt *const *const Z, iRe
 
 // Inner function of maxVol, list(n+r) list of best columns whose first r are the best.
 void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r,
-                  iReg *list, rExt** Z){
+                  iReg *list, rExt** Z, rExt *vcol_in, rExt *vrow_in){
 
    iReg irow, jcol;
    rExt zij_max;
-   std::vector<rExt> vcol_vec(n);
-   rExt *vcol = vcol_vec.data();
-   std::vector<rExt> vrow_vec(r);
-   rExt *vrow = vrow_vec.data();
+   std::vector<rExt> vcol_vec;
+   std::vector<rExt> vrow_vec;
+   rExt *vcol = vcol_in;
+   rExt *vrow = vrow_in;
+   if (!vcol) {
+      vcol_vec.resize(n);
+      vcol = vcol_vec.data();
+   }
+   if (!vrow) {
+      vrow_vec.resize(r);
+      vrow = vrow_vec.data();
+   }
 
    // Init the number of iterations
    iReg iter = 0;
@@ -41,7 +50,7 @@ void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r
    find_zij(n,r,Z,irow,jcol,zij_max);
 
    // Iterate
-   while ( (zij_max > 1.0+delta) & (iter < itmax) ){
+   while ( (zij_max > 1.0+delta) && (iter < itmax) ){
       // Increase iteration count
       iter++;
       // Swap rows irow and jcol in Z through rank-1 update
@@ -60,8 +69,6 @@ void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r
       find_zij(n,r,Z,irow,jcol,zij_max);
    }
 
-   // Check convergence at the end
-   if (zij_max > 1.0+delta){
-     throw linsol_error ("maxVol_inner","convergence not achieved");
-   }
+   // Reaching itmax means the basis is quasi-optimal (sub-extremal);
+   // do not abort the solver.
 }

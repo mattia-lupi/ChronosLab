@@ -22,4 +22,4 @@
 /**
  * @brief Inner function of maxVol, list(n+r) list of best columns whose first r are the best.
  */
-void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r, iReg *list, rExt** Z);
+void maxVol_inner(const iReg itmax, const rExt delta, const iReg n, const iReg r, iReg *list, rExt** Z, rExt *vcol = nullptr, rExt *vrow = nullptr);

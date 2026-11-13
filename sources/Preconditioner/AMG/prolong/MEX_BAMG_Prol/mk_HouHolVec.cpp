@@ -14,6 +14,10 @@ void mk_HouHolVec(const iReg n, const rExt *const v, rExt *w){
       norm_2 += w[i]*w[i];
    }
    norm = sqrt(norm_2);
+   if (norm == 0.0) {
+      for (iReg i = 0; i < n; i++) w[i] = 0.0;
+      return;
+   }
    // Compute non-normalized w
    if (w[0] == 0.0){
       w[0] = norm;
