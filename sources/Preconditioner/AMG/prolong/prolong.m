@@ -94,9 +94,7 @@ if ~two_stg_prol
          fcnode_exti = fcnode;
          fcnode_exti(fcnode_exti<0)= -1;
          % Create a compressed A with only strong connections
-         A_comp = A;
-         A_comp(S_patt <0) = 0;
-         tic;
+         A_comp = A .* (S_patt > 0);
          [P] = cpt_ProlMEX_EXTI(param.prolong,nc,fcnode_exti,S_patt,A,A_comp);
       otherwise
          err_msg = [char(param.prolong.proltype) ' is not a valid key for prolongation'];
@@ -159,8 +157,7 @@ else
          end
       case 'EXTI'
          % Create a compressed A with only strong connections
-         A_comp = A;
-         A_comp(S_patt <0) = 0;
+         A_comp = A .* (S_patt > 0);
          [P] = cpt_TwoStageProlMEX_ExtI(param.prolong,clist,fclist,fflist,A,S_patt,A_comp);
       otherwise
          err_msg = [char(param.prolong.proltype)...

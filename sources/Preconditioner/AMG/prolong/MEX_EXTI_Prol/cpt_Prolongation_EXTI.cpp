@@ -28,12 +28,13 @@
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
 
-struct MallocGuard {
-    void *ptr = nullptr;
-    explicit MallocGuard(void *p) : ptr(p) {}
-    ~MallocGuard() { if (ptr) free(ptr); }
-    MallocGuard(const MallocGuard&)            = delete;
-    MallocGuard& operator=(const MallocGuard&) = delete;
+template <typename T>
+struct ArrayGuard {
+    T *ptr = nullptr;
+    explicit ArrayGuard(T *p) : ptr(p) {}
+    ~ArrayGuard() { if (ptr) delete[] ptr; }
+    ArrayGuard(const ArrayGuard&)            = delete;
+    ArrayGuard& operator=(const ArrayGuard&) = delete;
 };
 
 //----------------------------------------------------------------------------------------
@@ -91,15 +92,15 @@ public:
         const TypedArray<double>  coef_C_arr   = inputs[11];
         const TypedArray<int32_t> fcnodes_arr  = inputs[12];
 
-        std::vector<int32_t> vecstart_vec(vecstart_arr.begin(), vecstart_arr.end());
-        std::vector<int32_t> iat_A_vec   (iat_A_arr.begin(),    iat_A_arr.end());
-        std::vector<int32_t> ja_A_vec    (ja_A_arr.begin(),     ja_A_arr.end());
-        std::vector<double>  coef_A_vec  (coef_A_arr.begin(),   coef_A_arr.end());
-        std::vector<int32_t> coef_S_vec  (coef_S_arr.begin(),   coef_S_arr.end());
-        std::vector<int32_t> iat_C_vec   (iat_C_arr.begin(),    iat_C_arr.end());
-        std::vector<int32_t> ja_C_vec    (ja_C_arr.begin(),     ja_C_arr.end());
-        std::vector<double>  coef_C_vec  (coef_C_arr.begin(),   coef_C_arr.end());
-        std::vector<int32_t> fcnodes_vec (fcnodes_arr.begin(),  fcnodes_arr.end());
+        const int32_t* vecstart_ptr = (vecstart_arr.getNumberOfElements() > 0) ? &(*vecstart_arr.begin()) : nullptr;
+        const int32_t* iat_A_ptr    = (iat_A_arr.getNumberOfElements() > 0)    ? &(*iat_A_arr.begin())    : nullptr;
+        const int32_t* ja_A_ptr     = (ja_A_arr.getNumberOfElements() > 0)     ? &(*ja_A_arr.begin())     : nullptr;
+        const double*  coef_A_ptr   = (coef_A_arr.getNumberOfElements() > 0)   ? &(*coef_A_arr.begin())   : nullptr;
+        const int32_t* coef_S_ptr   = (coef_S_arr.getNumberOfElements() > 0)   ? &(*coef_S_arr.begin())   : nullptr;
+        const int32_t* iat_C_ptr    = (iat_C_arr.getNumberOfElements() > 0)    ? &(*iat_C_arr.begin())    : nullptr;
+        const int32_t* ja_C_ptr     = (ja_C_arr.getNumberOfElements() > 0)     ? &(*ja_C_arr.begin())     : nullptr;
+        const double*  coef_C_ptr   = (coef_C_arr.getNumberOfElements() > 0)   ? &(*coef_C_arr.begin())   : nullptr;
+        const int32_t* fcnodes_ptr  = (fcnodes_arr.getNumberOfElements() > 0)  ? &(*fcnodes_arr.begin())  : nullptr;
 
         // -----------------------------------------------------------------------
         // Call the computational wrapper
@@ -111,18 +112,18 @@ public:
 
         int ierr = cpt_Prolongation_EXTI(
                        level, np,
-                       vecstart_vec.data(),
+                       vecstart_ptr,
                        nn_A, nt_A,
-                       iat_A_vec.data(),  ja_A_vec.data(),  coef_A_vec.data(),
-                       coef_S_vec.data(),
-                       iat_C_vec.data(),  ja_C_vec.data(),  coef_C_vec.data(),
-                       fcnodes_vec.data(),
+                       iat_A_ptr, ja_A_ptr, coef_A_ptr,
+                       coef_S_ptr,
+                       iat_C_ptr, ja_C_ptr, coef_C_ptr,
+                       fcnodes_ptr,
                        nn_I, nc_I,
                        nt_I, iat_I_raw, ja_I_raw, coef_I_raw);
 
-        MallocGuard g_iat (iat_I_raw);
-        MallocGuard g_ja  (ja_I_raw);
-        MallocGuard g_coef(coef_I_raw);
+        ArrayGuard<int>    g_iat (iat_I_raw);
+        ArrayGuard<int>    g_ja  (ja_I_raw);
+        ArrayGuard<double> g_coef(coef_I_raw);
 
         if (!iat_I_raw || !ja_I_raw || !coef_I_raw)
             throwError("EXTI_Prol:nullPointer",

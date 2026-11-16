@@ -31,15 +31,28 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                           int &nn_P, int &nt_P, int *iat_P, int *ja_P,
                           double *coef_P){
 
-   // Allocate some scratch vectors
-   // PER ESSERE SICURI BISOGNA AVERE IL MAX NUMERO DI NONZERI PER RIGA
-   double avg_nnz = 20.0*static_cast<double>(nt_A) / static_cast<double>(lastrow-firstrow);
-   int size_scr = static_cast<int>(avg_nnz);
-   int *WI         = new int [nn_A](); if (WI == NULL) return 1;
-   std::fill_n(WI,nn_A,0);
-   int *ja_FS      = new int [size_scr](); if (ja_FS == NULL) return 1;
-   double *coef_FS = new double [size_scr](); if (coef_FS == NULL) return 1;
-   int *list_weak  = new int [size_scr](); if (list_weak == NULL) return 1;
+   // Early exit if stripe is empty
+   if (firstrow >= lastrow || nn_loc <= 0) {
+      nn_P = 0;
+      nt_P = 0;
+      iat_P[0] = 0;
+      return 0;
+   }
+
+   // Allocate scratch vectors based on global nn_A to avoid division by zero or thread-count blowup
+   double avg_nnz = (nn_A > 0) ? (20.0 * static_cast<double>(nt_A) / static_cast<double>(nn_A)) : 50.0;
+   int size_scr = std::max(64, static_cast<int>(avg_nnz));
+   int *WI         = new int [nn_A]();
+   int *ja_FS      = new int [size_scr]();
+   double *coef_FS = new double [size_scr]();
+   int *list_weak  = new int [size_scr]();
+   if (WI == nullptr || ja_FS == nullptr || coef_FS == nullptr || list_weak == nullptr) {
+      delete [] WI;
+      delete [] ja_FS;
+      delete [] coef_FS;
+      delete [] list_weak;
+      return 1;
+   }
 
    // Init pointer to the prolongation matrix
    nn_P = 0;
@@ -65,6 +78,12 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
       // Check whether inod is FINE OR COARSE
       if (inod_coarse >= 0){
          nn_P++;
+
+         // Check buffer capacity for coarse node
+         if (ind_P >= ntmax_P) {
+            delete [] WI; delete [] ja_FS; delete [] coef_FS; delete [] list_weak;
+            return 2;
+         }
 
          // It is a coarse node
          ja_P[ind_P] = inod_coarse;
@@ -95,6 +114,12 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                   if (coef_S[j] > 0){
                      // Strong connection
 
+                     // Check capacity in ja_P / coef_P
+                     if (ind_P + n_int >= ntmax_P) {
+                        delete [] WI; delete [] ja_FS; delete [] coef_FS; delete [] list_weak;
+                        return 2;
+                     }
+
                      // Add this node to the interp. set and save its value
                      ja_P[ind_P+n_int] = jcol;
                      coef_P[ind_P+n_int] = coef_A[j];
@@ -118,9 +143,11 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                      //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                      // Keep track of weak COARSE neighbours in case they are promoted
                      // to interpolatory points
-                     WI[jcol] = -j;
-                     list_weak[n_weak] = jcol;
-                     n_weak++;
+                     WI[jcol] = -(j + 1);
+                     if (n_weak < size_scr) {
+                        list_weak[n_weak] = jcol;
+                        n_weak++;
+                     }
                   }
                } else {
                   // This neighbour is FINE
@@ -179,7 +206,7 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                // Consider only FINE nodes
                if (fcnodes[jcol] < 0){
                   double a_ik = coef_C[j];
-                  double a_ki_bar;
+                  double a_ki_bar = ZERO;
                   double ext_sum = 0.0;
                   int n_FS = 0;
                   // Explore its strong neighbours to expand the interpolatory set
@@ -203,9 +230,11 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                         if (fcnodes[kcol] >= 0){
                            // Update the extended sum and store an auxiliary coef
                            double a_kj_bar = std::min(ZERO,coef_C[k]);
-                           ja_FS[n_FS] = kcol;
-                           coef_FS[n_FS] = a_kj_bar;
-                           n_FS++;
+                           if (n_FS < size_scr) {
+                              ja_FS[n_FS] = kcol;
+                              coef_FS[n_FS] = a_kj_bar;
+                              n_FS++;
+                           }
                            ext_sum += a_kj_bar;
                            //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
                            //if (inod == DBNODE){
@@ -220,9 +249,14 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                               double value = ZERO;
                               if (WI[kcol] < 0){
                                  // The node was considered weak COARSE before
-                                 value = coef_A[-WI[kcol]];
+                                 value = coef_A[-WI[kcol] - 1];
                                  // Adjust denominator when the node is included
                                  denom -= value;
+                              }
+                              // Check capacity in ja_P / coef_P
+                              if (ind_P + n_int >= ntmax_P) {
+                                 delete [] WI; delete [] ja_FS; delete [] coef_FS; delete [] list_weak;
+                                 return 2;
                               }
                               // kcol was not in the interp. set, add it and init its
                               // coefficient
@@ -241,7 +275,7 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                   //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
                   // Check that extended sum is not null
-                  if ( abs(ext_sum) > EPS*a_ii ){
+                  if ( std::abs(ext_sum) > EPS*std::abs(a_ii) ){
                      // ext_sum !=0
 
                      // Update weights
@@ -285,6 +319,11 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
          //   }
          //}
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+         // Check for zero or near-zero denominator
+         if (std::abs(denom) < EPS) {
+            denom = (std::abs(a_ii) > EPS) ? a_ii : ONE;
+         }
 
          // Adjust column index in ja_P, compute weights and sort
          for (int i = ind_P; i < ind_P+n_int; i++){
