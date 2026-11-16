@@ -79,9 +79,6 @@ public:
         const int    nn_A      = static_cast<int>(s3[0]);
         const int num_threads = std::max(1,static_cast<int>(s7[0]));
 
-        // Configure OpenMP runtime thread count
-        omp_set_num_threads(num_threads);
-
         if (dump) {
             mprint("- Threads configured: " + std::to_string(num_threads) + "\n");
             mprint("- Get input arrays\n");
@@ -91,13 +88,9 @@ public:
         const TypedArray<int32_t> ja_A_arr   = inputs[5];
         const TypedArray<double>  coef_A_arr = inputs[6];
 
-        std::vector<int32_t> iat_A_vec (iat_A_arr.begin(),  iat_A_arr.end());
-        std::vector<int32_t> ja_A_vec  (ja_A_arr.begin(),   ja_A_arr.end());
-        std::vector<double>  coef_A_vec(coef_A_arr.begin(), coef_A_arr.end());
-
-        int32_t *iat_A  = iat_A_vec.data();
-        int32_t *ja_A   = ja_A_vec.data();
-        double  *coef_A = coef_A_vec.data();
+        const int32_t *iat_A  = &(*iat_A_arr.begin());
+        const int32_t *ja_A   = &(*ja_A_arr.begin());
+        const double  *coef_A = &(*coef_A_arr.begin());
 
         // -----------------------------------------------------------------------
         // Call the C++ computational kernel
@@ -127,7 +120,7 @@ public:
         if (!iat_FL_raw || !ja_FL_raw  || !coef_FL_raw ||
             !iat_FU_raw || !ja_FU_raw  || !coef_FU_raw)
             throwError("NSY_rFSAI:nullPointer",
-                       "Kernel returned a null pointer — likely an allocation failure.");
+                       "Kernel returned a null pointer - likely an allocation failure.");
 
         if (ierr != 0)
             throwError("NSY_rFSAI:computeError",

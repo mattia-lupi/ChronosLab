@@ -54,7 +54,7 @@ if is_posdef
    counts = diff(iat_G);               
    irow_G = repelem(1:nrows_M, counts);
    ja_G   = double(ja_G);
-   F      = sparse(irow_G,ja_G,coef_G);
+   F      = sparse(irow_G,ja_G,coef_G,nrows_M,nrows_M);
    % end function
    return
 else

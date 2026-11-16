@@ -80,14 +80,12 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
       int r_start = (int)(((long long)tid * nn) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nn) / actual_nth);
 
-      int *my_counts = &thread_counts[(size_t)tid * nn];
-
       // Pass 1: Thread-local column histogram of FUT
       for (int i = r_start; i < r_end; ++i) {
          int row_end = iat_FL[i+1];
          for (int j = iat_FL[i]; j < row_end; ++j) {
             if (coef_FU[j] != 0.0) {
-               my_counts[ja_FL[j]]++;
+               thread_counts[(size_t)ja_FL[j] * actual_nth + tid]++;
             }
          }
       }
@@ -98,9 +96,10 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
       #pragma omp for schedule(static)
       for (int c = 0; c < nn; ++c) {
          int running_sum = 0;
+         size_t c_offset = (size_t)c * actual_nth;
          for (int t = 0; t < actual_nth; ++t) {
-            thread_offsets[(size_t)t * nn + c] = running_sum;
-            running_sum += thread_counts[(size_t)t * nn + c];
+            thread_offsets[c_offset + t] = running_sum;
+            running_sum += thread_counts[c_offset + t];
          }
          col_totals[c] = running_sum;
       }
@@ -126,10 +125,8 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
       int r_start = (int)(((long long)tid * nn) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nn) / actual_nth);
 
-      int *my_offsets = &thread_offsets[(size_t)tid * nn];
-
       for (int c = 0; c < nn; ++c) {
-         my_offsets[c] += iat_FU[c];
+         thread_offsets[(size_t)c * actual_nth + tid] += iat_FU[c];
       }
 
       // Pass 3: Scatter transposed entries
@@ -138,7 +135,7 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
          for (int j = iat_FL[i]; j < row_end; ++j) {
             if (coef_FU[j] != 0.0) {
                int col = ja_FL[j];
-               int dest = my_offsets[col]++;
+               int dest = thread_offsets[(size_t)col * actual_nth + tid]++;
                ja_FU[dest] = i;
                coef_FU_new[dest] = coef_FU[j];
             }

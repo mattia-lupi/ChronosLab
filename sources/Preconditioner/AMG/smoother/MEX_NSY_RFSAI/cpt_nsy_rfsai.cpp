@@ -83,9 +83,10 @@ int cpt_nsy_rfsai(const int nstep, const int step_size, const double eps,
       return 1;
    }
 
+   size_t dense_dim = (size_t)std::max(1, mmax);
    std::vector<FSAIThreadWorkspace> workspaces(num_threads);
    for (int t = 0; t < num_threads; ++t) {
-      workspaces[t].init(nn_A, max_mrow);
+      workspaces[t].init(nn_A, dense_dim);
    }
 
    int global_ierr = 0;
@@ -240,6 +241,12 @@ int cpt_nsy_rfsai(const int nstep, const int step_size, const double eps,
          fprintf(dbfile,"SCAL FACTOR: %15.6e\n",scal_fac);
       }
       //////////////////////////////////////////////////////////
+
+      if (fabs(scal_fac) < 1.e-15) {
+         #pragma omp atomic write
+         global_ierr = 3;
+         continue;
+      }
 
       size_t row_dest = row_start_offset[irow];
       double fac = 1.0 / sqrt(fabs(scal_fac));

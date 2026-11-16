@@ -66,13 +66,11 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       int r_start = (int)(((long long)tid * nrows) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nrows) / actual_nth);
 
-      int *my_counts = &thread_counts[(size_t)tid * ncols];
-
       // Pass 1: Thread-local column histogram
       for (int i = r_start; i < r_end; ++i) {
          int row_end = iat[i+1];
          for (int j = iat[i]; j < row_end; ++j) {
-            my_counts[ja[j]]++;
+            thread_counts[(size_t)ja[j] * actual_nth + tid]++;
          }
       }
 
@@ -82,9 +80,10 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       #pragma omp for schedule(static)
       for (int c = 0; c < ncols; ++c) {
          int running_sum = 0;
+         size_t c_offset = (size_t)c * actual_nth;
          for (int t = 0; t < actual_nth; ++t) {
-            thread_offsets[(size_t)t * ncols + c] = running_sum;
-            running_sum += thread_counts[(size_t)t * ncols + c];
+            thread_offsets[c_offset + t] = running_sum;
+            running_sum += thread_counts[c_offset + t];
          }
          col_totals[c] = running_sum;
       }
@@ -104,10 +103,8 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       int r_start = (int)(((long long)tid * nrows) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nrows) / actual_nth);
 
-      int *my_offsets = &thread_offsets[(size_t)tid * ncols];
-
       for (int c = 0; c < ncols; ++c) {
-         my_offsets[c] += iat_T[c];
+         thread_offsets[(size_t)c * actual_nth + tid] += iat_T[c];
       }
 
       // Pass 3: Scatter transposed entries
@@ -115,7 +112,7 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
          int row_end = iat[i+1];
          for (int j = iat[i]; j < row_end; ++j) {
             int col = ja[j];
-            int dest = my_offsets[col]++;
+            int dest = thread_offsets[(size_t)col * actual_nth + tid]++;
             ja_T[dest] = i;
             coef_T[dest] = coef[j];
          }

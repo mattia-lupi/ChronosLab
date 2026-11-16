@@ -46,6 +46,7 @@ switch lower(method)
             opts.disp = verb;
             opts.tol = 5.e-4;
             [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm',opts);
+            lambda = abs(lambda);
             if verb
                fprintf('Max Lambda: %10.4f\n',lambda);
             end
@@ -62,11 +63,11 @@ switch lower(method)
                if verb
                   fprintf('WARNING: Correcting %d diagonals\n',numel(irow));
                end
-               mask = true(size(F, 1), 1);
-               mask(irow) = false;
+               dA = diag(A);
                diag_corr = zeros(size(F, 1), 1);
-               diag_corr(irow) = 1 ./ sqrt(diag(A(irow, irow)));
-               F = spdiags(double(mask), 0, size(F, 1), size(F, 1)) * F + spdiags(diag_corr, 0, size(F, 1), size(F, 1));
+               diag_corr(irow) = 1 ./ sqrt(dA(irow));
+               F(irow, :) = 0;
+               F = F + spdiags(diag_corr, 0, size(F, 1), size(F, 2));
             end
             % Compute damping parameter
             FAFT = @(x) F*(A*(F'*x));
@@ -116,8 +117,9 @@ switch lower(method)
         % Compute damping parameter
         FAFT = @(x) F*(A*(F'*x));
         % opts.issym = 1;
-        [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',1,...
+        [~,lambda,~] = eigs(FAFT,size(A,1),1,'lm','IsFunctionSymmetric',symm_flag,...
                          'Tolerance',1.e-2,'Display',verb,'FailureTreatment','keep');
+        lambda = abs(lambda);
         if verb
            fprintf('Max Lambda: %10.4f\n',lambda);
         end
