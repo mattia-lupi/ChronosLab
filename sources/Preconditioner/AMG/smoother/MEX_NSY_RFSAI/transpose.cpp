@@ -53,24 +53,28 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       return 0;
    }
 
-   // Parallel multi-thread transpose using num_threads threads
+   // Parallel multi-thread transpose using thread-major [tid * ncols + col] layout for contiguous histograms
    std::vector<int> thread_counts((size_t)num_threads * ncols, 0);
    std::vector<int> thread_offsets((size_t)num_threads * ncols, 0);
    std::vector<int> col_totals(ncols, 0);
+   int saved_nth = num_threads;
 
    #pragma omp parallel num_threads(num_threads)
    {
       int tid = omp_get_thread_num();
       int actual_nth = omp_get_num_threads();
+      #pragma omp single
+      saved_nth = actual_nth;
 
       int r_start = (int)(((long long)tid * nrows) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nrows) / actual_nth);
+      int *my_counts = &thread_counts[(size_t)tid * ncols];
 
-      // Pass 1: Thread-local column histogram
+      // Pass 1: Thread-local column histogram (stride-1 within thread)
       for (int i = r_start; i < r_end; ++i) {
          int row_end = iat[i+1];
          for (int j = iat[i]; j < row_end; ++j) {
-            thread_counts[(size_t)ja[j] * actual_nth + tid]++;
+            my_counts[ja[j]]++;
          }
       }
 
@@ -80,10 +84,10 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       #pragma omp for schedule(static)
       for (int c = 0; c < ncols; ++c) {
          int running_sum = 0;
-         size_t c_offset = (size_t)c * actual_nth;
          for (int t = 0; t < actual_nth; ++t) {
-            thread_offsets[c_offset + t] = running_sum;
-            running_sum += thread_counts[c_offset + t];
+            size_t idx = (size_t)t * ncols + c;
+            thread_offsets[idx] = running_sum;
+            running_sum += thread_counts[idx];
          }
          col_totals[c] = running_sum;
       }
@@ -95,16 +99,15 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
       iat_T[c + 1] = iat_T[c] + col_totals[c];
    }
 
-   #pragma omp parallel num_threads(num_threads)
+   #pragma omp parallel num_threads(saved_nth)
    {
       int tid = omp_get_thread_num();
-      int actual_nth = omp_get_num_threads();
-
-      int r_start = (int)(((long long)tid * nrows) / actual_nth);
-      int r_end   = (int)(((long long)(tid + 1) * nrows) / actual_nth);
+      int r_start = (int)(((long long)tid * nrows) / saved_nth);
+      int r_end   = (int)(((long long)(tid + 1) * nrows) / saved_nth);
+      int *my_offsets = &thread_offsets[(size_t)tid * ncols];
 
       for (int c = 0; c < ncols; ++c) {
-         thread_offsets[(size_t)c * actual_nth + tid] += iat_T[c];
+         my_offsets[c] += iat_T[c];
       }
 
       // Pass 3: Scatter transposed entries
@@ -112,7 +115,7 @@ int transpose(const int nrows, const int ncols, const int *const iat, const int 
          int row_end = iat[i+1];
          for (int j = iat[i]; j < row_end; ++j) {
             int col = ja[j];
-            int dest = thread_offsets[(size_t)col * actual_nth + tid]++;
+            int dest = my_offsets[col]++;
             ja_T[dest] = i;
             coef_T[dest] = coef[j];
          }

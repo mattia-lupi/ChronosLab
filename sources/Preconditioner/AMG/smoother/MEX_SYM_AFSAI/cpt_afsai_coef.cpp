@@ -157,10 +157,17 @@ for (iReg i = 1; i < mrow+1; i++){
 
    while (ii <= mrow){
 
+      if (jj >= endrow) {
+         for (iReg k = ii; k < mrow+1; k++){
+            full_A[(i-1)*mmax+k-1] = 0.;
+         }
+         goto exit_column_loop;
+      }
+
       // Make sure that ja(jj-1) >= vecinc(ii-1) (only upper part)
       while (ja[jj-1] < vecinc[ii-1]){
          jj += 1;
-         if (jj == endrow) {
+         if (jj >= endrow) {
             // If the row end is reached move to the next column
             for (iReg k = ii; k < mrow+1; k++){
                full_A[(i-1)*mmax+k-1] = 0.;
@@ -195,7 +202,7 @@ if (jj >= endrow || ja[jj-1] >= jendbloc) {
    return;
 }
 nulrhs = false;
-while (jj <= endrow && ja[jj-1] < jendbloc){
+while (jj < endrow && ja[jj-1] < jendbloc){
    if (vecinc[ii-1] > ja[jj-1]){
       jj += 1;
    }else if (vecinc[ii-1] == ja[jj-1]){
@@ -228,7 +235,7 @@ iReg jjcol;
 // Get the degree zero entries (A pattern)
 iExt j = iat[irow-1];
 iExt endrow = iat[irow];
-while (j <= endrow && ja[j-1] < jendbloc){
+while (j < endrow && ja[j-1] < jendbloc){
    // If JWN is positive add this entry to the tentative pattern
    if (JWN[ja[j-1]-1] >= 0) {
       ind_WR += 1;
@@ -473,7 +480,7 @@ for( iReg irow = 1; irow < nrows+1; irow++){
    iExt ind = iat[irow_glo-1];
    iExt endrow = iat[irow_glo];
    bool found_diag = false;
-   while (ind <= endrow && ja[ind-1] <= irow_glo){
+   while (ind < endrow && ja[ind-1] <= irow_glo){
       if (ja[ind-1] == irow_glo) {
          found_diag = true;
          break;

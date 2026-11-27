@@ -116,16 +116,16 @@ public:
         MallocGuard g_ja_FU  (ja_FU_raw);
         MallocGuard g_cFU    (coef_FU_raw);
 
+        if (ierr != 0)
+            throwError("NSY_rFSAI:computeError",
+                       "Compute_nsy_rfsai returned error code: " +
+                       std::to_string(ierr));
+
         // Null-pointer check (catches kernel malloc failures before deref)
         if (!iat_FL_raw || !ja_FL_raw  || !coef_FL_raw ||
             !iat_FU_raw || !ja_FU_raw  || !coef_FU_raw)
             throwError("NSY_rFSAI:nullPointer",
                        "Kernel returned a null pointer - likely an allocation failure.");
-
-        if (ierr != 0)
-            throwError("NSY_rFSAI:computeError",
-                       "Compute_nsy_rfsai returned error code: " +
-                       std::to_string(ierr));
 
         // -----------------------------------------------------------------------
         // Pack results into MATLAB TypedArray output objects

@@ -42,6 +42,8 @@
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #include <stdlib.h>  // to use: exit
 #include <iostream>
+#include <new>
+#include <vector>
 #include "omp.h"
 using namespace std;
 
@@ -51,13 +53,21 @@ using namespace std;
 #include "TWOLP_ProlStripe_EXTI.h"
 
 int EXTI_prolongation(const int level, const int nthreads,
-                      const int *vecstart, const int nn_A, const int nt_A,
+                      const int nn_A, const int nt_A,
                       const int *const iat_A, const int *const ja_A,
                       const double *const coef_A, const int *const coef_S,
-                      const int *const iat_C, const int *const ja_C,
-                      const double *const coef_C, const int *const fcnodes,
+                      const int *const fcnodes,
                       const int nr_I, const int nc_I, int &nt_I, int *&iat_I,
                       int *&ja_I, double *&coef_I){
+
+   // Compute thread row partitions in C++
+   std::vector<int> vecstart(nthreads + 1, 0);
+   if (nthreads > 0 && nn_A > 0) {
+      int bsize = nn_A / nthreads;
+      int resto = nn_A % nthreads;
+      for (int i = 1; i <= resto; ++i) vecstart[i] = vecstart[i - 1] + bsize + 1;
+      for (int i = resto + 1; i <= nthreads; ++i) vecstart[i] = vecstart[i - 1] + bsize;
+   }
 
    // Internal scratch variables
    int *ridv_i;
@@ -98,22 +108,25 @@ int EXTI_prolongation(const int level, const int nthreads,
       int firstrow = vecstart[myid];
       int lastrow  = vecstart[myid + 1];
       int nn_loc = lastrow - firstrow;
-      int nt_Imax = 100*nn_loc; // DA VERIFICARE @@@@@@@@@@@@@@@@@
       int nt_I_loc;
       int nn_I_loc;
       
       // Allocate local scratches
-      int *iat_scr = new int [nn_loc+1]();
-      int *ja_scr = new int [nt_Imax]();
-      double *coef_scr = new double [nt_Imax]();
-      if (iat_scr == nullptr || ja_scr == nullptr || coef_scr == nullptr) {
+      int *iat_scr = new (std::nothrow) int [nn_loc+1]();
+      std::vector<int> ja_scr;
+      std::vector<double> coef_scr;
+      if (nn_loc > 0) {
+         ja_scr.reserve(static_cast<size_t>(16) * nn_loc);
+         coef_scr.reserve(static_cast<size_t>(16) * nn_loc);
+      }
+      if (iat_scr == nullptr) {
          ierr_L = 1;
       }
 
       // Compute the local stripe of the prolongation
       if (ierr_L == 0) {
-         ierr_L = ONELP_ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,nt_Imax,
-                                        iat_A,ja_A,coef_A,coef_S,iat_C,ja_C,coef_C,
+         ierr_L = ONELP_ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,
+                                        iat_A,ja_A,coef_A,coef_S,
                                         fcnodes,nn_I_loc,nt_I_loc,iat_scr,ja_scr,
                                         coef_scr);
       } else {
@@ -148,9 +161,9 @@ int EXTI_prolongation(const int level, const int nthreads,
             nn_I = ridvn_i[nthreads];
             if (nn_I != nr_I) ierr += 1;
 
-            iat_I = new int [nn_I+1](); if (iat_I == nullptr) ierr += 1;
-            ja_I = new int [nt_I](); if (ja_I == nullptr) ierr += 1;
-            coef_I = new double [nt_I](); if (coef_I == nullptr) ierr += 1;
+            iat_I = new (std::nothrow) int [nn_I+1](); if (iat_I == nullptr) ierr += 1;
+            ja_I = new (std::nothrow) int [nt_I](); if (ja_I == nullptr) ierr += 1;
+            coef_I = new (std::nothrow) double [nt_I](); if (coef_I == nullptr) ierr += 1;
          }
          #pragma omp barrier
 
@@ -176,8 +189,6 @@ int EXTI_prolongation(const int level, const int nthreads,
 
       // Deallocate local scratches safely on all paths
       delete [] iat_scr;
-      delete [] ja_scr;
-      delete [] coef_scr;
 
    }
 

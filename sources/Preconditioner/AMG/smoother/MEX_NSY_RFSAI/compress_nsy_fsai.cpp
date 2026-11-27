@@ -49,6 +49,11 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
    double *coef_FL_new = (double*) malloc(nt_FL * sizeof(double));
    if (ja_FL_new == nullptr || coef_FL_new == nullptr){
       cout << "Allocation Error in compress_nsy_fsai" << endl;
+      free(iat_FL_new);
+      free(iat_FU);
+      free(ja_FL_new);
+      free(coef_FL_new);
+      iat_FU = nullptr;
       return 1;
    }
 
@@ -67,25 +72,29 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
       }
    }
 
-   // --- 2. Transpose FUT into FU in Compressed Format ---
+   // --- 2. Transpose FUT into FU in Compressed Format (thread-major layout) ---
    std::vector<int> thread_counts((size_t)num_threads * nn, 0);
    std::vector<int> thread_offsets((size_t)num_threads * nn, 0);
    std::vector<int> col_totals(nn, 0);
+   int saved_nth = num_threads;
 
    #pragma omp parallel num_threads(num_threads)
    {
       int tid = omp_get_thread_num();
       int actual_nth = omp_get_num_threads();
+      #pragma omp single
+      saved_nth = actual_nth;
 
       int r_start = (int)(((long long)tid * nn) / actual_nth);
       int r_end   = (int)(((long long)(tid + 1) * nn) / actual_nth);
+      int *my_counts = &thread_counts[(size_t)tid * nn];
 
       // Pass 1: Thread-local column histogram of FUT
       for (int i = r_start; i < r_end; ++i) {
          int row_end = iat_FL[i+1];
          for (int j = iat_FL[i]; j < row_end; ++j) {
             if (coef_FU[j] != 0.0) {
-               thread_counts[(size_t)ja_FL[j] * actual_nth + tid]++;
+               my_counts[ja_FL[j]]++;
             }
          }
       }
@@ -96,10 +105,10 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
       #pragma omp for schedule(static)
       for (int c = 0; c < nn; ++c) {
          int running_sum = 0;
-         size_t c_offset = (size_t)c * actual_nth;
          for (int t = 0; t < actual_nth; ++t) {
-            thread_offsets[c_offset + t] = running_sum;
-            running_sum += thread_counts[c_offset + t];
+            size_t idx = (size_t)t * nn + c;
+            thread_offsets[idx] = running_sum;
+            running_sum += thread_counts[idx];
          }
          col_totals[c] = running_sum;
       }
@@ -113,20 +122,30 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
    nt_FU = iat_FU[nn];
 
    // Allocate FU arrays
-   ja_FU = (int*) malloc(nt_FU * sizeof(int));
-   double *coef_FU_new = (double*) malloc(nt_FU * sizeof(double));
-   if (!ja_FU || !coef_FU_new) return 1;
+   size_t alloc_fu = static_cast<size_t>(std::max(1, nt_FU));
+   ja_FU = (int*) malloc(alloc_fu * sizeof(int));
+   double *coef_FU_new = (double*) malloc(alloc_fu * sizeof(double));
+   if (!ja_FU || !coef_FU_new) {
+      free(iat_FL_new);
+      free(ja_FL_new);
+      free(coef_FL_new);
+      free(iat_FU);
+      free(ja_FU);
+      free(coef_FU_new);
+      iat_FU = nullptr;
+      ja_FU = nullptr;
+      return 1;
+   }
 
-   #pragma omp parallel num_threads(num_threads)
+   #pragma omp parallel num_threads(saved_nth)
    {
       int tid = omp_get_thread_num();
-      int actual_nth = omp_get_num_threads();
-
-      int r_start = (int)(((long long)tid * nn) / actual_nth);
-      int r_end   = (int)(((long long)(tid + 1) * nn) / actual_nth);
+      int r_start = (int)(((long long)tid * nn) / saved_nth);
+      int r_end   = (int)(((long long)(tid + 1) * nn) / saved_nth);
+      int *my_offsets = &thread_offsets[(size_t)tid * nn];
 
       for (int c = 0; c < nn; ++c) {
-         thread_offsets[(size_t)c * actual_nth + tid] += iat_FU[c];
+         my_offsets[c] += iat_FU[c];
       }
 
       // Pass 3: Scatter transposed entries
@@ -135,7 +154,7 @@ int compress_nsy_fsai(const int nn, int &nt_FL, int &nt_FU,
          for (int j = iat_FL[i]; j < row_end; ++j) {
             if (coef_FU[j] != 0.0) {
                int col = ja_FL[j];
-               int dest = thread_offsets[(size_t)col * actual_nth + tid]++;
+               int dest = my_offsets[col]++;
                ja_FU[dest] = i;
                coef_FU_new[dest] = coef_FU[j];
             }

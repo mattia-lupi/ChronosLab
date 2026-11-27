@@ -43,8 +43,7 @@ eps_prol  = params.eps_prol;
 
 % Unpack the SoC matrix
 nn_S = size(mat_S,1);
-nt_S = nnz(mat_S);
-[iat_S,ja_S,coef_S] = unpack_csr(mat_S);
+[iat_S,ja_S] = unpack_csr(mat_S);
 
 % Adjust numbering of COARSE nodes in fcnodes
 is_c = fcnodes > 0;
@@ -60,23 +59,11 @@ ntv = size(TV,2);
 iat_S = int32(iat_S) - 1;
 ja_S = int32(ja_S) - 1;
 fcnodes = int32(fcnodes);
-coef_S = int32(coef_S);
 verb = double(verb);
 
-% Convert TV in proper 1-D array
-TV = TV';
-TV = TV(:);
-
-[nt_I,iat_I,ja_I,coef_I,c_mark] = ...
-                        cpt_Prolongation_BAMG(level,np,itmax_vol,dist_min,dist_max,...
-                        mmax,maxcond,maxrownrm,tol_vol,eps_prol,nn_S,nt_S,...
-                        iat_S,ja_S,coef_S,ntv,fcnodes,TV,nn_I,nc_I,verb);
-
-% Create a sparse matrix for the prolongation
-irow_I = repelem((1:nn_I)', diff(iat_I));
-nn_I = double(nn_I);
-nc_I = double(nc_I);
-mat_I = sparse(irow_I,ja_I,coef_I,nn_I,nc_I);
+[mat_I,c_mark] = cpt_Prolongation_BAMG(level,np,itmax_vol,dist_min,dist_max,...
+                        mmax,maxcond,maxrownrm,tol_vol,eps_prol,nn_S,...
+                        iat_S,ja_S,ntv,fcnodes,TV,nn_I,nc_I,verb);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %fprintf('max irow: %d %d\n',max(irow_I))
 %fprintf('size(mat_I): %d %d\n',size(mat_I))

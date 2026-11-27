@@ -1,4 +1,4 @@
-function [fcnode,Clist,Fclist,Fflist,S,S_patt] = agg_coarsen(param,A,TV,verb)
+function [fcnode,Clist,Fclist,Fflist,S,S_patt] = agg_coarsen(param,A,smootherOp,TV,verb)
 %-----------------------------------------------------------------------------------------
 %
 % Function to create the coarse space as a Fine/Coarse indicator and the lists of fine and

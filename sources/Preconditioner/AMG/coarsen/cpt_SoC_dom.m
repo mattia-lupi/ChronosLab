@@ -36,30 +36,29 @@ if verb
    fprintf('Filtering SoC\n')
    fprintf('Average NNZR before filtering: %f\n',nnz(A)/size(A,1))
 end
+nn = size(A,1);
 if tau >= 0
    sf = ss;
    sf(sf <= tau)=0;
-   S = sparse(ii,jj,sf);
+   S = sparse(ii,jj,sf,nn,nn);
    sp = ss;
    sp(ss <= tau)=-1;
    sp(ss >  tau)=1;
-   S_patt = sparse(ii,jj,sp);
+   S_patt = sparse(ii,jj,sp,nn,nn);
 else
-   nn = size(A,1);
    ncut = ceil(-nn*tau);
-   if ncut<nnz(A)
+   if ncut < numel(ss)
        [ss,perm] = sort(ss,'descend');
        ii_f = ii(perm(1:ncut));
        jj_f = jj(perm(1:ncut));
        sf = ss(1:ncut);
-       S = sparse(ii_f,jj_f,sf);
-       ss = 1;
-       ss(ncut+1:end) = -1;
-       S_patt = sparse(ii,jj,ss);
+       S = sparse(ii_f,jj_f,sf,nn,nn);
+       sp = ones(numel(ss),1);
+       sp(ncut+1:end) = -1;
+       S_patt = sparse(ii(perm),jj(perm),sp,nn,nn);
    else
-       S = sparse(ii,jj,ss);
-       S_patt = S;
-       S_patt(S_patt>0)=1;
+       S = sparse(ii,jj,ss,nn,nn);
+       S_patt = sparse(ii,jj,ones(numel(ss),1),nn,nn);
    end
 end
 if verb

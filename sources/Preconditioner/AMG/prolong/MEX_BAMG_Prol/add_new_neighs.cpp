@@ -14,13 +14,15 @@ void add_new_neighs(const iExt *const iat_S, const iReg *const ja_S,
       iReg jnod   = neigh[i_neigh];
       iExt istart = iat_S[jnod];
       iExt iend   = iat_S[jnod+1];
-      // Check storage
-      if ( n_neigh + (iend - istart) > nmax) {
-         throw linsol_error ("add_new_neighs","storage problem");
-      }
       for (iExt i = istart; i < iend; i++){
          iReg jcol = ja_S[i];
+         if (jcol < 0 || jcol >= nmax) {
+            throw linsol_error ("add_new_neighs","storage problem");
+         }
          if (WI[jcol] == 0){
+            if (n_neigh >= nmax) {
+               throw linsol_error ("add_new_neighs","storage problem");
+            }
             neigh[n_neigh] = jcol;
             n_neigh++;
             WI[jcol] = 1;

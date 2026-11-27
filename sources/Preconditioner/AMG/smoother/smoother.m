@@ -110,7 +110,7 @@ switch lower(method)
         smootherOp.lambda = lambda;
 
     case 'jacobi'
-        smootherOp.is_posdef = all(diag(A) > 0);
+        smootherOp.is_posdef = full(all(diag(A) > 0));
         % Compute Diagonal
         nA = size(A, 1);
         F = spdiags(1 ./ sqrt(full(diag(A))), 0, nA, nA);
