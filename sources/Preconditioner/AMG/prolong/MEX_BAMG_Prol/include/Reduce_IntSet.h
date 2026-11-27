@@ -7,4 +7,4 @@ void Reduce_IntSet(const rExt maxrownrm, const iReg itmax_vol, const rExt tol_vo
                    const iReg n_neigh, const iReg ntvecs, iReg &row_rank,
                    const iReg *const fcnodes, iReg *int_list, const iReg *neigh,
                    const rExt *const *const TV, rExt **TVcomp, rExt *WR, rExt *coef_P,
-                   rExt &row_nrm);
+                   rExt &row_nrm, rExt *wrot = nullptr, rExt *vcol = nullptr, rExt *vrow = nullptr);

@@ -42,6 +42,8 @@
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #include <stdlib.h>  // to use: exit
 #include <iostream>
+#include <new>
+#include <vector>
 #include "omp.h"
 using namespace std;
 
@@ -51,13 +53,21 @@ using namespace std;
 #include "TWOLP_ProlStripe_EXTI.h"
 
 int EXTI_prolongation(const int level, const int nthreads,
-                      const int *vecstart, const int nn_A, const int nt_A,
+                      const int nn_A, const int nt_A,
                       const int *const iat_A, const int *const ja_A,
                       const double *const coef_A, const int *const coef_S,
-                      const int *const iat_C, const int *const ja_C,
-                      const double *const coef_C, const int *const fcnodes,
+                      const int *const fcnodes,
                       const int nr_I, const int nc_I, int &nt_I, int *&iat_I,
                       int *&ja_I, double *&coef_I){
+
+   // Compute thread row partitions in C++
+   std::vector<int> vecstart(nthreads + 1, 0);
+   if (nthreads > 0 && nn_A > 0) {
+      int bsize = nn_A / nthreads;
+      int resto = nn_A % nthreads;
+      for (int i = 1; i <= resto; ++i) vecstart[i] = vecstart[i - 1] + bsize + 1;
+      for (int i = resto + 1; i <= nthreads; ++i) vecstart[i] = vecstart[i - 1] + bsize;
+   }
 
    // Internal scratch variables
    int *ridv_i;
@@ -67,8 +77,13 @@ int EXTI_prolongation(const int level, const int nthreads,
    int ierr = 0;
 
    // Allocate some scratch vectors
-   ridv_i = new int [nthreads+1](); if (ridv_i == NULL) exit(ierr += 1);
-   ridvn_i = new int [nthreads+1](); if (ridvn_i == NULL) exit(ierr += 1);
+   ridv_i = new int [nthreads+1]();
+   ridvn_i = new int [nthreads+1]();
+   if (ridv_i == nullptr || ridvn_i == nullptr) {
+      delete [] ridv_i;
+      delete [] ridvn_i;
+      return 1;
+   }
 
    int nn_I;
    // Compute the coefficients of the Prolongation matrix
@@ -82,8 +97,6 @@ int EXTI_prolongation(const int level, const int nthreads,
       std::chrono::duration<double> time_OLD,time_ONE,time_TWO;
       // Declaration of some private variables
       int istart_I, shift, istart_scr, iend_scr;
-      int *iat_scr, *ja_scr;
-      double *coef_scr;
 
       // Init local error code
       int ierr_L = 0;
@@ -95,117 +108,87 @@ int EXTI_prolongation(const int level, const int nthreads,
       int firstrow = vecstart[myid];
       int lastrow  = vecstart[myid + 1];
       int nn_loc = lastrow - firstrow;
-      int nt_Imax = 100*nn_loc; // DA VERIFICARE @@@@@@@@@@@@@@@@@
       int nt_I_loc;
       int nn_I_loc;
       
       // Allocate local scratches
-      iat_scr = new int [nn_loc+1]();
-      if (iat_scr == NULL) {ierr_L = 1; goto exit_pragma;}
-      ja_scr = new int [nt_Imax]();
-      if (ja_scr == NULL) {ierr_L = 1; goto exit_pragma;}
-      coef_scr = new double [nt_Imax]();
-      if (coef_scr == NULL) {ierr_L = 1; goto exit_pragma;}
+      int *iat_scr = new (std::nothrow) int [nn_loc+1]();
+      std::vector<int> ja_scr;
+      std::vector<double> coef_scr;
+      if (nn_loc > 0) {
+         ja_scr.reserve(static_cast<size_t>(16) * nn_loc);
+         coef_scr.reserve(static_cast<size_t>(16) * nn_loc);
+      }
+      if (iat_scr == nullptr) {
+         ierr_L = 1;
+      }
 
       // Compute the local stripe of the prolongation
-#if 1
-         START_ONE = std::chrono::high_resolution_clock::now();
-         ierr_L = ONELP_ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,nt_Imax,
-                                        iat_A,ja_A,coef_A,coef_S,iat_C,ja_C,coef_C,
+      if (ierr_L == 0) {
+         ierr_L = ONELP_ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,
+                                        iat_A,ja_A,coef_A,coef_S,
                                         fcnodes,nn_I_loc,nt_I_loc,iat_scr,ja_scr,
                                         coef_scr);
-         END_ONE = std::chrono::high_resolution_clock::now();
-         time_ONE = std::chrono::duration<double>(END_ONE-START_ONE);
-         //printf("TIME ONE [s]  = %15.6e\n",time_ONE.count());
-         //printf("\n\n\n\n------------\n\n\n\n");
-#endif
-#if 0
-         START_TWO = std::chrono::high_resolution_clock::now();
-         ierr_L = TWOLP_ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,nt_Imax,
-                                        iat_A,ja_A,coef_A,coef_S,iat_C,ja_C,coef_C,
-                                        fcnodes,nn_I_loc,nt_I_loc,iat_scr,ja_scr,
-                                        coef_scr);
-         END_TWO = std::chrono::high_resolution_clock::now();
-         time_TWO = std::chrono::duration<double>(END_TWO-START_TWO);
-         printf("TIME TWO [s]  = %15.6e\n",time_TWO.count());
-         printf("\n\n\n\n------------\n\n\n\n");
-#endif
-#if 0
-         START_OLD = std::chrono::high_resolution_clock::now();
-         ierr_L = ProlStripe_EXTI(firstrow,lastrow,nn_loc,nn_A,nt_A,nt_Imax,
-                                  iat_A,ja_A,coef_A,coef_S,fcnodes,nn_I_loc,nt_I_loc,
-                                  iat_scr,ja_scr,coef_scr);
-         END_OLD = std::chrono::high_resolution_clock::now();
-         time_OLD = std::chrono::duration<double>(END_OLD-START_OLD);
-         printf("TIME OLD [s]  = %15.6e\n",time_OLD.count());
-         printf("\n\n\n\n------------\n\n\n\n");
-#endif
+      } else {
+         nn_I_loc = 0;
+         nt_I_loc = 0;
+      }
+
       #pragma omp atomic update
       ierr += ierr_L;
 
-      //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-      //cout << nn_I_loc << " " << nt_I_loc << endl;
-      //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
       // Store local number of entries
       ridv_i[myid+1] = nt_I_loc;
-
       ridvn_i[myid+1] = nn_I_loc;
       #pragma omp barrier
-      if (ierr != 0) goto exit_pragma;
 
-      // Allocate the prolongation matrix
-      #pragma omp single
-      {
-         // Count the number of non-zeroes
-         ridv_i[0] = 0;
-         for (int ip = 0; ip < nthreads; ip++){
-             ridv_i[ip+1] = ridv_i[ip] + ridv_i[ip+1];
+      if (ierr == 0) {
+         // Allocate the prolongation matrix
+         #pragma omp single
+         {
+            // Count the number of non-zeroes
+            ridv_i[0] = 0;
+            for (int ip = 0; ip < nthreads; ip++){
+                ridv_i[ip+1] = ridv_i[ip] + ridv_i[ip+1];
+            }
+            nt_I = ridv_i[nthreads];
+
+            // Count the number of prolongation rows
+            ridvn_i[0] = 0;
+            for (int ip = 0; ip < nthreads; ip++){
+                ridvn_i[ip+1] = ridvn_i[ip] + ridvn_i[ip+1];
+            }
+            nn_I = ridvn_i[nthreads];
+            if (nn_I != nr_I) ierr += 1;
+
+            iat_I = new (std::nothrow) int [nn_I+1](); if (iat_I == nullptr) ierr += 1;
+            ja_I = new (std::nothrow) int [nt_I](); if (ja_I == nullptr) ierr += 1;
+            coef_I = new (std::nothrow) double [nt_I](); if (coef_I == nullptr) ierr += 1;
          }
-         nt_I = ridv_i[nthreads];
+         #pragma omp barrier
 
-         // Count the number of prolongation rows
-         ridvn_i[0] = 0;
-         for (int ip = 0; ip < nthreads; ip++){
-             ridvn_i[ip+1] = ridvn_i[ip] + ridvn_i[ip+1];
+         if (ierr == 0) {
+            // Store iat_scr, ja_scr and coef_scr in the prolongation matrix
+            istart_I = ridv_i[myid];
+            shift = ridvn_i[myid];
+            iend_scr = iat_scr[0];
+            for (int irow = 0; irow < nn_I_loc; irow++){
+               iat_I[shift+irow] = istart_I;
+               istart_scr = iend_scr;
+               iend_scr = iat_scr[irow+1];
+               int len_I = iend_scr - istart_scr;
+               for (int k = 0; k < len_I; k++){
+                  ja_I[istart_I+k] = ja_scr[istart_scr+k];
+                  coef_I[istart_I+k] = coef_scr[istart_scr+k];
+               }
+               istart_I += len_I;
+            }
+            if (myid == nthreads-1) iat_I[nn_I] = ridv_i[nthreads];
          }
-         nn_I = ridvn_i[nthreads];
-         if (nn_I != nr_I) ierr+=1;
-
-         iat_I = new int [nn_I+1](); if (iat_I == NULL) ierr += 1;
-         ja_I = new int [nt_I](); if (ja_I == NULL) ierr += 1;
-         coef_I = new double [nt_I](); if (coef_I == NULL) ierr += 1;
       }
-      if (ierr != 0) goto exit_pragma;
 
-      // Store iat_scr, ja_scr and coef_scr in the prolongation matrix
-      istart_I = ridv_i[myid];
-      //shift = firstrow;
-      shift = ridvn_i[myid];
-      iend_scr = iat_scr[0];
-      for (int irow = 0; irow < nn_I_loc; irow++){
-         iat_I[shift+irow] = istart_I;
-         istart_scr = iend_scr;
-         iend_scr = iat_scr[irow+1];
-         int len_I = iend_scr - istart_scr;
-         for (int k = 0; k < len_I; k++){
-            ja_I[istart_I+k] = ja_scr[istart_scr+k];
-            coef_I[istart_I+k] = coef_scr[istart_scr+k];
-         }
-         istart_I += len_I;
-      }
-      if (myid == nthreads-1) iat_I[nn_I] = ridv_i[nthreads];
-
-      // Deallocate local scratches
+      // Deallocate local scratches safely on all paths
       delete [] iat_scr;
-      delete [] ja_scr;
-      delete [] coef_scr;
-
-      // Exit point
-      exit_pragma: ;
-
-      // Check error codes
-      #pragma omp atomic update
-      ierr += ierr_L;
 
    }
 

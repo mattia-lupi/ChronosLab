@@ -49,7 +49,7 @@ void heapsort(Tx* x1, const Tn n){
 //----------------------------------------------------------------------------------------
 
 // Instantiate template
-#if !IREG_LONG==IEXT_LONG
+#if !(IREG_LONG==IEXT_LONG)
    template void heapsort<iReg,iReg>(iReg* x1, const iReg n);
    template void heapsort<iExt,iReg>(iExt* x1, const iReg n);
    template void heapsort<rExt,iReg>(rExt* x1, const iReg n);

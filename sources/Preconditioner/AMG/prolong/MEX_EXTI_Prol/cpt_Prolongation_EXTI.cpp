@@ -1,225 +1,114 @@
-//----------------------------------------------------------------------------------------
-// cpt_Prolongation_EXTI.cpp
-// Modernized MEX gateway — MathWorks C++ MEX API (R2018a+)
-// Uses: mex.hpp + mexAdapter.hpp (matlab::data API)
-//
-// MATLAB signature:
-//   [nt_I, iat_I, ja_I, coef_I] =
-//       cpt_Prolongation_EXTI(level, np, vecstart, nn_A, nt_A,
-//                             iat_A, ja_A, coef_A, coef_S,
-//                             iat_C, ja_C, coef_C, fcnodes,
-//                             nn_I, nc_I)
-//
-//----------------------------------------------------------------------------------------
-
-#include <cstdint>
-#include "mex.hpp"
-#include "mexAdapter.hpp"
+#include "mex.h"
+#include "matrix.h"
 #include "EXTI_prolongation.h"
-
-#include <cstdlib>    // free()
-#include <string>
+#include <omp.h>
 #include <vector>
-#include <algorithm>  // std::copy
+#include <algorithm>
+#include <cstdint>
 
-//----------------------------------------------------------------------------------------
-// Convenience aliases
-//----------------------------------------------------------------------------------------
-using namespace matlab::data;
-using matlab::mex::ArgumentList;
-
-struct MallocGuard {
-    void *ptr = nullptr;
-    explicit MallocGuard(void *p) : ptr(p) {}
-    ~MallocGuard() { if (ptr) free(ptr); }
-    MallocGuard(const MallocGuard&)            = delete;
-    MallocGuard& operator=(const MallocGuard&) = delete;
-};
-
-//----------------------------------------------------------------------------------------
-// Computational wrapper — logic unchanged from original
-//----------------------------------------------------------------------------------------
-static int cpt_Prolongation_EXTI(const int level, const int nthreads,
-                                 const int *const vecstart,
-                                 const int nn_A, const int nt_A,
-                                 const int *const iat_A, const int *const ja_A,
-                                 const double *const coef_A,
-                                 const int *const coef_S,
-                                 const int *const iat_C, const int *const ja_C,
-                                 const double *const coef_C,
-                                 const int *const fcnodes,
-                                 const int nr_I, const int nc_I,
-                                 int &nt_I, int *&iat_I,
-                                 int *&ja_I, double *&coef_I)
+// Returns MATLAB sparse matrix directly via C++ vecstart and OpenMP CSR->CSC assembly
+// Inputs (11): level, np, nn_A, nt_A, iat_A, ja_A, coef_A, coef_S, fcnodes, nn_I, nc_I
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    return EXTI_prolongation(level, nthreads, vecstart,
-                             nn_A, nt_A, iat_A, ja_A, coef_A, coef_S,
-                             iat_C, ja_C, coef_C, fcnodes,
-                             nr_I, nc_I, nt_I, iat_I, ja_I, coef_I);
+    if (nrhs != 11 || nlhs != 1) {
+        mexErrMsgIdAndTxt("EXTI_Prol:badArgCount", "Expected 11 inputs and 1 output.");
+    }
+
+    const int level    = static_cast<int>(mxGetScalar(prhs[0]));
+    const int np       = std::max(1, static_cast<int>(mxGetScalar(prhs[1])));
+    const int nn_A     = static_cast<int>(mxGetScalar(prhs[2]));
+    const int nt_A     = static_cast<int>(mxGetScalar(prhs[3]));
+    const int32_t *iat_A  = mxGetInt32s(prhs[4]);
+    const int32_t *ja_A   = mxGetInt32s(prhs[5]);
+    const double  *coef_A = mxGetDoubles(prhs[6]);
+    const int32_t *coef_S = mxGetInt32s(prhs[7]);
+    const int32_t *fcn    = mxGetInt32s(prhs[8]);
+    const int nn_I     = static_cast<int>(mxGetScalar(prhs[9]));
+    const int nc_I     = static_cast<int>(mxGetScalar(prhs[10]));
+
+    int nt_I = 0;
+    int *iat_I = nullptr, *ja_I = nullptr;
+    double *coef_I = nullptr;
+
+    int ierr = EXTI_prolongation(level, np, nn_A, nt_A, iat_A, ja_A, coef_A, coef_S,
+                                 fcn, nn_I, nc_I, nt_I, iat_I, ja_I, coef_I);
+    if (ierr != 0 || !iat_I) {
+        delete[] iat_I; delete[] ja_I; delete[] coef_I;
+        mexErrMsgIdAndTxt("EXTI_Prol:computeError", "EXTI_prolongation failed with error %d.", ierr);
+    }
+
+    // Skip explicit zeros to match MATLAB sparse() and avoid downstream filter corruption
+    if (nt_I > 0 && nc_I > 0 && nn_I > 0) {
+        int nth_used = np;
+        std::vector<int> thread_counts(static_cast<std::size_t>(np) * nc_I, 0);
+        std::vector<int> thread_offsets(static_cast<std::size_t>(np) * nc_I, 0);
+        std::vector<int> col_totals(nc_I, 0);
+
+        #pragma omp parallel num_threads(np)
+        {
+            int tid = omp_get_thread_num();
+            int nth = omp_get_num_threads();
+            #pragma omp single
+            nth_used = nth;
+
+            int r0 = static_cast<int>((static_cast<long long>(tid) * nn_I) / nth);
+            int r1 = static_cast<int>((static_cast<long long>(tid + 1) * nn_I) / nth);
+            int *tc = &thread_counts[static_cast<std::size_t>(tid) * nc_I];
+            for (int r = r0; r < r1; ++r) {
+                for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) {
+                    if (coef_I[k] != 0.0) tc[ja_I[k]]++;
+                }
+            }
+            #pragma omp barrier
+            #pragma omp for schedule(static)
+            for (int c = 0; c < nc_I; ++c) {
+                int sum = 0;
+                for (int t = 0; t < nth; ++t) {
+                    thread_offsets[static_cast<std::size_t>(t) * nc_I + c] = sum;
+                    sum += thread_counts[static_cast<std::size_t>(t) * nc_I + c];
+                }
+                col_totals[c] = sum;
+            }
+        }
+
+        int nt_nz = 0;
+        for (int c = 0; c < nc_I; ++c) nt_nz += col_totals[c];
+
+        plhs[0] = mxCreateSparse(static_cast<mwSize>(nn_I), static_cast<mwSize>(nc_I),
+                                 static_cast<mwSize>(std::max(1, nt_nz)), mxREAL);
+        mwIndex *jc = mxGetJc(plhs[0]);
+        mwIndex *ir = mxGetIr(plhs[0]);
+        double  *pr = mxGetDoubles(plhs[0]);
+
+        jc[0] = 0;
+        for (int c = 0; c < nc_I; ++c) jc[c + 1] = jc[c] + static_cast<mwIndex>(col_totals[c]);
+
+        if (nt_nz > 0) {
+            #pragma omp parallel num_threads(nth_used)
+            {
+                int tid = omp_get_thread_num();
+                int r0 = static_cast<int>((static_cast<long long>(tid) * nn_I) / nth_used);
+                int r1 = static_cast<int>((static_cast<long long>(tid + 1) * nn_I) / nth_used);
+                int *to = &thread_offsets[static_cast<std::size_t>(tid) * nc_I];
+                for (int c = 0; c < nc_I; ++c) to[c] += static_cast<int>(jc[c]);
+                for (int r = r0; r < r1; ++r) {
+                    for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) {
+                        double val = coef_I[k];
+                        if (val == 0.0) continue;
+                        int dst = to[ja_I[k]]++;
+                        ir[dst] = static_cast<mwIndex>(r);
+                        pr[dst] = val;
+                    }
+                }
+            }
+        }
+    } else {
+        plhs[0] = mxCreateSparse(static_cast<mwSize>(nn_I), static_cast<mwSize>(nc_I), 1, mxREAL);
+        mwIndex *jc = mxGetJc(plhs[0]);
+        for (int c = 0; c <= nc_I; ++c) jc[c] = 0;
+    }
+
+    delete[] iat_I;
+    delete[] ja_I;
+    delete[] coef_I;
 }
-
-//----------------------------------------------------------------------------------------
-// MexFunction
-//----------------------------------------------------------------------------------------
-class MexFunction : public matlab::mex::Function {
-
-    ArrayFactory factory;
-
-public:
-
-    void operator()(ArgumentList outputs, ArgumentList inputs) override
-    {
-        validateArguments(outputs, inputs);
-
-        // -----------------------------------------------------------------------
-        // Read inputs
-        // -----------------------------------------------------------------------
-        const int level  = static_cast<int>(TypedArray<double>(inputs[ 0])[0]);
-        const int np     = static_cast<int>(TypedArray<double>(inputs[ 1])[0]);
-        const int nn_A   = static_cast<int>(TypedArray<double>(inputs[ 3])[0]);
-        const int nt_A   = static_cast<int>(TypedArray<double>(inputs[ 4])[0]);
-        const int nn_I   = static_cast<int>(TypedArray<double>(inputs[13])[0]);
-        const int nc_I   = static_cast<int>(TypedArray<double>(inputs[14])[0]);
-
-        const TypedArray<int32_t> vecstart_arr = inputs[ 2];
-        const TypedArray<int32_t> iat_A_arr    = inputs[ 5];
-        const TypedArray<int32_t> ja_A_arr     = inputs[ 6];
-        const TypedArray<double>  coef_A_arr   = inputs[ 7];
-        const TypedArray<int32_t> coef_S_arr   = inputs[ 8];
-        const TypedArray<int32_t> iat_C_arr    = inputs[ 9];
-        const TypedArray<int32_t> ja_C_arr     = inputs[10];
-        const TypedArray<double>  coef_C_arr   = inputs[11];
-        const TypedArray<int32_t> fcnodes_arr  = inputs[12];
-
-        std::vector<int32_t> vecstart_vec(vecstart_arr.begin(), vecstart_arr.end());
-        std::vector<int32_t> iat_A_vec   (iat_A_arr.begin(),    iat_A_arr.end());
-        std::vector<int32_t> ja_A_vec    (ja_A_arr.begin(),     ja_A_arr.end());
-        std::vector<double>  coef_A_vec  (coef_A_arr.begin(),   coef_A_arr.end());
-        std::vector<int32_t> coef_S_vec  (coef_S_arr.begin(),   coef_S_arr.end());
-        std::vector<int32_t> iat_C_vec   (iat_C_arr.begin(),    iat_C_arr.end());
-        std::vector<int32_t> ja_C_vec    (ja_C_arr.begin(),     ja_C_arr.end());
-        std::vector<double>  coef_C_vec  (coef_C_arr.begin(),   coef_C_arr.end());
-        std::vector<int32_t> fcnodes_vec (fcnodes_arr.begin(),  fcnodes_arr.end());
-
-        // -----------------------------------------------------------------------
-        // Call the computational wrapper
-        // -----------------------------------------------------------------------
-        int     nt_I     = 0;
-        int    *iat_I_raw  = nullptr;
-        int    *ja_I_raw   = nullptr;
-        double *coef_I_raw = nullptr;
-
-        int ierr = cpt_Prolongation_EXTI(
-                       level, np,
-                       vecstart_vec.data(),
-                       nn_A, nt_A,
-                       iat_A_vec.data(),  ja_A_vec.data(),  coef_A_vec.data(),
-                       coef_S_vec.data(),
-                       iat_C_vec.data(),  ja_C_vec.data(),  coef_C_vec.data(),
-                       fcnodes_vec.data(),
-                       nn_I, nc_I,
-                       nt_I, iat_I_raw, ja_I_raw, coef_I_raw);
-
-        MallocGuard g_iat (iat_I_raw);
-        MallocGuard g_ja  (ja_I_raw);
-        MallocGuard g_coef(coef_I_raw);
-
-        if (!iat_I_raw || !ja_I_raw || !coef_I_raw)
-            throwError("EXTI_Prol:nullPointer",
-                       "Kernel returned a null pointer — likely an allocation failure.");
-
-        if (ierr != 0)
-            throwError("EXTI_Prol:computeError",
-                       "cpt_Prolongation_EXTI returned error code: " +
-                       std::to_string(ierr));
-
-        // -----------------------------------------------------------------------
-        // Pack results into MATLAB output arrays.
-        // -----------------------------------------------------------------------
-        const std::size_t sz_iat = static_cast<std::size_t>(nn_I + 1);
-        const std::size_t sz_nt  = static_cast<std::size_t>(nt_I);
-
-        // --- nt_I : scalar double ---------------------------------------------
-        TypedArray<double> out_nt_I =
-            factory.createScalar<double>(static_cast<double>(nt_I));
-
-        // --- iat_I : double, length nn_I+1, 0-based → 1-based ----------------
-        TypedArray<double> out_iat_I = factory.createArray<double>({sz_iat, 1});
-        {
-            auto it = out_iat_I.begin();
-            for (int i = 0; i <= nn_I; ++i, ++it)
-                *it = static_cast<double>(iat_I_raw[i] + 1);
-        }
-
-        // --- ja_I : double, length nt_I, 0-based → 1-based -------------------
-        TypedArray<double> out_ja_I = factory.createArray<double>({sz_nt, 1});
-        {
-            auto it = out_ja_I.begin();
-            for (std::size_t i = 0; i < sz_nt; ++i, ++it)
-                *it = static_cast<double>(ja_I_raw[i] + 1);
-        }
-
-        // --- coef_I : double, length nt_I -------------------------------------
-        TypedArray<double> out_coef_I = factory.createArray<double>({sz_nt, 1});
-        std::copy(coef_I_raw, coef_I_raw + sz_nt, out_coef_I.begin());
-
-        // MallocGuards destruct here — iat_I, ja_I, coef_I freed automatically [NEW-2]
-
-        // -----------------------------------------------------------------------
-        // Return outputs to MATLAB
-        // -----------------------------------------------------------------------
-        outputs[0] = std::move(out_nt_I);
-        outputs[1] = std::move(out_iat_I);
-        outputs[2] = std::move(out_ja_I);
-        outputs[3] = std::move(out_coef_I);
-    }
-
-private:
-
-    void validateArguments(ArgumentList& outputs, ArgumentList& inputs)
-    {
-        if (inputs.size() != 15)
-            throwError("EXTI_Prol:badInputCount",
-                       "Expected 15 input arguments, got " +
-                       std::to_string(inputs.size()) + ".");
-
-        if (outputs.size() != 4)
-            throwError("EXTI_Prol:badOutputCount",
-                       "Expected 4 output arguments, got " +
-                       std::to_string(outputs.size()) + ".");
-
-        // Scalar double inputs: level(0), np(1), nn_A(3), nt_A(4), nn_I(13), nc_I(14)
-        for (std::size_t i : {0u, 1u, 3u, 4u, 13u, 14u})
-            if (inputs[i].getType() != ArrayType::DOUBLE ||
-                inputs[i].getNumberOfElements() != 1)
-                throwError("EXTI_Prol:badScalar",
-                           "Input argument " + std::to_string(i + 1) +
-                           " must be a real double scalar.");
-
-        // int32 array inputs: vecstart(2), iat_A(5), ja_A(6), coef_S(8),
-        //                     iat_C(9), ja_C(10), fcnodes(12)
-        for (std::size_t i : {2u, 5u, 6u, 8u, 9u, 10u, 12u})
-            if (inputs[i].getType() != ArrayType::INT32)
-                throwError("EXTI_Prol:badArray",
-                           "Input argument " + std::to_string(i + 1) +
-                           " must be an int32 array.");
-
-        // double array inputs: coef_A(7), coef_C(11)
-        for (std::size_t i : {7u, 11u})
-            if (inputs[i].getType() != ArrayType::DOUBLE)
-                throwError("EXTI_Prol:badArray",
-                           "Input argument " + std::to_string(i + 1) +
-                           " must be a double array.");
-    }
-
-    void throwError(const std::string& id, const std::string& msg)
-    {
-        getEngine()->feval(u"error", 0,
-            std::vector<Array>{
-                factory.createCharArray(id),
-                factory.createCharArray(msg)
-            });
-    }
-};
-
-//----------------------------------------------------------------------------------------

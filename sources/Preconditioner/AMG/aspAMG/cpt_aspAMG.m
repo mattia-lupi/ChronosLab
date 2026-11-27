@@ -196,7 +196,7 @@ else
       fclist = 0;
       fflist = 0;
    else
-      [fcnode,clist,fclist,fflist,S,S_patt] = agg_coarsen(param.coarsen,A,TV,verb);
+      [fcnode,clist,fclist,fflist,S,S_patt] = agg_coarsen(param.coarsen,A,smootherOp,TV,verb);
       num_f = numel(fclist) + numel(fflist);
       num_c = numel(clist);
    end

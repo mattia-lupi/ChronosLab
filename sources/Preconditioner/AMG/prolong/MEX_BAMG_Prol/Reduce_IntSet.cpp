@@ -13,11 +13,11 @@ void Reduce_IntSet(const rExt maxrownrm, const iReg itmax_vol, const rExt tol_vo
                    const iReg n_neigh, const iReg ntvecs, iReg &row_rank,
                    const iReg *const fcnodes, iReg *int_list, const iReg *neigh,
                    const rExt *const *const TV, rExt **TVcomp, rExt *WR, rExt *coef_P,
-                   rExt &row_nrm){
+                   rExt &row_nrm, rExt *wrot, rExt *vcol, rExt *vrow){
 
    while (row_nrm > maxrownrm) {
-      if (row_rank == 1){
-         row_rank--;
+      if (row_rank <= 1){
+         row_rank = 0;
          break;
       }
 
@@ -38,7 +38,7 @@ void Reduce_IntSet(const rExt maxrownrm, const iReg itmax_vol, const rExt tol_vo
 
       // Select the best basis using maxVol
       maxVol(cmax,maxcond,itmax_vol,tol_vol,n_int,ntvecs,TVcomp,
-             row_rank,int_list);
+             row_rank,int_list,wrot,vcol,vrow);
       // Sort the list
       heapsort(int_list,row_rank);
 

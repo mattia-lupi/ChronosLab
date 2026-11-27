@@ -21,8 +21,11 @@ if verb
    fprintf('Computing SoC\n')
 end
 
+[nRows, nCols] = size(A);
+A_off = A - spdiags(diag(A), 0, nRows, nCols);
+
 % Get the minimum value of each row (which should be negative)
-min_row = full(min(A-diag(diag(A))))';
+min_row = full(min(A_off, [], 2));
 
 % Treat possible Dirichlet (isolated) nodes
 min_row(min_row==0) = 1;
@@ -30,7 +33,6 @@ min_row(min_row==0) = 1;
 % Compute SoC
 [ii,jj,aa] = find(A);
 ss = aa ./ min_row(ii);
-S = sparse(ii,jj,ss);
 if verb
    fprintf('End Computing SoC\n')
 
@@ -38,11 +40,11 @@ if verb
 end
 sf = ss;
 sf(sf <= tau) = 0;
-S = sparse(ii,jj,sf);
+S = sparse(ii,jj,sf,nRows,nCols);
 sp = ss;
 sp(ss <= tau)=-1;
 sp(ss >  tau)=1;
-S_patt = sparse(ii,jj,sp);
+S_patt = sparse(ii,jj,sp,nRows,nCols);
 if verb
    fprintf('End Filtering SoC\n')
 end
@@ -53,7 +55,7 @@ end
 % Complete the matrix with a unitary diagonal
 nn = size(S,1);
 S = S + speye(nn);
-S_patt = S_patt - diag(diag(S_patt)) + speye(nn);
+S_patt = S_patt - spdiags(diag(S_patt), 0, nn, nn) + speye(nn);
 
 if verb
    fprintf('# of S off-diagonal entries:    %10d\n',nnz(S)-nn);

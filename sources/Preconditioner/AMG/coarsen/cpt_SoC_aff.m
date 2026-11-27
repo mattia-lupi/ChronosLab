@@ -57,17 +57,22 @@ if tau >= 0
    S_patt = sparse(ii,jj,sp,nn,nn);
 else
    ncut = ceil(-nn*tau);
-   if ncut<nnz(A)
+   if ncut < numel(ss)
       [ss,perm] = sort(ss,'descend');
       lim_val = ss(ncut);
-      ncut = find(ss<lim_val,1,'first')-1;
+      idx = find(ss < lim_val, 1, 'first');
+      if isempty(idx)
+         ncut = numel(ss);
+      else
+         ncut = idx - 1;
+      end
       ii_f = ii(perm(1:ncut));
       jj_f = jj(perm(1:ncut));
       sf = ss(1:ncut);
       S = sparse(ii_f,jj_f,sf,nn,nn);
-      ss(:) = 1;
-      ss(ncut+1:end) = -1;
-      S_patt = sparse(ii,jj,ss,nn,nn);
+      sp = ones(numel(ss),1);
+      sp(ncut+1:end) = -1;
+      S_patt = sparse(ii(perm),jj(perm),sp,nn,nn);
    else
       S_patt = S;
       S_patt(S_patt>0)=1;

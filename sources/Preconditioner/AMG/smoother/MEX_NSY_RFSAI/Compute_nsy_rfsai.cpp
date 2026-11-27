@@ -44,7 +44,17 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    int *iat_Asym     = (int*) malloc((nn_A+1) * sizeof(int));
    int *ja_Asym      = (int*) malloc(nt_A * sizeof(int));
    double *coef_Asym = (double*) malloc(nt_A * sizeof(double));
+   double *coef_AT  = nullptr;
+   auto cleanup = [&]() {
+      if (diag_A) free(diag_A);
+      if (iat_Asym) free(iat_Asym);
+      if (ja_Asym) free(ja_Asym);
+      if (coef_Asym) free(coef_Asym);
+      if (coef_AT) free(coef_AT);
+   };
+
    if (iat_Asym == nullptr || ja_Asym == nullptr || coef_Asym == nullptr){
+      cleanup();
       cout << "Error in allocating symmetrize pattern A" << endl;
       return 1;
    }
@@ -52,9 +62,9 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    memcpy(ja_Asym,ja_A,nt_A*sizeof(int)); 
    memcpy(coef_Asym,coef_A,nt_A*sizeof(double)); 
 
-   double *coef_AT  = nullptr;
    ierr = SymmetrizePattern(nn_A,iat_Asym,ja_Asym,coef_Asym,coef_AT,num_threads);
    if (ierr != 0){
+      cleanup();
       cout << "Error in SymmetrizePattern" << endl;
       return 2;
    }
@@ -84,6 +94,7 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    ierr = cpt_nsy_rfsai(nstep,step_size,eps,nn_A,nt_A,diag_A,iat_Asym,ja_Asym,coef_Asym,
                         coef_AT,iat_FL,ja_FL,coef_FL,coef_FU,num_threads);
    if (ierr != 0){
+      cleanup();
       cout << "Error in cpt_nsy_rfsai" << endl;
       return 3;
    }
@@ -103,16 +114,13 @@ int Compute_nsy_rfsai(const int nstep, const int step_size, const double eps,
    int nt_FU;
    ierr = compress_nsy_fsai(nn_A,nt_FL,nt_FU,iat_FL,ja_FL,iat_FU,ja_FU,coef_FL,coef_FU,num_threads);
    if (ierr != 0){
+      cleanup();
       cout << "Error in compress_nsy_fsai" << endl;
       return 4;
    }
 
    // Delete scratch vectors
-   free(diag_A);
-   free(iat_Asym);
-   free(ja_Asym);
-   free(coef_Asym);
-   free(coef_AT);
+   cleanup();
 
    return 0;
 

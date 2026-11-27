@@ -157,10 +157,17 @@ for (iReg i = 1; i < mrow+1; i++){
 
    while (ii <= mrow){
 
+      if (jj >= endrow) {
+         for (iReg k = ii; k < mrow+1; k++){
+            full_A[(i-1)*mmax+k-1] = 0.;
+         }
+         goto exit_column_loop;
+      }
+
       // Make sure that ja(jj-1) >= vecinc(ii-1) (only upper part)
       while (ja[jj-1] < vecinc[ii-1]){
          jj += 1;
-         if (jj == endrow) {
+         if (jj >= endrow) {
             // If the row end is reached move to the next column
             for (iReg k = ii; k < mrow+1; k++){
                full_A[(i-1)*mmax+k-1] = 0.;
@@ -189,9 +196,13 @@ for (iReg i = 1; i < mrow+1; i++){
 // The sign of the right-hand-side is changed
 iReg ii = 1;
 iExt jj = iat[irow-1];
-nulrhs = ja[jj-1] >= jendbloc;
-if (nulrhs) return;
-while (ja[jj-1] < jendbloc){
+iExt endrow = iat[irow];
+if (jj >= endrow || ja[jj-1] >= jendbloc) {
+   nulrhs = true;
+   return;
+}
+nulrhs = false;
+while (jj < endrow && ja[jj-1] < jendbloc){
    if (vecinc[ii-1] > ja[jj-1]){
       jj += 1;
    }else if (vecinc[ii-1] == ja[jj-1]){
@@ -219,20 +230,20 @@ void kap_grad(iReg irow, iReg nequ, iExt nterm, iReg mmax, iReg &mrow, iReg jend
               iReg * const JWN, rExt * const WR){
 
 iReg ind_WR = 0;
+iReg jjcol;
 
 // Get the degree zero entries (A pattern)
 iExt j = iat[irow-1];
-iReg jjcol = ja[j-1];
-while (jjcol < jendbloc){
+iExt endrow = iat[irow];
+while (j < endrow && ja[j-1] < jendbloc){
    // If JWN is positive add this entry to the tentative pattern
-   if (JWN[jjcol-1] >= 0) {
+   if (JWN[ja[j-1]-1] >= 0) {
       ind_WR += 1;
-      JWN[jjcol-1] = ind_WR;
+      JWN[ja[j-1]-1] = ind_WR;
       IWN[mrow+ind_WR-1] = ja[j-1];
       WR[ind_WR-1] = mat_A[j-1];
    }
    j += 1;
-   jjcol = ja[j-1];
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -467,15 +478,26 @@ for( iReg irow = 1; irow < nrows+1; irow++){
 
    // Compute the scaling factor for this row
    iExt ind = iat[irow_glo-1];
-   while (ja[ind-1] < irow_glo){
+   iExt endrow = iat[irow_glo];
+   bool found_diag = false;
+   while (ind < endrow && ja[ind-1] <= irow_glo){
+      if (ja[ind-1] == irow_glo) {
+         found_diag = true;
+         break;
+      }
       ind += 1;
    }
 
-   rExt scal_fac = coef_A[ind-1] - cpt_ddot(mrow,rhs_sav.data(),rhs.data());
+   rExt scal_fac = 0.0;
+   if (!found_diag) {
+      thread_is_posdef = 0;
+   } else {
+      scal_fac = coef_A[ind-1] - cpt_ddot(mrow,rhs_sav.data(),rhs.data());
+   }
 
    if (scal_fac < 0.){
       thread_is_posdef = 0;
-      if (mrow > 0) {
+      if (mrow > 0 && found_diag) {
          // Recompute this row in safer way
          bool nulrhs;
          gather_fullsys(nulrhs,irow_glo,mrow,irow_glo,nequ,nterm,mmax,iat,ja,IWN.data(),

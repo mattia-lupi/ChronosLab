@@ -15,6 +15,8 @@
 #include <cmath>      // to use: abs
 #include <algorithm>  // to use: fill_n,min
 #include <limits>     // to use: numeric_limits<double>epsilon()
+#include <new>
+#include <vector>
 
 #include "ir_heapsort.h"
 
@@ -23,23 +25,34 @@ const double ZERO = 0.0;
 const double EPS = std::numeric_limits<double>::epsilon();
 
 int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_loc,
-                          const int nn_A, const int nt_A, const int ntmax_P,
+                          const int nn_A, const int nt_A,
                           const int *const iat_A, const int *const ja_A,
                           const double *const coef_A, const int *const coef_S,
-                          const int *const iat_C, const int *const ja_C,
-                          const double *const coef_C, const int *const fcnodes,
-                          int &nn_P, int &nt_P, int *iat_P, int *ja_P,
-                          double *coef_P){
+                          const int *const fcnodes,
+                          int &nn_P, int &nt_P, int *iat_P,
+                          std::vector<int> &ja_P, std::vector<double> &coef_P){
 
-   // Allocate some scratch vectors
-   // PER ESSERE SICURI BISOGNA AVERE IL MAX NUMERO DI NONZERI PER RIGA
-   double avg_nnz = 20.0*static_cast<double>(nt_A) / static_cast<double>(lastrow-firstrow);
-   int size_scr = static_cast<int>(avg_nnz);
-   int *WI         = new int [nn_A](); if (WI == NULL) return 1;
-   std::fill_n(WI,nn_A,0);
-   int *ja_FS      = new int [size_scr](); if (ja_FS == NULL) return 1;
-   double *coef_FS = new double [size_scr](); if (coef_FS == NULL) return 1;
-   int *list_weak  = new int [size_scr](); if (list_weak == NULL) return 1;
+   // Early exit if stripe is empty
+   if (firstrow >= lastrow || nn_loc <= 0) {
+      nn_P = 0;
+      nt_P = 0;
+      iat_P[0] = 0;
+      return 0;
+   }
+
+   // Allocate scratch vectors based on global nn_A to avoid division by zero or thread-count blowup
+   double avg_nnz = (nn_A > 0) ? (20.0 * static_cast<double>(nt_A) / static_cast<double>(nn_A)) : 50.0;
+   int size_scr = std::max(64, static_cast<int>(avg_nnz));
+   int *WI = new (std::nothrow) int [nn_A]();
+   if (WI == nullptr) {
+      return 1;
+   }
+   std::vector<int> ja_FS;
+   std::vector<double> coef_FS;
+   std::vector<int> list_weak;
+   ja_FS.reserve(size_scr);
+   coef_FS.reserve(size_scr);
+   list_weak.reserve(size_scr);
 
    // Init pointer to the prolongation matrix
    nn_P = 0;
@@ -67,8 +80,8 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
          nn_P++;
 
          // It is a coarse node
-         ja_P[ind_P] = inod_coarse;
-         coef_P[ind_P] = ONE;
+         ja_P.push_back(inod_coarse);
+         coef_P.push_back(ONE);
          ind_P++;
 
       } else if (inod_coarse == -1) {
@@ -80,9 +93,9 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
 
          // First loop to classify distance 1 coarse neighbours of inod
          int n_int = 0;
-         int n_weak = 0;
+         list_weak.clear();
          double denom = ZERO;
-         double a_ii;
+         double a_ii = ZERO;
          for (int j = iat_A[inod]; j < iat_A[inod+1]; j++){ // Loop on dist_1 neigh
             int jcol = ja_A[j];
             if (jcol == inod){
@@ -96,42 +109,25 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
                      // Strong connection
 
                      // Add this node to the interp. set and save its value
-                     ja_P[ind_P+n_int] = jcol;
-                     coef_P[ind_P+n_int] = coef_A[j];
+                     ja_P.push_back(jcol);
+                     coef_P.push_back(coef_A[j]);
                      WI[jcol] = n_int+1;
                      n_int++;
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                     //if (inod == DBNODE){
-                     //   cout << "AGGIUNTO COARSE: " << jcol << " " << WI[jcol] <<
-                     //           " " << coef_A[j] << endl;
-                     //}
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                   } else {
                      // Weak connection
 
                      // The node is not in the interp. set (not yet)
                      denom += coef_A[j];
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                     //if (inod == DBNODE){
-                     //   cout << "AGGIUNGO CO A WEAK " << jcol << " " << coef_A[j] << endl;
-                     //}
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                      // Keep track of weak COARSE neighbours in case they are promoted
                      // to interpolatory points
-                     WI[jcol] = -j;
-                     list_weak[n_weak] = jcol;
-                     n_weak++;
+                     WI[jcol] = -(j + 1);
+                     list_weak.push_back(jcol);
                   }
                } else {
                   // This neighbour is FINE
                   if (coef_S[j] < 0){
                      // Weak connection, just adjust denominator
                      denom += coef_A[j];
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                     //if (inod == DBNODE){
-                     //    cout << "AGGIUNGO FI a DEN" << jcol << " " << coef_A[j] << endl;
-                     //}
-                     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                   } 
                }
             }
@@ -166,102 +162,76 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
          //}
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
 
-         // Explore strong FINE neighbors to extend the interpolatory set (using
-         // the compressed matrix C)
-         for (int j = iat_C[inod]; j < iat_C[inod+1]; j++){ // Loop on dist_1 neigh
-            int jcol = ja_C[j];
-            if (jcol != inod){ //This check is necessary only if C has diagonals
-               //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
-               //if (inod == DBNODE){
-               //   cout << "Exploring FINE neighbor " << jcol << endl;
-               //}
-               //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
+         // Explore strong FINE neighbors directly using (iat_A, ja_A, coef_A) guarded by coef_S > 0
+         for (int j = iat_A[inod]; j < iat_A[inod+1]; j++){ // Loop on dist_1 neigh
+            if (coef_S[j] <= 0) continue;
+            int jcol = ja_A[j];
+            if (jcol != inod){
                // Consider only FINE nodes
                if (fcnodes[jcol] < 0){
-                  double a_ik = coef_C[j];
-                  double a_ki_bar;
+                  double a_ik = coef_A[j];
+                  double a_ki_bar = ZERO;
                   double ext_sum = 0.0;
-                  int n_FS = 0;
+                  ja_FS.clear();
+                  coef_FS.clear();
                   // Explore its strong neighbours to expand the interpolatory set
-                  for (int k = iat_C[jcol]; k < iat_C[jcol+1]; k++){ // Strong neigh loop
-                     int kcol = ja_C[k];
+                  for (int k = iat_A[jcol]; k < iat_A[jcol+1]; k++){ // Strong neigh loop
+                     if (coef_S[k] <= 0) continue;
+                     int kcol = ja_A[k];
                      if (kcol == inod){
                         // This is the current FINE node --> save its coefficient
-                        a_ki_bar = std::min(ZERO,coef_C[k]);
+                        a_ki_bar = std::min(ZERO,coef_A[k]);
                         // Update the extended sum
                         ext_sum += a_ki_bar;
-                        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
-                        //if (inod == DBNODE){
-                        //   cout << "coef_C[k] " << coef_C[k] << endl;
-                        //   cout << "EXTSUM " << ext_sum - a_ki_bar << endl;
-                        //   cout << "AGGIUNGO A EXTSUM KI " << a_ki_bar << endl;
-                        //   cout << "EXTSUM " << ext_sum << endl;
-                        //}
-                        //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
                      } else {
                         // Consider only COARSE neighbors
                         if (fcnodes[kcol] >= 0){
                            // Update the extended sum and store an auxiliary coef
-                           double a_kj_bar = std::min(ZERO,coef_C[k]);
-                           ja_FS[n_FS] = kcol;
-                           coef_FS[n_FS] = a_kj_bar;
-                           n_FS++;
+                           double a_kj_bar = std::min(ZERO,coef_A[k]);
+                           ja_FS.push_back(kcol);
+                           coef_FS.push_back(a_kj_bar);
                            ext_sum += a_kj_bar;
-                           //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
-                           //if (inod == DBNODE){
-                           //   cout << "coef_C[k] " << coef_C[k] << endl;
-                           //   cout << "EXTSUM " << ext_sum - a_kj_bar << endl;
-                           //   cout << "AGGIUNGO A EXTSUM " << kcol << " " << a_kj_bar << endl;
-                           //   cout << "EXTSUM " << ext_sum << endl;
-                           //}
-                           //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
                            // Check that the node has not been added yet to the interp. set
                            if ( WI[kcol] <= 0 ){
                               double value = ZERO;
                               if (WI[kcol] < 0){
                                  // The node was considered weak COARSE before
-                                 value = coef_A[-WI[kcol]];
+                                 value = coef_A[-WI[kcol] - 1];
                                  // Adjust denominator when the node is included
                                  denom -= value;
                               }
                               // kcol was not in the interp. set, add it and init its
                               // coefficient
-                              ja_P[ind_P+n_int] = kcol;
-                              coef_P[ind_P+n_int] = value;
+                              ja_P.push_back(kcol);
+                              coef_P.push_back(value);
                               WI[kcol] = n_int+1;
                               n_int++;
                            }
                         }
                      }
                   } // End Strong neigh loop
-                  //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                  //if (inod == DBNODE){
-                     //cout << "EXT_SUM FINAL" << ext_sum << endl;
-                  //}
-                  //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
                   // Check that extended sum is not null
-                  if ( abs(ext_sum) > EPS*a_ii ){
+                  if ( std::abs(ext_sum) > EPS*std::abs(a_ii) ){
                      // ext_sum !=0
 
                      // Update weights
-                     for (int k = 0; k < n_FS; k++){
+                     for (std::size_t k = 0; k < ja_FS.size(); k++){
                         int pos = WI[ja_FS[k]]-1;
                         coef_P[ind_P+pos] += (a_ik*coef_FS[k]) / ext_sum;
                      }
                      // Update denominator
-                     //denom += (a_ik * a_ik_bar) / ext_sum; // QUI CI VA a_ki_bar
                      denom += (a_ik * a_ki_bar) / ext_sum;
 
                   } else {
                      // ext_sum == 0
                   
                      // Treat the case of zero extended sum
-                     double fac = ONE / (static_cast<double>(n_int+1));
+                     double fac = ONE / (static_cast<double>(ja_FS.size() + 1));
                      // Update denominator
                      denom += a_ik*fac;
                      // Update all the weights
-                     for (int k = 0; k < n_FS; k++){
+                     for (std::size_t k = 0; k < ja_FS.size(); k++){
                         int pos = WI[ja_FS[k]]-1;
                         coef_P[ind_P+pos] += a_ik*fac;
                      }
@@ -286,6 +256,11 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
          //}
          //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+         // Check for zero or near-zero denominator
+         if (std::abs(denom) < EPS) {
+            denom = (std::abs(a_ii) > EPS) ? a_ii : ONE;
+         }
+
          // Adjust column index in ja_P, compute weights and sort
          for (int i = ind_P; i < ind_P+n_int; i++){
             // Reset WI
@@ -293,41 +268,13 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
             ja_P[i] = fcnodes[ja_P[i]];
             coef_P[i] = -coef_P[i] / denom;
          }
-         ir_heapsort(&(ja_P[ind_P]),&(coef_P[ind_P]),n_int);
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
-         //double sum = 0.0;
-         //for (int i = ind_P; i < ind_P+n_int; i++) sum += coef_P[i];
-         //for (int i = ind_P; i < ind_P+n_int; i++) coef_P[i] /= sum;
-         //if (inod >= DBNODE && inod <=ENDNODE){
-         //   cout << endl;
-         //   cout << "WGTS:" << endl;
-         //   for (int i = ind_P; i < ind_P+n_int; i++) cout << ja_P[i] << " ";
-         //   cout << endl;
-         //   for (int i = ind_P; i < ind_P+n_int; i++) cout << coef_P[i] << " ";
-         //   cout << endl;
-         //   double sum = 0.0;
-         //   for (int i = ind_P; i < ind_P+n_int; i++){
-         //      sum += coef_P[i];
-         //   }
-         //   cout << "SOMMA " << sum << endl;
-            //cout << "XXXX " << XXX << endl;
-         //}
-         //if (inod >= DBNODE && inod <= ENDNODE){
-         //   double sum_P = 0.0;
-         //   for (int i = ind_P; i < ind_P+n_int; i++){
-         //      sum_P += coef_P[i];
-         //   }
-         //   double sum_A = 0.0;
-         //   for (int i = iat_A[inod]; i < iat_A[inod+1]; i++){
-         //      sum_A += coef_A[i];
-         //   }
-            //cout << "SOMMA A | SOMMA P: " << setw(12) << sum_A/DDD << "  " << sum_P << endl;
-         //}
-         //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@22
+         if (n_int > 0) {
+            ir_heapsort(&(ja_P[ind_P]),&(coef_P[ind_P]),n_int);
+         }
          ind_P += n_int;
 
          // Reset WI for weak coarse nodes
-         for (int i = 0; i < n_weak; i++) WI[list_weak[i]] = 0;
+         for (std::size_t i = 0; i < list_weak.size(); i++) WI[list_weak[i]] = 0;
 
       }
 
@@ -341,9 +288,6 @@ int ONELP_ProlStripe_EXTI(const int firstrow, const int lastrow, const int nn_lo
 
    // Deallocate scratches
    delete [] WI;
-   delete [] ja_FS;
-   delete [] coef_FS;
-   delete [] list_weak;
 
    return 0;
 }

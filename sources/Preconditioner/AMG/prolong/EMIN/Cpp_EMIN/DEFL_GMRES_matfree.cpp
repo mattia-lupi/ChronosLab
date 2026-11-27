@@ -149,6 +149,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    init_energy = beta * beta;
    double Eold = init_energy, DE0 = 0.0, DEk = 0.0;
    double const beta0 = beta;
+   double latest_resid = beta;
    if (beta <= 0.0) exit_test = true;
 
    #if COMP_ENRG
@@ -256,6 +257,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
          g[j]   = temp;
 
          double const resid = std::abs(g[j+1]);
+         latest_resid = resid;
 
          double const E = resid * resid;
          DEk = std::abs(Eold - E);
@@ -349,6 +351,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
       beta = dnrm2_par(np,nn_K,res,ridv);
 
       if (beta <= 0.0) {
+         latest_resid = 0.0;
          exit_test = true;
          break;
       }
@@ -371,7 +374,7 @@ int DEFL_GMRES_matfree(const int np, const int prec_type, const int sol_type, co
    free(g);
 
    #if COMP_ENRG
-   double const final_energy = beta * beta;
+   double const final_energy = latest_resid * latest_resid;
    if(verb){
       std::cout << std::setprecision(6) << std::scientific;
       std::cout << "Final Energy:    " << final_energy << std::endl;

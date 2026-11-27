@@ -67,9 +67,9 @@ public:
         const TypedArray<int32_t> ja_M_arr   = inputs[9];
         const TypedArray<double>  coef_M_arr = inputs[10];
 
-        std::vector<iExt> iat_M_vec (iat_M_arr.begin(),  iat_M_arr.end());
-        std::vector<iReg> ja_M_vec  (ja_M_arr.begin(),   ja_M_arr.end());
-        std::vector<rExt> coef_M_vec(coef_M_arr.begin(), coef_M_arr.end());
+        const iExt *iat_M = &(*iat_M_arr.begin());
+        const iReg *ja_M  = &(*ja_M_arr.begin());
+        const rExt *coef_M = &(*coef_M_arr.begin());
 
         const iExt kmax    = 1 + static_cast<iExt>(n_step) * static_cast<iExt>(step_size);
         const iExt nzmax_G = static_cast<iExt>(nrows) * kmax;
@@ -88,9 +88,9 @@ public:
         // This function expects 1 based indices for iat and ja as in fortran
         compute_local_fsai(nthread, n_step, step_size, tau, eps,
                            nrows, nrows_M, nterm_M,
-                           iat_M_vec.data(),
-                           ja_M_vec.data(),
-                           coef_M_vec.data(),
+                           iat_M,
+                           ja_M,
+                           coef_M,
                            &nterm_G_val,
                            iat_G_vec.data(),
                            ja_G_vec.data(),
