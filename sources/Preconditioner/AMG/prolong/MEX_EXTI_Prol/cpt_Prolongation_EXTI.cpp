@@ -37,12 +37,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("EXTI_Prol:computeError", "EXTI_prolongation failed with error %d.", ierr);
     }
 
-    plhs[0] = mxCreateSparse(static_cast<mwSize>(nn_I), static_cast<mwSize>(nc_I),
-                             static_cast<mwSize>(std::max(1, nt_I)), mxREAL);
-    mwIndex *jc = mxGetJc(plhs[0]);
-    mwIndex *ir = mxGetIr(plhs[0]);
-    double  *pr = mxGetDoubles(plhs[0]);
-
+    // Skip explicit zeros to match MATLAB sparse() and avoid downstream filter corruption
     if (nt_I > 0 && nc_I > 0 && nn_I > 0) {
         int nth_used = np;
         std::vector<int> thread_counts(static_cast<std::size_t>(np) * nc_I, 0);
@@ -60,7 +55,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             int r1 = static_cast<int>((static_cast<long long>(tid + 1) * nn_I) / nth);
             int *tc = &thread_counts[static_cast<std::size_t>(tid) * nc_I];
             for (int r = r0; r < r1; ++r) {
-                for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) tc[ja_I[k]]++;
+                for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) {
+                    if (coef_I[k] != 0.0) tc[ja_I[k]]++;
+                }
             }
             #pragma omp barrier
             #pragma omp for schedule(static)
@@ -73,25 +70,41 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 col_totals[c] = sum;
             }
         }
+
+        int nt_nz = 0;
+        for (int c = 0; c < nc_I; ++c) nt_nz += col_totals[c];
+
+        plhs[0] = mxCreateSparse(static_cast<mwSize>(nn_I), static_cast<mwSize>(nc_I),
+                                 static_cast<mwSize>(std::max(1, nt_nz)), mxREAL);
+        mwIndex *jc = mxGetJc(plhs[0]);
+        mwIndex *ir = mxGetIr(plhs[0]);
+        double  *pr = mxGetDoubles(plhs[0]);
+
         jc[0] = 0;
         for (int c = 0; c < nc_I; ++c) jc[c + 1] = jc[c] + static_cast<mwIndex>(col_totals[c]);
 
-        #pragma omp parallel num_threads(nth_used)
-        {
-            int tid = omp_get_thread_num();
-            int r0 = static_cast<int>((static_cast<long long>(tid) * nn_I) / nth_used);
-            int r1 = static_cast<int>((static_cast<long long>(tid + 1) * nn_I) / nth_used);
-            int *to = &thread_offsets[static_cast<std::size_t>(tid) * nc_I];
-            for (int c = 0; c < nc_I; ++c) to[c] += static_cast<int>(jc[c]);
-            for (int r = r0; r < r1; ++r) {
-                for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) {
-                    int dst = to[ja_I[k]]++;
-                    ir[dst] = static_cast<mwIndex>(r);
-                    pr[dst] = coef_I[k];
+        if (nt_nz > 0) {
+            #pragma omp parallel num_threads(nth_used)
+            {
+                int tid = omp_get_thread_num();
+                int r0 = static_cast<int>((static_cast<long long>(tid) * nn_I) / nth_used);
+                int r1 = static_cast<int>((static_cast<long long>(tid + 1) * nn_I) / nth_used);
+                int *to = &thread_offsets[static_cast<std::size_t>(tid) * nc_I];
+                for (int c = 0; c < nc_I; ++c) to[c] += static_cast<int>(jc[c]);
+                for (int r = r0; r < r1; ++r) {
+                    for (int k = iat_I[r]; k < iat_I[r + 1]; ++k) {
+                        double val = coef_I[k];
+                        if (val == 0.0) continue;
+                        int dst = to[ja_I[k]]++;
+                        ir[dst] = static_cast<mwIndex>(r);
+                        pr[dst] = val;
+                    }
                 }
             }
         }
     } else {
+        plhs[0] = mxCreateSparse(static_cast<mwSize>(nn_I), static_cast<mwSize>(nc_I), 1, mxREAL);
+        mwIndex *jc = mxGetJc(plhs[0]);
         for (int c = 0; c <= nc_I; ++c) jc[c] = 0;
     }
 
